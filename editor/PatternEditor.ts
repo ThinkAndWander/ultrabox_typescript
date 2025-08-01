@@ -1766,8 +1766,8 @@ export class PatternEditor {
                     const pattern: Pattern | null = this._doc.getCurrentPattern(this._barOffset);
                     if (pattern) {
                         const stretch = new ChangeStretchHorizontal(this._doc, pattern,
-                            this._selectionOriginalCoords.start, this._selectionOriginalCoords.end,
-                            this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd);
+                            this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd,
+                            this._selectionOriginalCoords.start, this._selectionOriginalCoords.end);
                         sequence.append(stretch);
                     }
                 }
@@ -1781,8 +1781,8 @@ export class PatternEditor {
                     const pattern: Pattern | null = this._doc.getCurrentPattern(this._barOffset);
                     if (pattern) {
                         const stretch = new ChangeStretchHorizontal(this._doc, pattern,
-                            this._selectionOriginalCoords.start, this._selectionOriginalCoords.end,
-                            this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd);
+                            this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd,
+                            this._selectionOriginalCoords.start, this._selectionOriginalCoords.end);
                         sequence.append(stretch);
                     }
                 }
