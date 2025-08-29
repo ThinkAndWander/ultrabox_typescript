@@ -531,6 +531,11 @@ export class PatternEditor {
         return this._cursor.valid && this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1 && this._doc.selection.patternSelectionEnd - 1.25 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternSelectionEnd + 3;
     }
 
+    /** Returns the current pitch under the cursor, intended for identifying mod channels. Returns undefined if it fails. */
+    public getCursorNotePitch(): number | undefined {
+        return this._cursor.curNote?.pitches[0] ?? undefined;
+    }
+
     private _findMousePitch(pixelY: number): number {
         return Math.max(0, Math.min(this._pitchCount - 1, this._pitchCount - (pixelY / this._pitchHeight))) + this._octaveOffset;
     }

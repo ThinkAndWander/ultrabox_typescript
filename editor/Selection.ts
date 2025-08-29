@@ -7,6 +7,7 @@ import { ChangeGroup } from "./Change";
 import { ColorConfig } from "./ColorConfig";
 import { ChangeTrackSelection, ChangeChannelBar, ChangeAddChannel, ChangeRemoveChannel, ChangeChannelOrder, ChangeDuplicateSelectedReusedPatterns, ChangeNoteAdded, ChangeNoteTruncate, ChangePatternNumbers, ChangePatternSelection, ChangeInsertBars, ChangeDeleteBars, ChangeEnsurePatternExists, ChangeNoteLength, ChangePaste, ChangeSetPatternInstruments, ChangeViewInstrument, ChangeModChannel, ChangeModInstrument, ChangeModSetting, ChangeModFilter, ChangePatternsPerChannel, ChangePatternRhythm, ChangePatternScale, ChangeTranspose, ChangeRhythm, comparePatternNotes, unionOfUsedNotes, generateScaleMap, discardInvalidPatternInstruments, patternsContainSameInstruments } from "./changes";
 import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeStretchHorizontal, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross } from "./changesNoteOps";
+import { PatternEditor } from "./PatternEditor";
 
 interface PatternCopy {
     instruments: number[];
@@ -971,7 +972,7 @@ export class Selection {
      * @param avgPitch If true, flattens notes without averaging their base pitch between all notes.
      * @param vol If true, flattens the volume to full (100%) which is considered the most useful behavior.
     */
-    public noteFlattenAcross(avgPitch?: boolean, vol?: boolean): void {
+    public noteFlattenAcross(editor: PatternEditor, avgPitch?: boolean, vol?: boolean): void {
         this._changeFlatten = new ChangeGroup();
 
         const x1 = (this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0);
@@ -986,19 +987,15 @@ export class Selection {
                     const note = pattern.notes[i];
                     if (note.end > x1 && note.start < x2) {
                         if (vol) {
-                            this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                this.stepAcrossPresets['volume alternate'] as IStepData
-                            ))
-
-                            /*if (this._doc.song.getChannelIsNoise(channelIndex)) {
-                                this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    this.stepAcrossPresets['volume max-min'] as IStepData
+                            if (this._doc.song.getChannelIsNoise(channelIndex)) {
+                                this._changeFlatten.append(new ChangeStepAcross(editor, this._doc, channelIndex, pattern,
+                                    { volAdd: { array: [1, 0], per: 'note' } }
                                 ))
                             } else {
-                                this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
+                                this._changeFlatten.append(new ChangeStepAcross(editor, this._doc, channelIndex, pattern,
                                     this.stepAcrossPresets['volume max'] as IStepData
                                 ))
-                            }*/
+                            }
                         } else {
                             this._changeFlatten.append(new ChangeStretchVerticalRelative(
                                 this._doc, channelIndex, pattern, 0, 0, avgPitch, note.start, note.end, bounds));
@@ -1049,39 +1046,35 @@ export class Selection {
     }
 
     // Presets for noteStepAcross.
-    private multWave = (freqFrom: number, freqTo: number, amplitude: number) => `(sin(pi/(${freqFrom} + num/len*(${freqTo}-${freqFrom})) * num)*${amplitude} + 1) / 2`;
-    private multStagger = (num1: number, t: number, num2: number, t2: number) => {
-        const arr = [];
-        for (let i = 0; i < t; i++) { arr[i] = num1; }
-        for (let i = 0; i < t2; i++) { arr[t+i] = num2; }
-        return arr;
-    }
-    private multRepeat = (array: number[], repeats: number, multFunc: (val: number, ind: number) => number) => {
-        const arr = [];
-        for (let i = 0; i < repeats; i++)
-            for (let j = 0; j < array.length; j++)
-                arr.push(multFunc(array[j], j));
-
-        return array;
-    }
-    private stepAcrossPresets = {
+    private multWave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
+    private expCurve = (len: number) => { const arr = []; for (let i = 0; i < len; i++) { arr.push((i/(len-1)) ** 2); } return arr; };
+    public stepAcrossPresets = {
         'fade in': { volMult: { array: [0, 1], per: 'time' } },
         'fade out': { volMult: { array: [1, 0], per: 'time' } },
-        'studio fade in': { volMult: { array: [0, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1], per: 'time' } },
-        'studio fade out': { volMult: { array: [1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0], per: 'time' } },
-        'volume up': { volAdd: { array: [1 / Config.noteSizeMax], per: 'note' }},
-        'volume down': { volAdd: { array: [-1 / Config.noteSizeMax], per: 'note' }},
-        'volume max': { volAdd: { array: [1], per: 'note', type: 'cycle' }},
-        'volume max-min': { volAdd: { array: [1, 0], per: 'note' } },
-        'invert volume': { volAdd: { array: ['1 - 2*x'], per: 'pin' }},
-        'wobble fast': { volMult: { array: [this.multWave(4, 4, 0.5)], per: 'time' }, insertPinsEvery: 1 },
-        'wobble med': { volMult: { array: [this.multWave(8, 8, 0.5)], per: 'time' }, insertPinsEvery: 1 },
-        'wobble slow': { volMult: { array: [this.multWave(16, 16, 0.5)], per: 'time' }, insertPinsEvery: 1 },
-        'wobble slow-fast': { volMult: { array: [this.multWave(16, 4, 0.5)], per: 'time' }, insertPinsEvery: 1 },
-        'volume alternate': { volAdd: { array: [1 / Config.noteSizeMax, -1 / Config.noteSizeMax], per: 'note', type: 'cycle' }},
-        'gain start': { volMult: { array: [2, 1], per: 'time' }},
-        'gain end': { volMult: { array: [1, 2], per: 'time' }},
-        'volume interrupt': { volMult: { array: ['floor(random() * 1.5 + 0.5) === 0 ? 0.5 : 1'], per: 'time' }, insertPinsEvery: 1 },
+        'studio fade in': { volMult: { array: this.expCurve(5), per: 'time' } },
+        'studio fade out': { volMult: { array: this.expCurve(5).reverse(), per: 'time' } },
+        'mod-studio fade in': { volMult: { array: ['pow(num / (len - 1), 2)'], per: 'time' } },
+        'mod-studio fade out': { volMult: { array: ['1 - pow(num / (len - 1), 2)'], per: 'time' } },
+        'volume up': { volAdd: { array: ['1 / (maxval - minval)'], per: 'note' } },
+        'volume down': { volAdd: { array: ['-1 / (maxval - minval)'], per: 'note' } },
+        'volume double': { volMult: { array: [2], per: 'note' } },
+        'volume halve': { volMult: { array: [0.5], per: 'note' } },
+        'max contrast': { volMult: { array: ['average + (x-average*((maxval - minval) / (maxval - biggest + smallest - minval))) - x'], per: 'pin' } },
+        'contrast up': { volMult: { array: ['average + (x-average*2) - x'], per: 'pin' } },
+        'contrast down': { volMult: { array: ['average + (x-average/2) - x'], per: 'pin' } },
+        'minimum contrast up': { volMult: { array: ['x < average ? average + (x-average/2) - x : x'], per: 'pin' } },
+        'maximum contrast down': { volMult: { array: ['x > average ? average + (x-average/2) - x : x'], per: 'pin' } },
+        'invert volume': { volAdd: { array: ['maxval - minval - num'], per: 'pin' }},
+        'gain start': { volAdd: { array: ['num === 0 ? (1 / (maxval - minval)) : 0'], per: 'time' }, volMult: { array: [2, 1], per: 'time' } },
+        'gain end': { volAdd: { array: ['num === 0 ? (1 / (maxval - minval)) : 0'], per: 'time' }, volMult: { array: [1, 2], per: 'time' } },
+        'volume alternate': { volAdd: { array: ['1 / (maxval - minval)', '-1 / (maxval - minval)'], per: 'note', type: 'cycle' } },
+        'volume interrupt': { volMult: { array: ['floor(random() * 1.5 + 0.5) === 0 ? 0.5 : 1'], per: 'time' } },
+        'volume max': { volAdd: { array: [1], per: 'note' } },
+        'wobble fast': { volMult: { array: [this.multWave(4, 4, 0.5)], per: 'time' } },
+        'wobble med': { volMult: { array: [this.multWave(8, 8, 0.5)], per: 'time' } },
+        'wobble slow': { volMult: { array: [this.multWave(16, 16, 0.5)], per: 'time' } },
+        'wobble slow-fast': { volMult: { array: [this.multWave(16, 4, 0.5)], per: 'time' } },
+        'pitch alternate': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } }
     }
 
     /** Cumulatively performs volume/pitch changes to existing and/or new pins.
@@ -1089,12 +1082,12 @@ export class Selection {
      * See the step function in changesNoteOps.ts.
      * @param data The arrays and how they interact.
     */
-    public noteStepAcross(data: (keyof typeof this.stepAcrossPresets | IStepData)): void {
+    public noteStepAcross(editor: PatternEditor, data: (keyof typeof this.stepAcrossPresets | IStepData)): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._changeNoteOperations.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
+                this._changeNoteOperations.append(new ChangeStepAcross(editor, this._doc, channelIndex, pattern,
                     typeof data !== 'string' ? data : this.stepAcrossPresets[data] as IStepData));
 			}
         }

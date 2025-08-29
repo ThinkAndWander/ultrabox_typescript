@@ -4,7 +4,7 @@ import { Slider } from "./HTMLWrapper";
 import { PatternEditor, SelectionMode } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
 
-const { button, div, label, input } = HTML;
+const { button, div, label, input, option, select } = HTML;
 
 type TipHandler = (tipName: string) => void;
 
@@ -37,8 +37,8 @@ export class EditorTabSelection {
     private _splitAcross : HTMLInputElement;
     private _splitLabel : HTMLDivElement;
     private _stepFunctionSelect: HTMLSelectElement;
+    private _function : HTMLButtonElement;
     
-
     constructor(doc: SongDocument, patternEditor: PatternEditor, tipHandler: TipHandler) {
         this._doc = doc;
         this._patternEditor = patternEditor;
@@ -70,7 +70,11 @@ export class EditorTabSelection {
         this._split = button({ class: "selectionOps-actionbutton noteOpSplit" });
         this._splitLabel = div({ class: "tip", onclick: () => tipHandler("selectionSplit") }, "");
         this._splitDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
-        this._stepFunctionSelect = buildOptions(select(), Config.chipWaves.map(wave => wave.name));
+
+        this._stepFunctionSelect = select();
+        (Object.keys(this._doc.selection.stepAcrossPresets) as (keyof typeof this._doc.selection.stepAcrossPresets)[])
+            .forEach((key) => this._stepFunctionSelect.appendChild(option({value: key}, key)))
+        this._function = button({ class: "selectionOps-actionbutton noteOpFunction" });
 
         this._splitSliderInputBox = input({ type: "number", step: "1", min: 1, max: Math.floor(this._doc.song.partsPerPattern / 2), value: "1" });
         this._splitSlider = new Slider(
@@ -85,7 +89,7 @@ export class EditorTabSelection {
                 label({ class: "checkbox-container" }, this._splitAcross, "Across"),
                 label({ class: "checkbox-container" }, this._splitAbsolute, "Absolute")));
 
-        const _selectionOpsRow1 = [
+        const _selectionOps = [
             div({ class: "selectionOps-action"},
                 this._merge,
                 div({ class: "tip", onclick: () => tipHandler("selectionMerge") }, "Merge"),
@@ -97,10 +101,7 @@ export class EditorTabSelection {
             div({ class: "selectionOps-action"},
                 this._spread,
                 div({ class: "tip", onclick: () => tipHandler("selectionSpread") }, "Spread"),
-                label({ class: "checkbox-container" }, this._spreadPitch, "Pitch"))
-        ];
-
-        const _selectionOpsRow2 = [
+                label({ class: "checkbox-container" }, this._spreadPitch, "Pitch")),
             div({ class: "selectionOps-action"},
                 this._mirrorH,
                 this._mirrorV,
@@ -109,15 +110,17 @@ export class EditorTabSelection {
                 this._flatten,
                 div({ class: "tip", onclick: () => tipHandler("selectionFlatten") }, "Flatten"),
                 label({ class: "checkbox-container" }, this._flattenPitch, "Pitch"),
-                label({ class: "checkbox-container" }, this._flattenVolume, "Vol"))
-        ];
-
-        const _selectionOpsRow3 = [
+                label({ class: "checkbox-container" }, this._flattenVolume, "Vol")),
             div({ class: "selectionOps-action"},
                 this._split,
                 this._splitLabel,
                 this._splitDropdown),
-            this._splitDropdownGroup
+            this._splitDropdownGroup,
+            div({ class: "selectionOps-action"},
+                this._function,
+                div({ class: "tip", onclick: () => tipHandler("selectionFunction") }, "Function"),
+                div({ class: "selectContainer" }, this._stepFunctionSelect)
+            )
         ];
 
         _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Move));
@@ -126,7 +129,7 @@ export class EditorTabSelection {
             this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none")
         });
 
-        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split]
+        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split, this._function]
             .forEach((o) => o.addEventListener("click", this._whenSettingButtonClicked));
 
         this._splitSliderInputBox.addEventListener("input", this._updateSplitSliderParts(this._splitSliderInputBox));
@@ -140,9 +143,7 @@ export class EditorTabSelection {
             _selectionOpsDescription,
             this._selectionModeLabel,
             _selectionModeButtonsGroup,
-            ..._selectionOpsRow1,
-            ..._selectionOpsRow2,
-            ..._selectionOpsRow3);
+            ..._selectionOps);
     }
 
     private _whenSelectionModeChanged = (type: SelectionMode): void => {
@@ -169,7 +170,7 @@ export class EditorTabSelection {
         } else if (event.target === this._spread) {
             this._doc.selection.noteSpreadAcross(this._spreadPitch.checked);
         } else if (event.target === this._flatten) {
-            this._doc.selection.noteFlattenAcross(!this._flattenPitch.checked, this._flattenVolume.checked);
+            this._doc.selection.noteFlattenAcross(this._patternEditor, !this._flattenPitch.checked, this._flattenVolume.checked);
         } else if (event.target === this._mirrorH) {
             this._doc.selection.noteMirrorAcross(false);
         } else if (event.target === this._mirrorV) {
@@ -177,6 +178,11 @@ export class EditorTabSelection {
         } else if (event.target === this._split) {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked)
+        } else if (event.target === this._function) {
+            const preset = this._stepFunctionSelect.value as keyof typeof this._doc.selection.stepAcrossPresets;
+            if (this._doc.selection.stepAcrossPresets[preset]) {
+                this._doc.selection.noteStepAcross(this._patternEditor, preset);
+            }
         }
     }
 
