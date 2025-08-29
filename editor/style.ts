@@ -170,6 +170,9 @@ document.head.appendChild(HTML.style({ type: "text/css" }, `
 		<path d="M2.960992,16C2.960992,16 14.022811,16 14.022811,16 " transform="matrix(0.40696532,0,0,1,18.293202099,-5.857204894)" fill="none" stroke="${ColorConfig.primaryText}" stroke-width="2"/> \
 		<path d="M2.960992,16C2.960992,16 14.022811,16 14.022811,16 " transform="matrix(0,1.69800195,-1,0,34.418809989,-3.66298398)" fill="none" stroke="${ColorConfig.primaryText}" stroke-dasharray="1"/> \
 	</svg>'));
+	--internal-note-function-symbol: var(--note-function-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"> \
+		<path d="M19.440698,12C19.440698,12 4.559302,20.591778 4.559302,20.591778 C4.559302,20.591778 4.559302,3.408222 4.559302,3.408222 C4.559302,3.408222 19.440698,12 19.440698,12 Z" fill="${ColorConfig.primaryText}"/> \
+	</svg>'));
 }
 
 html {
@@ -347,6 +350,7 @@ input.tab-settings-radio + div {
 .beepboxEditor .noteOpFlatten { background-image: var(--internal-note-flatten-symbol) !important; }
 .beepboxEditor .noteOpMirror { background-image: var(--internal-note-mirror-symbol) !important; }
 .beepboxEditor .noteOpSplit { background-image: var(--internal-note-split-symbol) !important; }
+.beepboxEditor .noteOpFunction { background-image: var(--internal-note-function-symbol) !important; }
 
 .beepboxEditor div.selectionOps-action label {
     padding-left: 0.3rem;

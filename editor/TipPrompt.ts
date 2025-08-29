@@ -5,7 +5,7 @@ import { Prompt } from "./Prompt";
 import { SongDocument } from "./SongDocument";
 import { Config } from "../synth/SynthConfig";
 
-const { button, div, p, h2, h3 } = HTML;
+const { button, div, p, span, h2, h3, ul, li } = HTML;
 
 export class TipPrompt implements Prompt {
 		private readonly _closeButton: HTMLButtonElement = button({class: "cancelButton"});
@@ -67,6 +67,27 @@ export class TipPrompt implements Prompt {
 					p("This makes a number of evenly-spaced cuts across the selected range, which separate notes."),
 					p("Split affects on-screen notes that fit within your selection. It also works across channel selections.")
 				);
+			} break;
+			case "selectionFunction": {
+				message = div(
+					h2("Function"),
+					p("This makes edits, like wobbles, that affect things like volume and pitch, or values in a mod channel. The presets are:"),
+					ul(li(
+						span({ style: "font-weight: bold" }, "Invert "),
+						span("flips the value across its range. It has no settings. This makes unique effects with fades and overlapping uninverted versions.")
+					), li(
+						span({ style: "font-weight: bold" }, "Stagger"),
+						span("alternates between two sets of changes to apply to the value. You can change how long the sets last before switching to the other. This is good for on/off patterns in music.")
+					), li(
+						span({ style: "font-weight: bold" }, "Ramp"),
+						span("moves from one set of changes to another as it moves across values. You can also get jagged ramps by rounding. This is good for custom fades and gains.")
+					)), li(
+						span({ style: "font-weight: bold" }, "Wave"),
+						span("wobbles the values along a wave, between two sets of changes (one for wave peaks, and one for troughs) with start and end amplitudes and frequencies. Try wobbling volumes as an example!")
+					), li(
+						span({ style: "font-weight: bold" }, "Custom"),
+						span("lets you perform arbitrary functions by giving values (numbers or math) and how to apply them. Values are separated by commas like 5, 4, x + 1. Math is allowed and you can use anything in the javascript Math object, like 'round(3.3)'. ")
+					))
 			} break;
 			case "key": {
 				message = div(
