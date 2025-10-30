@@ -37,7 +37,7 @@ export class EditorTabSelection {
     private _splitAcross : HTMLInputElement;
     private _splitLabel : HTMLDivElement;
     private _stepFunctionSelect: HTMLSelectElement;
-    private _function : HTMLButtonElement;
+    private _stepFunction : HTMLButtonElement;
     
     constructor(doc: SongDocument, patternEditor: PatternEditor, tipHandler: TipHandler) {
         this._doc = doc;
@@ -74,7 +74,7 @@ export class EditorTabSelection {
         this._stepFunctionSelect = select();
         (Object.keys(this._doc.selection.stepAcrossPresets) as (keyof typeof this._doc.selection.stepAcrossPresets)[])
             .forEach((key) => this._stepFunctionSelect.appendChild(option({value: key}, key)))
-        this._function = button({ class: "selectionOps-actionbutton noteOpFunction" });
+        this._stepFunction = button({ class: "selectionOps-actionbutton noteOpFunction" });
 
         this._splitSliderInputBox = input({ type: "number", step: "1", min: 1, max: Math.floor(this._doc.song.partsPerPattern / 2), value: "1" });
         this._splitSlider = new Slider(
@@ -117,7 +117,7 @@ export class EditorTabSelection {
                 this._splitDropdown),
             this._splitDropdownGroup,
             div({ class: "selectionOps-action"},
-                this._function,
+                this._stepFunction,
                 div({ class: "tip", onclick: () => tipHandler("selectionFunction") }, "Function"),
                 div({ class: "selectContainer" }, this._stepFunctionSelect)
             )
@@ -129,7 +129,7 @@ export class EditorTabSelection {
             this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none")
         });
 
-        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split, this._function]
+        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split, this._stepFunction]
             .forEach((o) => o.addEventListener("click", this._whenSettingButtonClicked));
 
         this._splitSliderInputBox.addEventListener("input", this._updateSplitSliderParts(this._splitSliderInputBox));
@@ -178,7 +178,7 @@ export class EditorTabSelection {
         } else if (event.target === this._split) {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked)
-        } else if (event.target === this._function) {
+        } else if (event.target === this._stepFunction) {
             const preset = this._stepFunctionSelect.value as keyof typeof this._doc.selection.stepAcrossPresets;
             if (this._doc.selection.stepAcrossPresets[preset]) {
                 this._doc.selection.noteStepAcross(this._patternEditor, preset);
