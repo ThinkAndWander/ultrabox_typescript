@@ -348,7 +348,7 @@ export class ChangeStackLeftAcross extends ChangeSequence {
 export interface IStepArray {
     array: (number|string)[]
     type?: 'normal'|'step'|'cycle' // across-lerp is default
-    per?: 'note'|'pin'|'time' // note is default. Pin doesn't work for pitch arrays.
+    per?: 'note'|'pin'|'time' // note is default. Pin has no effect for pitch arrays.
 }
 
 /** Represents the full options set of ChangeStepAcross for all arrays and their metadata, refer to function.
@@ -433,8 +433,10 @@ export class ChangeStepAcross extends ChangeSequence {
                             : match === 'x' ? String(val) : match === 'num' ? String(index)
                             : match === 'len' ? String(endNum === 0 ? 1 : endNum)
                             : match === 'maxval' ? String(maxVolume) : match === 'minval' ? String(minVolume)
-                            : match === 'smallest' ? String(info.min / maxVolume) : match === 'biggest' ? String(info.max / maxVolume)
-                            : match === 'average' ? String(info.avg / maxVolume) : match === 'prev' ? String(info.prevVal / maxVolume)
+                            : match === 'smallest' ? String(info.min / (maxVolume - minVolume))
+							: match === 'biggest' ? String(info.max / (maxVolume - minVolume))
+                            : match === 'average' ? String(info.avg / (maxVolume - minVolume))
+							: match === 'prev' ? String(info.prevVal / (maxVolume - minVolume))
                             : ''});
                 entry = entry.replaceAll(matchNotWhitelist, ''); // symbols except +-*/?:!()%&|. Clears () and =>
                 entry = +(Function('return ' + entry)()); // Execute. Same as eval without the warning
@@ -536,8 +538,10 @@ export class ChangeStepAcross extends ChangeSequence {
                     ratios = [noteRatio, notePinOrPitchRatio, timeRatio];
     
                     noteData.prevVal = (j !== 0) ? note.pins[j - 1].size : -1;
-                    volMultValue = getArrayValue(note.pins[j].size / volRange, j, ratios, endNums, data.volMult, noteData) ?? volMultValue;
-                    volAddValue = getArrayValue(note.pins[j].size / volRange, j, ratios, endNums, data.volAdd, noteData) ?? volAddValue;
+                    volMultValue = getArrayValue(note.pins[j].size / volRange,
+						data.volMult?.per === 'note' ? i - firstIndex : j, ratios, endNums, data.volMult, noteData) ?? volMultValue;
+                    volAddValue = getArrayValue(note.pins[j].size / volRange,
+						data.volAdd?.per === 'note' ? i - firstIndex : j, ratios, endNums, data.volAdd, noteData) ?? volAddValue;
     
                     // Perform. Note that mod channels express pins in the range 0 to MIN+MAX instead of -MIN to +MAX.
                     note.pins[j].size *= volMultValue;
@@ -555,8 +559,10 @@ export class ChangeStepAcross extends ChangeSequence {
                     notePinOrPitchRatio = j / endNums[1];
                     ratios = [noteRatio, notePinOrPitchRatio, timeRatio];
     
-                    pitchMultValue = getArrayValue(note.pitches[j], j, ratios, endNums, data.pitchMult, noteData) ?? pitchMultValue;
-                    pitchAddValue = getArrayValue(note.pitches[j], j, ratios, endNums, data.pitchAdd, noteData) ?? pitchAddValue;
+                    pitchMultValue = getArrayValue(note.pitches[j],
+						data.pitchMult?.per === 'note' ? i - firstIndex : j, ratios, endNums, data.pitchMult, noteData) ?? pitchMultValue;
+                    pitchAddValue = getArrayValue(note.pitches[j],
+						data.pitchAdd?.per === 'note' ? i - firstIndex : j, ratios, endNums, data.pitchAdd, noteData) ?? pitchAddValue;
     
                     // Perform.
                     note.pitches[j] = note.pitches[j] * pitchMultValue;
