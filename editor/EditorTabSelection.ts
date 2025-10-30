@@ -38,7 +38,19 @@ export class EditorTabSelection {
     private _splitLabel : HTMLDivElement;
     private _stepFunctionSelect: HTMLSelectElement;
     private _stepFunction : HTMLButtonElement;
-    
+	private _volDropdown: HTMLButtonElement;
+	private _volDropdownGroup: HTMLDivElement;
+	private _volLabel: HTMLDivElement;
+	private _volUp: HTMLButtonElement;
+	private _volDown: HTMLButtonElement;
+	private _volFadeOut: HTMLButtonElement;
+	private _volFadeIn: HTMLButtonElement;
+	private _volGainEnd: HTMLButtonElement;
+	private _volGainStart: HTMLButtonElement;
+	private _volStudioFadeOut: HTMLButtonElement;
+	private _volStudioFadeIn: HTMLButtonElement;
+	private _volContrastMax: HTMLButtonElement;
+	
     constructor(doc: SongDocument, patternEditor: PatternEditor, tipHandler: TipHandler) {
         this._doc = doc;
         this._patternEditor = patternEditor;
@@ -70,6 +82,17 @@ export class EditorTabSelection {
         this._split = button({ class: "selectionOps-actionbutton noteOpSplit" });
         this._splitLabel = div({ class: "tip", onclick: () => tipHandler("selectionSplit") }, "");
         this._splitDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
+		this._volLabel = div({ class: "tip", onclick: () => tipHandler("selectionVolOps") }, "vol");
+		this._volDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
+		this._volUp = button({ class: "selectionOps-actionbutton noteOpVolChange" });
+		this._volDown = button({ class: "selectionOps-actionbutton noteOpVolChange", style: 'transform: scaleY(-1);' });
+		this._volFadeOut = button({ class: "selectionOps-actionbutton noteOpVolFade" });
+		this._volFadeIn = button({ class: "selectionOps-actionbutton noteOpVolFade", style: 'transform: scaleX(-1);' });
+		this._volGainEnd = button({ class: "selectionOps-actionbutton noteOpVolGain" });
+		this._volGainStart = button({ class: "selectionOps-actionbutton noteOpVolGain", style: 'transform: scaleX(-1);' });
+		this._volStudioFadeOut = button({ class: "selectionOps-actionbutton noteOpVolCrossfade" });
+		this._volStudioFadeIn = button({ class: "selectionOps-actionbutton noteOpVolCrossfade", style: 'transform: scaleX(-1);' });
+		this._volContrastMax = button({ class: "selectionOps-actionbutton noteOpVolContrastMax" });
 
         this._stepFunctionSelect = select();
         (Object.keys(this._doc.selection.stepAcrossPresets) as (keyof typeof this._doc.selection.stepAcrossPresets)[])
@@ -88,6 +111,14 @@ export class EditorTabSelection {
             div({ class: "selectionOps-row-inside"},
                 label({ class: "checkbox-container" }, this._splitAcross, "Across"),
                 label({ class: "checkbox-container" }, this._splitAbsolute, "Absolute")));
+
+		this._volDropdownGroup = div({ class: "editor-controls", style: "display: none;" },
+            div({ class: "selectionOps-action"},
+                this. _volGainEnd,
+				this._volGainStart,
+				this._volStudioFadeOut,
+				this._volStudioFadeIn,
+				this._volContrastMax));
 
         const _selectionOps = [
             div({ class: "selectionOps-action"},
@@ -116,6 +147,14 @@ export class EditorTabSelection {
                 this._splitLabel,
                 this._splitDropdown),
             this._splitDropdownGroup,
+			div({ class: "selectionOps-action"},
+                this._volUp,
+                this._volDown,
+				this._volFadeOut,
+				this._volFadeIn,
+				this._volLabel,
+                this._volDropdown),
+			this._volDropdownGroup,
             div({ class: "selectionOps-action"},
                 this._stepFunction,
                 div({ class: "tip", onclick: () => tipHandler("selectionFunction") }, "Function"),
@@ -126,10 +165,16 @@ export class EditorTabSelection {
         _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Move));
         _selectionModeBtnStretch.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Stretch));
         this._splitDropdown.addEventListener("click", () => {
-            this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none")
+            this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none");
         });
+		this._volDropdown.addEventListener("click", () => {
+			this._volDropdownGroup.style.display = (this._volDropdownGroup.style.display === "none" ? "" : "none");
+		});
 
-        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split, this._stepFunction]
+        [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split,
+			this._volUp, this._volDown, this._volFadeOut, this._volFadeIn,
+			this._volGainEnd, this._volGainStart, this._volStudioFadeOut, this._volStudioFadeIn, this._volContrastMax,
+			this._stepFunction]
             .forEach((o) => o.addEventListener("click", this._whenSettingButtonClicked));
 
         this._splitSliderInputBox.addEventListener("input", this._updateSplitSliderParts(this._splitSliderInputBox));
@@ -178,7 +223,25 @@ export class EditorTabSelection {
         } else if (event.target === this._split) {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked)
-        } else if (event.target === this._stepFunction) {
+        } else if (event.target === this._volUp) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'volume double');
+		} else if (event.target === this._volDown) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'volume halve');
+		} else if (event.target === this._volFadeOut) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'fade out');
+		} else if (event.target === this._volFadeIn) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'fade in');
+		} else if (event.target === this._volGainEnd) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'gain end');
+		} else if (event.target === this._volGainStart) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'gain start');
+		} else if (event.target === this._volStudioFadeOut) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'studio fade out'); // TODO: replace with mod version for mod channels!
+		} else if (event.target === this._volStudioFadeIn) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'studio fade in'); // TODO: replace with mod version for mod channels!
+		} else if (event.target === this._volContrastMax) {
+			this._doc.selection.noteStepAcross(this._patternEditor, 'max contrast');
+		} else if (event.target === this._stepFunction) {
             const preset = this._stepFunctionSelect.value as keyof typeof this._doc.selection.stepAcrossPresets;
             if (this._doc.selection.stepAcrossPresets[preset]) {
                 this._doc.selection.noteStepAcross(this._patternEditor, preset);
