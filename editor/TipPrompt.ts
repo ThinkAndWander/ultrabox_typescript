@@ -68,6 +68,21 @@ export class TipPrompt implements Prompt {
 					p("Split affects on-screen notes that fit within your selection. It also works across channel selections.")
 				);
 			} break;
+			case "selectionVolOps": {
+				message = div(
+					h2("Volume operations"),
+					p("These buttons adjust volume for the whole pattern, or the selection, even selections that include parts of notes."),
+					p("These are the operations in order from top-left to bottom-right:"),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume up/down "),
+					div("Doubles or halves the volume"),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume fade out/in "),
+					div("Fade the selection to zero at the end or start"),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume gain end/start "),
+					div("Doubles volume of the selection at the end or start (opposite of fade)"),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume studio fade out/in "),
+					div("Like the volume fade operations, but with a quadratic curve so the fade is strong at the center, gradual at the ends")
+				);
+			} break;
 			case "selectionFunction": {
 				message = div(
 					h2("Function"),

@@ -170,6 +170,25 @@ document.head.appendChild(HTML.style({ type: "text/css" }, `
 		<path d="M2.960992,16C2.960992,16 14.022811,16 14.022811,16 " transform="matrix(0.40696532,0,0,1,18.293202099,-5.857204894)" fill="none" stroke="${ColorConfig.primaryText}" stroke-width="2"/> \
 		<path d="M2.960992,16C2.960992,16 14.022811,16 14.022811,16 " transform="matrix(0,1.69800195,-1,0,34.418809989,-3.66298398)" fill="none" stroke="${ColorConfig.primaryText}" stroke-dasharray="1"/> \
 	</svg>'));
+	--internal-note-volchange-symbol: var(--note-volchange-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
+		<path fill="none" stroke="${ColorConfig.primaryText}" stroke-width="2" d="m5.48 13.713 7.426-7.426M18.946 13.713 11.52 6.287"/> \
+	</svg>'));
+	--internal-note-volfade-symbol: var(--note-volfade-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
+		<path fill="${ColorConfig.primaryText}" d="M2.6 21.4V2.6l18.8 18.8H2.6Z"/> \
+	</svg>'));
+	--internal-note-volgain-symbol: var(--note-volgain-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
+		<path fill="${ColorConfig.primaryText}" d="M2.6 21.4V2.6l18.8 18.8H2.6Z"/> \
+		<path fill="none" stroke="${ColorConfig.primaryText}" stroke-width="1.2569" d="m12 9.054 4.667-4.667M20.463 9.054l-4.667-4.667"/> \
+	</svg>'));
+	--internal-note-volcrossfade-symbol: var(--note-volcrossfade-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
+		<path fill="${ColorConfig.primaryText}" d="M2.6 21.4V2.6s.381 1.832.48 2.24C6.531 19.128 21.4 21.4 21.4 21.4H2.6Z"/> \
+	</svg>'));
+	--internal-note-volcontrastmax-symbol: var(--note-volcontrastmax-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
+		<path fill="${ColorConfig.primaryText}" stroke-width="1.2569" d="m16.231 11.814-4.667-4.667M7.769 11.814l4.667-4.667"/> \
+		<path fill="none" stroke="${ColorConfig.primaryText}" d="M3.68 19S7.9 14.36 12 14.36c4.22 0 8.32 4.64 8.32 4.64"/> \
+		<path fill="none" stroke="${ColorConfig.primaryText}" d="M1.36 14h21.28"/> \
+		<path fill="none" stroke="${ColorConfig.primaryText}" stroke-width="1.2569" d="m16.231 7.814-4.667-4.667M7.769 7.814l4.667-4.667"/> \
+	</svg>'));
 	--internal-note-function-symbol: var(--note-function-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"> \
 		<path d="M19.440698,12C19.440698,12 4.559302,20.591778 4.559302,20.591778 C4.559302,20.591778 4.559302,3.408222 4.559302,3.408222 C4.559302,3.408222 19.440698,12 19.440698,12 Z" fill="${ColorConfig.primaryText}"/> \
 	</svg>'));
@@ -351,6 +370,11 @@ input.tab-settings-radio + div {
 .beepboxEditor .noteOpMirror { background-image: var(--internal-note-mirror-symbol) !important; }
 .beepboxEditor .noteOpSplit { background-image: var(--internal-note-split-symbol) !important; }
 .beepboxEditor .noteOpFunction { background-image: var(--internal-note-function-symbol) !important; }
+.beepboxEditor .noteOpVolChange { background-image: var(--internal-note-volchange-symbol) !important; }
+.beepboxEditor .noteOpVolFade { background-image: var(--internal-note-volfade-symbol) !important; }
+.beepboxEditor .noteOpVolGain { background-image: var(--internal-note-volgain-symbol) !important; }
+.beepboxEditor .noteOpVolCrossfade { background-image: var(--internal-note-volcrossfade-symbol) !important; }
+.beepboxEditor .noteOpVolContrastMax { background-image: var(--internal-note-volcontrastmax-symbol) !important; }
 
 .beepboxEditor div.selectionOps-action label {
     padding-left: 0.3rem;
