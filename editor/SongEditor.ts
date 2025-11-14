@@ -3796,6 +3796,17 @@ export class SongEditor {
             return;
         }
 
+		// Defer to any active input element.
+		if (document.activeElement?.tagName === "INPUT" && document.activeElement?.attributes.getNamedItem("type")?.value === "text") {
+			// Enter/esc returns focus to form
+            if (event.keyCode == 13 || event.keyCode == 27) {
+                this.mainLayer.focus();
+                this._patternEditor.stopEditingModLabel(event.keyCode == 27);
+            }
+
+			return;
+		}
+
         // Defer to actively editing song title, channel name, or mod label
         if (document.activeElement == this._songTitleInputBox.input || this._patternEditor.editingModLabel || document.activeElement == this._muteEditor._channelNameInput.input) {
             // Enter/esc returns focus to form
@@ -3825,7 +3836,7 @@ export class SongEditor {
                     || document.activeElement == this._unisonExpressionInputBox
                     || document.activeElement == this._unisonSignInputBox
 
-                ) {
+		) {
             // Enter/esc returns focus to form
             if (event.keyCode == 13 || event.keyCode == 27) {
                 this.mainLayer.focus();

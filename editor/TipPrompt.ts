@@ -73,13 +73,13 @@ export class TipPrompt implements Prompt {
 					h2("Volume operations"),
 					p("These buttons adjust volume for the whole pattern, or the selection, even selections that include parts of notes."),
 					p("These are the operations in order from top-left to bottom-right:"),
-					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume up/down "),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume up/down"),
 					div("Doubles or halves the volume"),
-					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume fade out/in "),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume fade out/in"),
 					div("Fade the selection to zero at the end or start"),
-					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume gain end/start "),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume gain end/start"),
 					div("Doubles volume of the selection at the end or start (opposite of fade)"),
-					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume studio fade out/in "),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Volume studio fade out/in"),
 					div("Like the volume fade operations, but with a quadratic curve so the fade is strong at the center, gradual at the ends")
 				);
 			} break;
@@ -87,22 +87,17 @@ export class TipPrompt implements Prompt {
 				message = div(
 					h2("Function"),
 					p("This makes edits, like wobbles, that affect things like volume and pitch, or values in a mod channel. The presets are:"),
-					ul(li(
-						span({ style: "font-weight: bold" }, "Invert "),
-						span("flips the value across its range. It has no settings. This makes unique effects with fades and overlapping uninverted versions.")
-					), li(
-						span({ style: "font-weight: bold" }, "Stagger"),
-						span("alternates between two sets of changes to apply to the value. You can change how long the sets last before switching to the other. This is good for on/off patterns in music.")
-					), li(
-						span({ style: "font-weight: bold" }, "Ramp"),
-						span("moves from one set of changes to another as it moves across values. You can also get jagged ramps by rounding. This is good for custom fades and gains.")
-					)), li(
-						span({ style: "font-weight: bold" }, "Wave"),
-						span("wobbles the values along a wave, between two sets of changes (one for wave peaks, and one for troughs) with start and end amplitudes and frequencies. Try wobbling volumes as an example!")
-					), li(
-						span({ style: "font-weight: bold" }, "Custom"),
-						span("lets you perform arbitrary functions by giving values (numbers or math) and how to apply them. Values are separated by commas like 5, 4, x + 1. Math is allowed and you can use anything in the javascript Math object, like 'round(3.3)'. ")
-					))
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Invert"),
+					div("flips the value across its range. It has no settings. This makes unique effects with fades and overlapping uninverted versions."),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Stagger"),
+					div("alternates between two sets of changes to apply to the value. You can change how long the sets last before switching to the other. This is good for on/off patterns in music."),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Ramp"),
+					div("moves from one set of changes to another as it moves across values. You can also get jagged ramps by rounding. This is good for custom fades and gains."),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Wave"),
+					div("wobbles the values along a wave, between two sets of changes (one for wave peaks, and one for troughs) with start and end amplitudes and frequencies. Try wobbling volumes as an example!"),
+					div({ style: "font-weight: bold; padding-top: 12px" }, "Custom"),
+					div("lets you perform arbitrary functions by giving values (numbers or math) and how to apply them. Values are separated by commas like 5, 4, x + 1. Math is allowed and you can use anything in the javascript Math object, like 'round(3.3)'.")
+				)
 			} break;
 			case "key": {
 				message = div(

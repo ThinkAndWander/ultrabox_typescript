@@ -184,10 +184,11 @@ document.head.appendChild(HTML.style({ type: "text/css" }, `
 		<path fill="${ColorConfig.primaryText}" d="M2.6 21.4V2.6s.381 1.832.48 2.24C6.531 19.128 21.4 21.4 21.4 21.4H2.6Z"/> \
 	</svg>'));
 	--internal-note-volcontrastmax-symbol: var(--note-volcontrastmax-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"> \
-		<path fill="${ColorConfig.primaryText}" stroke-width="1.2569" d="m16.231 11.814-4.667-4.667M7.769 11.814l4.667-4.667"/> \
-		<path fill="none" stroke="${ColorConfig.primaryText}" d="M3.68 19S7.9 14.36 12 14.36c4.22 0 8.32 4.64 8.32 4.64"/> \
-		<path fill="none" stroke="${ColorConfig.primaryText}" d="M1.36 14h21.28"/> \
-		<path fill="none" stroke="${ColorConfig.primaryText}" stroke-width="1.2569" d="m16.231 7.814-4.667-4.667M7.769 7.814l4.667-4.667"/> \
+	<g fill="none" stroke="${ColorConfig.primaryText}" stroke-width="2"> \
+	<path stroke-width="1.2569" d="m16.231 11.814-4.667-4.667M7.769 11.814l4.667-4.667"/></g> \
+	<path fill="${ColorConfig.primaryText}" d="M3.68 19S7.9 14.36 12 14.36c4.22 0 8.32 4.64 8.32 4.64M1.36 14h21.28"/> \
+	<g fill="none" stroke="${ColorConfig.primaryText}" stroke-width="2"> \
+	<path stroke-width="1.2569" d="m16.231 7.814-4.667-4.667M7.769 7.814l4.667-4.667"/></g> \
 	</svg>'));
 	--internal-note-function-symbol: var(--note-function-symbol, url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"> \
 		<path d="M19.440698,12C19.440698,12 4.559302,20.591778 4.559302,20.591778 C4.559302,20.591778 4.559302,3.408222 4.559302,3.408222 C4.559302,3.408222 19.440698,12 19.440698,12 Z" fill="${ColorConfig.primaryText}"/> \
@@ -331,6 +332,10 @@ input.tab-settings-radio + div {
 	font-size: 1.5rem;
 }
 
+.beepboxEditor .inlineblock {
+    display: inline-block;
+}
+
 .beepboxEditor div.selectionOps-row-inside {
     display: flex;
 }
@@ -351,6 +356,11 @@ input.tab-settings-radio + div {
 
 .beepboxEditor button.selectionOps-actionbutton:focus {
     background-color: ${ColorConfig.uiWidgetFocus}
+}
+
+.beepboxEditor button.selectionOps-actionbutton:disabled {
+	opacity: 0.5;
+	pointer-events: none;
 }
 
 .beepboxEditor button.selectionOps-actionbutton + .tip,
@@ -378,6 +388,10 @@ input.tab-settings-radio + div {
 
 .beepboxEditor div.selectionOps-action label {
     padding-left: 0.3rem;
+}
+
+.selectionOps-textbox {
+    width: 94%;
 }
 
 .trackAndMuteContainer {
@@ -925,6 +939,7 @@ input.tab-settings-radio + div {
 .beepboxEditor .selectContainer {
 	position: relative;
 }
+
 .beepboxEditor .selectContainer:not(.menu)::after {
 	content: "";
 	flex-shrink: 0;
