@@ -1074,7 +1074,7 @@ export class Selection {
         'wobble slow': { volMult: { array: [this.multWave(16, 16, 0.5)], per: 'time' } },
         'wobble slow-fast': { volMult: { array: [this.multWave(16, 4, 0.5)], per: 'time' } },
         'nonmod pitch alternate': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } }
-    }
+    } satisfies { [key: string]: IStepData };
 
     /** Cumulatively performs volume/pitch changes to existing and/or new pins.
      * 

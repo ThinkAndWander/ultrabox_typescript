@@ -3,10 +3,19 @@ import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Slider } from "./HTMLWrapper";
 import { PatternEditor, SelectionMode } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
+import { IStepData } from "./changesNoteOps";
 
 const { button, div, label, input, option, select } = HTML;
 
 type TipHandler = (tipName: string) => void;
+type stepFunctionCategoriesType = 'Choose...' | 'Invert' | 'Stagger' | 'Ramp' | 'Wave' | 'Custom';
+const stepFunctionCategories: { [key: string]: stepFunctionCategoriesType } = {
+    Invert: 'Invert',
+    Stagger: 'Stagger',
+    Ramp: 'Ramp',
+    Wave: 'Wave',
+    Custom: 'Custom'
+};
 
 /** This contains the controls for the Selection tab in the song editor. */
 export class EditorTabSelection {
@@ -14,6 +23,7 @@ export class EditorTabSelection {
 
     private _doc: SongDocument;
     private _patternEditor: PatternEditor;
+    private _tipHandler: TipHandler;
     private _selectionModeMoveLabel: HTMLDivElement;
     private _selectionModeStretchLabel : HTMLDivElement;
     private _selectionModeLabel : HTMLDivElement;
@@ -37,7 +47,10 @@ export class EditorTabSelection {
     private _splitAcross : HTMLInputElement;
     private _splitLabel : HTMLDivElement;
     private _stepFunctionSelect: HTMLSelectElement;
-    private _stepFunction : HTMLButtonElement;
+    private _stepFunctionRun : HTMLButtonElement;
+    private _stepFunctionParameterGroup : HTMLDivElement;
+    private _stepFunction = () => {};
+    private _stepFunctionCurried = () => { this._stepFunction(); }
 	private _volDropdown: HTMLButtonElement;
 	private _volDropdownGroup: HTMLDivElement;
 	private _volLabel: HTMLDivElement;
@@ -54,10 +67,11 @@ export class EditorTabSelection {
     constructor(doc: SongDocument, patternEditor: PatternEditor, tipHandler: TipHandler) {
         this._doc = doc;
         this._patternEditor = patternEditor;
-        this._constructHTML(tipHandler);
+        this._tipHandler = tipHandler;
+        this._constructHTML();
     }
 
-    private _constructHTML(tipHandler: TipHandler) {
+    private _constructHTML() {
         const _selectionOpsDescription = div({ style: `padding: 3px 0; max-width: 15em; text-align: center; color: ${ColorConfig.secondaryText};` }, "Selection");
         this._selectionModeLabel = div({ style: `padding: 3px 0; color: ${ColorConfig.secondaryText};` }, "Move mode");
         const _selectionModeBtnMove = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
@@ -80,9 +94,9 @@ export class EditorTabSelection {
         this._flattenPitch = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._flattenVolume = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._split = button({ class: "selectionOps-actionbutton noteOpSplit" });
-        this._splitLabel = div({ class: "tip", onclick: () => tipHandler("selectionSplit") }, "");
+        this._splitLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionSplit") }, "");
         this._splitDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
-		this._volLabel = div({ class: "tip", onclick: () => tipHandler("selectionVolOps") }, "vol");
+		this._volLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionVolOps") }, "vol");
 		this._volDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
 		this._volUp = button({ class: "selectionOps-actionbutton noteOpVolChange" });
 		this._volDown = button({ class: "selectionOps-actionbutton noteOpVolChange", style: 'transform: scaleY(-1);' });
@@ -95,9 +109,14 @@ export class EditorTabSelection {
 		this._volContrastMax = button({ class: "selectionOps-actionbutton noteOpVolContrastMax" });
 
         this._stepFunctionSelect = select();
-        (Object.keys(this._doc.selection.stepAcrossPresets) as (keyof typeof this._doc.selection.stepAcrossPresets)[])
+        const defaultOption: stepFunctionCategoriesType = "Choose...";
+        this._stepFunctionSelect.appendChild(option({ value: defaultOption, selected: 'selected' }, defaultOption));
+        (Object.keys(stepFunctionCategories))
             .forEach((key) => this._stepFunctionSelect.appendChild(option({value: key}, key)))
-        this._stepFunction = button({ class: "selectionOps-actionbutton noteOpFunction" });
+        this._stepFunctionSelect.addEventListener('change', this._setStepFunction);
+        this._stepFunctionRun = button({ class: "selectionOps-actionbutton noteOpFunction" });
+        this._stepFunctionRun.addEventListener("click", this._stepFunction);
+        this._setStepFunction(); // set defaults
 
         this._splitSliderInputBox = input({ type: "number", step: "1", min: 1, max: Math.floor(this._doc.song.partsPerPattern / 2), value: "1" });
         this._splitSlider = new Slider(
@@ -120,26 +139,28 @@ export class EditorTabSelection {
 				this._volStudioFadeIn,
 				this._volContrastMax));
 
+        this._stepFunctionParameterGroup = div();
+
         const _selectionOps = [
             div({ class: "selectionOps-action"},
                 this._merge,
-                div({ class: "tip", onclick: () => tipHandler("selectionMerge") }, "Merge"),
+                div({ class: "tip", onclick: () => this._tipHandler("selectionMerge") }, "Merge"),
                 label({ class: "checkbox-container" }, this._mergeAll, "All")),
             div({ class: "selectionOps-action"},
                 this._bridge,
-                div({ class: "tip", onclick: () => tipHandler("selectionBridge") }, "Bridge"),
+                div({ class: "tip", onclick: () => this._tipHandler("selectionBridge") }, "Bridge"),
                 label({ class: "checkbox-container" }, this._bridgeBend, "Bend")),
             div({ class: "selectionOps-action"},
                 this._spread,
-                div({ class: "tip", onclick: () => tipHandler("selectionSpread") }, "Spread"),
+                div({ class: "tip", onclick: () => this._tipHandler("selectionSpread") }, "Spread"),
                 label({ class: "checkbox-container" }, this._spreadPitch, "Pitch")),
             div({ class: "selectionOps-action"},
                 this._mirrorH,
                 this._mirrorV,
-                div({ class: "tip", onclick: () => tipHandler("selectionMirror") }, "Mirror")),
+                div({ class: "tip", onclick: () => this._tipHandler("selectionMirror") }, "Mirror")),
             div({ class: "selectionOps-action"},
                 this._flatten,
-                div({ class: "tip", onclick: () => tipHandler("selectionFlatten") }, "Flatten"),
+                div({ class: "tip", onclick: () => this._tipHandler("selectionFlatten") }, "Flatten"),
                 label({ class: "checkbox-container" }, this._flattenPitch, "Pitch"),
                 label({ class: "checkbox-container" }, this._flattenVolume, "Vol")),
             div({ class: "selectionOps-action"},
@@ -156,10 +177,11 @@ export class EditorTabSelection {
                 this._volDropdown),
 			this._volDropdownGroup,
             div({ class: "selectionOps-action"},
-                this._stepFunction,
-                div({ class: "tip", onclick: () => tipHandler("selectionFunction") }, "Function"),
-                div({ class: "selectContainer" }, this._stepFunctionSelect)
-            )
+                this._stepFunctionRun,
+                div({ class: "tip", onclick: () => this._tipHandler("selectionFunction") }, "Function"),
+                div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._stepFunctionSelect)
+            ),
+            this._stepFunctionParameterGroup
         ];
 
         _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Move));
@@ -173,8 +195,7 @@ export class EditorTabSelection {
 
         [this._merge, this._bridge, this._spread, this._mirrorH, this._mirrorV, this._flatten, this._split,
 			this._volUp, this._volDown, this._volFadeOut, this._volFadeIn,
-			this._volGainEnd, this._volGainStart, this._volStudioFadeOut, this._volStudioFadeIn, this._volContrastMax,
-			this._stepFunction]
+			this._volGainEnd, this._volGainStart, this._volStudioFadeOut, this._volStudioFadeIn, this._volContrastMax]
             .forEach((o) => o.addEventListener("click", this._whenSettingButtonClicked));
 
         this._splitSliderInputBox.addEventListener("input", this._updateSplitSliderParts(this._splitSliderInputBox));
@@ -236,18 +257,315 @@ export class EditorTabSelection {
 		} else if (event.target === this._volGainStart) {
 			this._doc.selection.noteStepAcross(this._patternEditor, 'gain start');
 		} else if (event.target === this._volStudioFadeOut) {
-			this._doc.selection.noteStepAcross(this._patternEditor, 'studio fade out'); // TODO: replace with mod version for mod channels!
+            const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
+			this._doc.selection.noteStepAcross(this._patternEditor, isModChannel ? 'mod-studio fade out' : 'studio fade out');
 		} else if (event.target === this._volStudioFadeIn) {
-			this._doc.selection.noteStepAcross(this._patternEditor, 'studio fade in'); // TODO: replace with mod version for mod channels!
+            const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
+			this._doc.selection.noteStepAcross(this._patternEditor, isModChannel ? 'mod-studio fade in' : 'studio fade in');
 		} else if (event.target === this._volContrastMax) {
 			this._doc.selection.noteStepAcross(this._patternEditor, 'max contrast');
-		} else if (event.target === this._stepFunction) {
-            const preset = this._stepFunctionSelect.value as keyof typeof this._doc.selection.stepAcrossPresets;
-            if (this._doc.selection.stepAcrossPresets[preset]) {
-                this._doc.selection.noteStepAcross(this._patternEditor, preset);
-            }
+		}
+    }
+
+    private _setStepFunction = (): void => {
+        switch (this._stepFunctionSelect.value as stepFunctionCategoriesType) {
+            case stepFunctionCategories.Invert:
+                this._getInvertFunctionGUI();
+                break;
+            case stepFunctionCategories.Stagger:
+                this._getStaggerFunctionGUI();
+                break;
+            case stepFunctionCategories.Ramp:
+				this._getRampFunctionGUI();
+                break;
+            case stepFunctionCategories.Wave:
+                break;
+            case stepFunctionCategories.Custom:
+                break;
+            default:
+                this._stepFunctionParameterGroup?.replaceChildren();
+                break;
+        }
+
+        this._stepFunctionRun.removeEventListener("click", this._stepFunctionCurried);
+        this._stepFunctionRun.addEventListener("click", this._stepFunctionCurried);
+
+        if (!!stepFunctionCategories[this._stepFunctionSelect.value]) {
+            this._stepFunctionRun.removeAttribute("disabled");
+        } else {
+            this._stepFunctionRun.setAttribute("disabled", "true");
         }
     }
+
+	/** The invert GUI performs either invert from center (flip) or invert from top (invert). */
+	private _getInvertFunctionGUI() {
+		const chkbxInvertInstead = input({ type: "checkbox", class: "selectionOps-checkbox" });
+
+		const updatePerform = () => {
+			this._stepFunction = () => {
+				this._doc.selection.noteStepAcross(this._patternEditor, chkbxInvertInstead.checked ? 'invert' : 'flip volume' );
+			}
+		}
+
+		chkbxInvertInstead.addEventListener("change", updatePerform);
+
+		this._stepFunctionParameterGroup.replaceChildren(
+			div({ class: "selectionOps-action"},
+				label({ class: "checkbox-container" }, chkbxInvertInstead, "Invert instead of flip?")
+			));
+
+		updatePerform();
+	}
+
+	/**
+	 * The stagger GUI performs any number of changesets sequentially, where a changeset consists of the target unit,
+	 * such as notes or pins, to then add and multiply every N units while performing a different add/multiply for the
+	 * other cases. It's similar to IStepData except restricted to one array item.
+	 * 
+	 * The function template is identical for add and multiply and is: num % {EVERY} === 0 ? {VALUE} : {OTHER}
+	 */
+	private _getStaggerFunctionGUI() {
+		interface IRowData {
+            rowAffect: HTMLSelectElement;
+            rowEvery: HTMLInputElement;
+            rowAdd: HTMLInputElement;
+            rowAddOther: HTMLInputElement;
+            rowMultiplyBy: HTMLInputElement;
+            rowMultiplyOther: HTMLInputElement;
+            rowRemove: HTMLButtonElement;
+            generated: HTMLDivElement[];
+        }
+
+        const rows: IRowData[] = [];
+        const affects = {
+            vpn: "volume per note",
+            vpp: "volume per pin",
+            vbt: "volume by time",
+            ppn: "pitch per note",
+            ppp: "pitch per pin",
+            pbt: "pitch by time"
+        };
+
+        /** Reads control values to update the action when user runs the function. */
+        const updatePerform = () => {
+            this._stepFunction = () => {
+                let isFirstRow = true;
+                for (let row of rows) {
+                    const stepData: IStepData = {};
+                    const type = row.rowAffect.value as keyof typeof affects;
+                    const or = (str: string, val: string) => str === "" ? val : str;
+
+                    const add = [`num % (${or(row.rowEvery.value, "2")}) === 0 \
+                        ? (${or(row.rowAdd.value, isFirstRow ? "(1 / (maxval - minval))" : "0")}) \
+                        : (${or(row.rowAddOther.value, isFirstRow ? "(-1 / (maxval - minval))" : "0")})`];
+                    const mul = [`num % (${or(row.rowEvery.value, "2")}) === 0 \
+                        ? (${or(row.rowMultiplyBy.value, isFirstRow ? "(1 / (maxval - minval))" : "1")}) \
+                        : (${or(row.rowMultiplyOther.value, isFirstRow ? "(1 / (maxval - minval))" : "1")})`];
+
+                    if (type === affects.vbt || type === affects.vpn || type === affects.vpp) {
+                        const per = type === affects.vpn ? "note" : type === affects.vpp ? "pin" : "time";
+                        stepData.volAdd = { array: add, type: "cycle", per: per },
+                        stepData.volMult = { array: mul, type: "cycle", per: per }
+                    } else if (type === affects.pbt || type === affects.ppn || type === affects.ppp) {
+                        const per = type === affects.ppn ? "note" : type === affects.ppp ? "pin" : "time";
+                        stepData.pitchAdd = { array: add, type: "cycle", per: per },
+                        stepData.pitchMult = { array: mul, type: "cycle", per: per }
+                    }
+
+                    this._doc.selection.noteStepAcross(this._patternEditor, stepData);
+                    isFirstRow = false;
+                }
+            }
+        }
+
+        /** Handles interactions of a single row, returning it + its components to be read by updatePerform */
+        const createRow = (isFirstRow?: boolean): IRowData => {
+            const affect = select({ value: affects.vpn },
+                ...Object.keys(affects).map(key => option({ value: affects[key as keyof typeof affects] }, affects[key as keyof typeof affects])));
+            const every = input({ class: "selectionOps-textbox", placeholder: "2", type: "text" });
+            const add = input({ class: "selectionOps-textbox", placeholder: isFirstRow ? "1 / (maxval - minval)" : "0", type: "text" });
+            const addOther = input({ class: "selectionOps-textbox", placeholder: isFirstRow ? "-1 / (maxval - minval)" : "0", type: "text" });
+            const multiplyBy = input({ class: "selectionOps-textbox", placeholder: "1", type: "text" });
+            const multiplyOther = input({ class: "selectionOps-textbox", placeholder: "1", type: "text" });
+            const remove = button({ style: "margin-right: 4px;" }, "remove row");
+
+            // Clicking remove on a row finds itself in the rows and removes itself that way.
+            if (!isFirstRow) {
+                remove.addEventListener("click", () => {
+                    const index = rows.findIndex(row => row.rowRemove === remove);
+                    if (index !== -1) {
+                        rows[index].generated.forEach(o => o.remove());
+                        rows.splice(index, 1);
+                    }
+                    updatePerform();
+                });
+            }
+
+            [affect, every, add, addOther, multiplyBy, multiplyOther]
+                .forEach(o => o.addEventListener("input", updatePerform));
+
+            return {
+                generated: [
+                    div({ class: "selectionOps-action"}, label({ style: "width: 100%;" },
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAffect") }, "Affect"),
+                        div({ class: "selectContainer", style: "width: 100%;" }, affect))),
+                    div({ class: "selectionOps-action"}, label({}, 
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerEvery") }, "Every"), every)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAdd") }, "Add"), add)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAdd") }, "Otherwise add"), addOther)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerMultiply") }, "Multiply by"), multiplyBy)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerMultiply") }, "Otherwise multiply"), multiplyOther)),
+                    ...(isFirstRow ? [] : [div({ class: "inlineblock"}, remove)])],
+                rowAffect: affect,
+                rowEvery: every,
+                rowAdd: add,
+                rowAddOther: addOther,
+                rowMultiplyBy: multiplyBy,
+                rowMultiplyOther: multiplyOther,
+                rowRemove: remove
+            }
+        }
+
+        // Add first row and create "add row" button
+        rows.push(createRow(true));
+        const addRow = button({}, "Add row");
+        addRow.addEventListener("click", () => {
+            rows.push(createRow());
+            this._stepFunctionParameterGroup.lastElementChild?.before(...rows[rows.length - 1].generated);
+            // no effects, skip updatePerform
+        })
+
+        this._stepFunctionParameterGroup.replaceChildren(
+            ...rows.flatMap(rows => rows.generated),
+            div({ class: "inlineblock" }, addRow));
+        updatePerform();
+	}
+
+	/**
+	 * The ramp GUI performs a step function consisting of the granularity, such as notes or pins, and the target
+	 * property such as volume or pitch, with the chosen cycle behavior and any number of entries for add/multiply.
+	 * It's the same as IStepData.
+	 * 
+	 * The function template is pow(num / (len - 1), {VALUE}).
+	 *   - edit this until it can ramp to a specific value as well
+	 *   - types of easing functions here
+	 */
+	private _getRampFunctionGUI() {
+		interface IRowData {
+            rowAffect: HTMLSelectElement;
+			rowCycling: HTMLSelectElement;
+            rowAdd: HTMLInputElement;
+            rowMultiplyBy: HTMLInputElement;
+            rowRemove: HTMLButtonElement;
+            generated: HTMLDivElement[];
+        }
+
+        const rows: IRowData[] = [];
+        const affects = {
+            vpn: "volume per note",
+            vpp: "volume per pin",
+            vbt: "volume by time",
+            ppn: "pitch per note",
+            ppp: "pitch per pin",
+            pbt: "pitch by time"
+        };
+
+        /** Reads control values to update the action when user runs the function. */
+        const updatePerform = () => {
+            this._stepFunction = () => {
+                for (let row of rows) {
+                    const stepData: IStepData = {};
+                    const type = row.rowAffect.value as keyof typeof affects;
+                    const or = (str: string[]) => str?.[0] === "" ? ["0"] : str;
+					const add = or(row.rowAdd.value.split(','));
+					const mul = or(row.rowMultiplyBy.value.split(','));
+					const cycleType = row.rowCycling.value as 'cycle' | 'step' | 'normal';
+
+                    if (type === affects.vbt || type === affects.vpn || type === affects.vpp) {
+                        const per = type === affects.vpn ? "note" : type === affects.vpp ? "pin" : "time";
+                        stepData.volAdd = { array: add, type: cycleType, per: per },
+                        stepData.volMult = { array: mul, type: cycleType, per: per }
+                    } else if (type === affects.pbt || type === affects.ppn || type === affects.ppp) {
+                        const per = type === affects.ppn ? "note" : type === affects.ppp ? "pin" : "time";
+                        stepData.pitchAdd = { array: add, type: cycleType, per: per },
+                        stepData.pitchMult = { array: mul, type: cycleType, per: per }
+                    }
+
+                    this._doc.selection.noteStepAcross(this._patternEditor, stepData);
+                }
+            }
+        }
+
+        /** Handles interactions of a single row, returning it + its components to be read by updatePerform */
+        const createRow = (isFirstRow?: boolean): IRowData => {
+            const affect = select({ value: affects.vpn },
+                ...Object.keys(affects).map(key => option({ value: affects[key as keyof typeof affects] }, affects[key as keyof typeof affects])));
+            const every = input({ class: "selectionOps-textbox", placeholder: "2", type: "text" });
+            const add = input({ class: "selectionOps-textbox", placeholder: isFirstRow ? "1 / (maxval - minval)" : "0", type: "text" });
+            const addOther = input({ class: "selectionOps-textbox", placeholder: isFirstRow ? "-1 / (maxval - minval)" : "0", type: "text" });
+            const multiplyBy = input({ class: "selectionOps-textbox", placeholder: "1", type: "text" });
+            const multiplyOther = input({ class: "selectionOps-textbox", placeholder: "1", type: "text" });
+            const remove = button({ style: "margin-right: 4px;" }, "remove row");
+
+            // Clicking remove on a row finds itself in the rows and removes itself that way.
+            if (!isFirstRow) {
+                remove.addEventListener("click", () => {
+                    const index = rows.findIndex(row => row.rowRemove === remove);
+                    if (index !== -1) {
+                        rows[index].generated.forEach(o => o.remove());
+                        rows.splice(index, 1);
+                    }
+                    updatePerform();
+                });
+            }
+
+            [affect, every, add, addOther, multiplyBy, multiplyOther]
+                .forEach(o => o.addEventListener("input", updatePerform));
+
+            return {
+                generated: [
+                    div({ class: "selectionOps-action"}, label({ style: "width: 100%;" },
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAffect") }, "Affect"),
+                        div({ class: "selectContainer", style: "width: 100%;" }, affect))),
+                    div({ class: "selectionOps-action"}, label({}, 
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerEvery") }, "Every"), every)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAdd") }, "Add"), add)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerAdd") }, "Otherwise add"), addOther)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerMultiply") }, "Multiply by"), multiplyBy)),
+                    div({ class: "selectionOps-action"}, label({},
+                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepStaggerMultiply") }, "Otherwise multiply"), multiplyOther)),
+                    ...(isFirstRow ? [] : [div({ class: "inlineblock"}, remove)])],
+                rowAffect: affect,
+                rowEvery: every,
+                rowAdd: add,
+                rowAddOther: addOther,
+                rowMultiplyBy: multiplyBy,
+                rowMultiplyOther: multiplyOther,
+                rowRemove: remove
+            }
+        }
+
+        // Add first row and create "add row" button
+        rows.push(createRow(true));
+        const addRow = button({}, "Add row");
+        addRow.addEventListener("click", () => {
+            rows.push(createRow());
+            this._stepFunctionParameterGroup.lastElementChild?.before(...rows[rows.length - 1].generated);
+            // no effects, skip updatePerform
+        })
+
+        this._stepFunctionParameterGroup.replaceChildren(
+            ...rows.flatMap(rows => rows.generated),
+            div({ class: "inlineblock" }, addRow));
+        updatePerform();
+	}
 
     private _updateSplitSliderParts = (source: HTMLInputElement) => (): void => {
         const newValue = source.valueAsNumber;
