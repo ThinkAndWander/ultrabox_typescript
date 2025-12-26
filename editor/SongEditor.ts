@@ -91,6 +91,7 @@ function buildPresetOptions(isNoise: boolean, idSet: string): HTMLSelectElement 
     } else {
         menu.appendChild(option({ value: InstrumentType.chip }, EditorConfig.valueToPreset(InstrumentType.chip)!.name));
         menu.appendChild(option({ value: InstrumentType.customChipWave }, EditorConfig.valueToPreset(InstrumentType.customChipWave)!.name));
+        menu.appendChild(option({ value: InstrumentType.customWave }, EditorConfig.valueToPreset(InstrumentType.customWave)!.name));
         menu.appendChild(option({ value: InstrumentType.pwm }, EditorConfig.valueToPreset(InstrumentType.pwm)!.name));
         menu.appendChild(option({ value: InstrumentType.supersaw}, EditorConfig.valueToPreset(InstrumentType.supersaw)!.name));
         menu.appendChild(option({ value: InstrumentType.fm }, EditorConfig.valueToPreset(InstrumentType.fm)!.name));
@@ -2545,6 +2546,11 @@ export class SongEditor {
                 this._customWaveDraw.style.display = "none";
             }
 
+            if (instrument.type === InstrumentType.customWave) {
+                // TODO: turn on/off visibility of sliders associated only to this
+            } else {
+            }
+
             if (instrument.type == InstrumentType.supersaw) {
 				this._supersawDynamismRow.style.display = "";
 				this._supersawSpreadRow.style.display = "";
@@ -2653,7 +2659,6 @@ export class SongEditor {
             }
             this._pulseWidthSlider.input.title = prettyNumber(instrument.pulseWidth) + "%";
 
-
             if (effectsIncludeTransition(instrument.effects)) {
                 this._transitionRow.style.display = "";
                 if (this._openTransitionDropdown)
@@ -2742,7 +2747,7 @@ export class SongEditor {
             if (effectsIncludeDistortion(instrument.effects)) {
                 this._distortionRow.style.display = "";
                 if (instrument.type == InstrumentType.chip || instrument.type == InstrumentType.customChipWave || instrument.type == InstrumentType.pwm || instrument.type == InstrumentType.supersaw)
-                    this._aliasingRow.style.display = "";
+                    this._aliasingRow.style.display = ""; // TODO: support customWave?
                 else
                     this._aliasingRow.style.display = "none";
                 this._distortionSlider.updateValue(instrument.distortion);
@@ -2797,6 +2802,7 @@ export class SongEditor {
             }
 
             if (instrument.type == InstrumentType.chip || instrument.type == InstrumentType.customChipWave || instrument.type == InstrumentType.harmonics || instrument.type == InstrumentType.pickedString || instrument.type == InstrumentType.spectrum || instrument.type == InstrumentType.pwm || instrument.type == InstrumentType.noise) {
+                // TODO: support customWave?
                 this._unisonSelectRow.style.display = "";
                 setSelectedValue(this._unisonSelect, instrument.unison);
                 this._unisonVoicesInputBox.value = instrument.unisonVoices + "";
@@ -2868,6 +2874,8 @@ export class SongEditor {
                     this.prompt.customChipCanvas.render();
                 }
             }
+
+            // TODO: support customWave by showing and handling a read-only display of the waveform
 
             this._renderInstrumentBar(channel, instrumentIndex, colors);
         }

@@ -221,10 +221,15 @@ function projectNoteIntoBar(oldNote: Note, timeOffset: number, noteStartPart: nu
     }
 }
 
+/**
+ * Javascript's % operator is remainder, not modulo. Given that, this function is true modulo.
+ * The difference is in how negatives are handled.
+ */
 function mod(a: number, b: number): number {
     return (a % b + b) % b;
 }
 
+/** Sums with a function call from range [c, a) while the sum is <= a. */
 function sigma(a: number, b: (i: number) => number, c: number): number {
     let result = 0;
     for (let i = c; i <= a; i++) {
@@ -1041,11 +1046,12 @@ export class ChangeRandomGeneratedInstrument extends Change {
                 { item: InstrumentType.pwm, weight: 2 },
                 { item: InstrumentType.supersaw, weight: 2 },
                 { item: InstrumentType.customChipWave, weight: 2 },
+                { item: InstrumentType.customWave, weight: 2 },
                 { item: InstrumentType.harmonics, weight: 2 },
                 { item: InstrumentType.pickedString, weight: 2 },
                 { item: InstrumentType.spectrum, weight: 2 },
                 { item: InstrumentType.fm, weight: 2 },
-				{ item: InstrumentType.fm6op, weight: 2 },
+				{ item: InstrumentType.fm6op, weight: 2 }
 			]);
 			instrument.preset = instrument.type = type;
 			
@@ -1529,7 +1535,10 @@ export class ChangeRandomGeneratedInstrument extends Change {
                     instrument.customChipWave = randomGeneratedArray;
                     instrument.customChipWaveIntegral = randomGeneratedArrayIntegral;
                 } break;
-               // case InstrumentType.noise: {
+                case InstrumentType.customWave: {
+                    // Whatever I need to randomize goes here, based on what sort of data is stored at the Config level. I would not 
+                } break;
+                // case InstrumentType.noise: {
                 //     instrument.chipNoise = selectWeightedRandom([
                 //         { item: 0, weight: 1 }, // retro
                 //         { item: 1, weight: 1 }, // white

@@ -5,6 +5,7 @@ import { Preset, EditorConfig } from "../editor/EditorConfig";
 import { scaleElementsByFactor, inverseRealFourierTransform } from "./FFT";
 import { Deque } from "./Deque";
 import { events } from "../global/Events";
+import { createWaveFormula, IWave, IWaveArgument, waveFunction } from "../global/Signal";
 import { FilterCoefficients, FrequencyResponse, DynamicBiquadFilter, warpInfinityToNyquist } from "./filtering";
 
 declare global {
@@ -48,17 +49,17 @@ export function parseIntWithDefault<T>(s: string, defaultValue: T): number | T {
 }
 
 function encode32BitNumber(buffer: number[], x: number): void {
-    // 0b11_
+    // 3 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 5)) & 0x3]);
-    //      111111_
+    //      128 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 4)) & 0x3f]);
-    //             111111_
+    //             128 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 3)) & 0x3f]);
-    //                    111111_
+    //                    128 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 2)) & 0x3f]);
-    //                           111111_
+    //                           128 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 1)) & 0x3f]);
-    //                                  111111
+    //                                  128 in binary
     buffer.push(base64IntToCharCode[(x >>> (6 * 0)) & 0x3f]);
 }
 
@@ -79,6 +80,34 @@ function decode32BitNumber(compressed: string, charIndex: number): number {
     //                                  111111
     x |= base64CharCodeToInt[compressed.charCodeAt(charIndex++)] << (6 * 0);
     return x;
+}
+
+/**
+ * Mutates {buffer} to add a number rounded to {precision} digits after the decimal place, up to 16 digits.
+ * For the sake of keeping URL short, do not do more than a precision of 2. Prefer only 1 if possible.
+*/
+function encodeFloat(buffer: number[], float: number, precision?: number) {
+    // toLocaleString has a max precision of 16 digits, probably due to float constraints
+
+    // Cast to string avoiding number groups, scientific notation, etc. up to precision 16 and 
+    // Round to desired precision
+    let toStr;
+    if (precision) {
+        const powerOf = 10 ** (precision ?? 0);
+        toStr = ''
+    } else {
+        toStr = ''
+    }
+
+    
+    const taoStr = (Math.round(float * toPowerOf) / toPowerOf).toLocaleString('fullwide', { useGrouping: false });
+
+    for (let i = 0; i < toStr.length; i++) {
+        buffer.push(base64CharCodeToInt[+toStr.charAt(i)]);
+    }
+
+    const floatToNthDigit = Math.round(float * power) / power;
+    buffer.push(floatToNthDigit);
 }
 
 function encodeUnisonSettings(buffer: number[], v: number, s: number, o: number, e: number, i: number): void {
@@ -242,7 +271,7 @@ const enum SongTagCode {
 	arpeggioSpeed       = CharCode.G, // added in JummBox URL version 3 for arpeggioSpeed, DEPRECATED
 	harmonics           = CharCode.H, // added in BeepBox URL version 7
 	stringSustain       = CharCode.I, // added in BeepBox URL version 9
-//	                    = CharCode.J,
+	customWave          = CharCode.J, // added in RolyBox's 2nd update
 //	                    = CharCode.K,
 	pan                 = CharCode.L, // added between 8 and 9, DEPRECATED
 	customChipWave      = CharCode.M, // added in JummBox URL version 1(?) for customChipWave
@@ -1449,6 +1478,7 @@ export class Instrument {
     public feedbackAmplitude: number = 0;
     public customChipWave: Float32Array = new Float32Array(64);
     public customChipWaveIntegral: Float32Array = new Float32Array(65); // One extra element for wrap-around in chipSynth.
+    public customWave: { ops: IWave, func: waveFunction, args?: IWaveArgument } | undefined;
     public readonly operators: Operator[] = [];
     public readonly spectrumWave: SpectrumWave;
     public readonly harmonicsWave: HarmonicsWave = new HarmonicsWave();
@@ -1601,6 +1631,10 @@ export class Instrument {
                 }
 
                 this.customChipWaveIntegral[64] = 0.0;
+                break;
+            case InstrumentType.customWave:
+                const ops = {} satisfies IWave;
+                this.customWave = { ops, func: createWaveFormula(ops) as waveFunction };
                 break;
             case InstrumentType.fm:
                 this.chord = Config.chords.dictionary["custom interval"].index;
@@ -2036,6 +2070,8 @@ export class Instrument {
                 // Meh, waste of space and can be inaccurate. It will be recalc'ed when instrument loads.
                 //instrumentObject["customChipWaveIntegral"][i] = this.customChipWaveIntegral[i];
             }
+        } else if (this.type === InstrumentType.customWave) {
+            // TODO: whatever you need here.
         } else if (this.type == InstrumentType.mod) {
             instrumentObject["modChannels"] = [];
             instrumentObject["modInstruments"] = [];
@@ -3408,6 +3444,30 @@ export class Song {
                     // Push custom wave values
                     for (let j: number = 0; j < 64; j++) {
                         buffer.push(base64IntToCharCode[(instrument.customChipWave[j] + 24) as number]);
+                    }
+                } else if (instrument.type === InstrumentType.customWave) {
+                    if (instrument.customWave?.ops) {
+
+                        if (typeof(instrument.customWave.ops.frequency) === 'number') { buffer.push(base64IntToCharCode[instrument.customWave.ops.frequency]); }
+                        if (typeof(instrument.customWave.ops.frequencyAccel) === 'number') { buffer.push(base64IntToCharCode[instrument.customWave.ops.frequencyAccel]); }
+                        if (typeof(instrument.customWave.ops.bend) === 'number') { buffer.push(base64IntToCharCode[instrument.customWave.ops.bend]); }
+                        if (typeof(instrument.customWave.ops.bendAccel) === 'number') { buffer.push(base64IntToCharCode[instrument.customWave.ops.bendAccel]); }
+                        if (typeof(instrument.customWave.ops.phase) === 'number') { buffer.push(base64IntToCharCode[instrument.customWave.ops.phase]); }
+
+                        if (instrument.customWave.ops.absMod) {
+                            if (typeof(instrument.customWave.ops.absMod.absoluteOffset) === 'number')
+                                { buffer.push(base64IntToCharCode[instrument.customWave.ops.absMod.absoluteOffset]); }
+                            if (typeof(instrument.customWave.ops.absMod.absoluteSkipNormalize) === 'boolean')
+                                { buffer.push(base64IntToCharCode[+instrument.customWave.ops.absMod.absoluteSkipNormalize]); }
+                            if (typeof(instrument.customWave.ops.absMod.absoluteValue) === 'boolean')
+                                { buffer.push(base64IntToCharCode[+instrument.customWave.ops.absMod.absoluteValue]); }
+                        }
+
+                        if (typeof(instrument.customWave.ops.amplifyMod)) {
+                            if (typeof(instrument.customWave.ops.amplifyMod.amplitude) === 'number')
+                                { buffer.push(base64IntToCharCode[instrument.customWave.ops.absMod.absoluteOffset]); }
+                        }
+
                     }
                 } else if (instrument.type == InstrumentType.noise) {
                     buffer.push(SongTagCode.wave, base64IntToCharCode[instrument.chipNoise]);

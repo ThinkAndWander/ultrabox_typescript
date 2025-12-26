@@ -636,7 +636,7 @@ export class ExportPrompt implements Prompt {
                                     instrumentProgram = 81; // sawtooth
                                 } else if (instrument.type == InstrumentType.pickedString) {
                                     instrumentProgram = 0x19; // steel guitar
-                                } else if (instrument.type == InstrumentType.customChipWave) {
+                                } else if (instrument.type == InstrumentType.customChipWave || instrument.type === InstrumentType.customWave) {
                                     instrumentProgram = 81; // sawtooth
                                 } else {
                                     throw new Error("Unrecognized instrument type.");
