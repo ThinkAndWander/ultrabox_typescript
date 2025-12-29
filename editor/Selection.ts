@@ -994,7 +994,7 @@ export class Selection {
                                 ))
                             } else {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    this.stepAcrossPresets['volume max'] as IStepData,
+                                    { volAdd: { array: ['maxval - minval'], per: 'note' } },
                                     undefined, undefined, pitchIndex
                                 ))
                             }
@@ -1047,65 +1047,19 @@ export class Selection {
         this._doc.record(this._changeNoteOperations);
     }
 
-    // Presets for noteStepAcross.
-    private multWave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
-    private expCurve = (len: number) => { const arr = []; for (let i = 0; i < len; i++) { arr.push((i/(len-1)) ** 2); } return arr; };
-    public stepAcrossPresets = {
-        'fade in': { volMult: { array: [0, 1], per: 'time' }, onlyExistingPins: true },
-        'fade out': { volMult: { array: [1, 0], per: 'time' }, onlyExistingPins: true },
-        'fade every note': { volMult: { array: [ '1 - num / len'], per: 'pin' }, onlyExistingPins: true },
-        'studio fade in': { volMult: { array: this.expCurve(5), per: 'time' } },
-        'studio fade out': { volMult: { array: this.expCurve(5).reverse(), per: 'time' } },
-        'mod-studio fade in': { volMult: { array: ['pow(num / (len - 1), 2)'], per: 'time' } },
-        'mod-studio fade out': { volMult: { array: ['1 - pow(num / (len - 1), 2)'], per: 'time' } },
-        'gain start': { volAdd: { array: ['(num === 0 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [2, 1], per: 'time' }, onlyExistingPins: true },
-        'gain end': { volAdd: { array: ['(num === 1 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [1, 2], per: 'time' }, onlyExistingPins: true },
-		'volume up': { volAdd: { array: [1], per: 'pin' }, onlyExistingPins: true },
-        'volume down': { volAdd: { array: [-1], per: 'pin' }, onlyExistingPins: true },
-		'volume double': { volMult: { array: [2], per: 'pin' }, onlyExistingPins: true },
-        'volume halve': { volMult: { array: [0.5], per: 'pin' }, onlyExistingPins: true },
-        'max contrast': { volAdd: { array: ['(x / biggest * (1 - biggest)) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-        'contrast double': { volAdd: { array: ['((x - average) * 2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-		'contrast halve': { volAdd: { array: ['((x - average) * -0.5) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-        'flip volume': { volAdd: { array: ['((x - average) * -2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-        'invert': { volAdd: { array: ['(1 - x - x) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-        'volume alternate': { volMult: { array: [0, 1], per: 'note', type: 'cycle' } },
-        'volume toggle': { volAdd: { array: ['(num % 2 === 0 ? 1 : -1)'], per: 'note', type: 'cycle' }, onlyExistingPins: true },
-        'volume interrupt': { volMult: { array: ['random() > 0.5 ? 0.5 : 1'], per: 'time' } },
-        'volume max': { volAdd: { array: ['maxval - minval'], per: 'note' } },
-        'wobble fast': { volMult: { array: [this.multWave(4, 4, 0.5)], per: 'time' } },
-        'wobble fast-med': { volMult: { array: [this.multWave(4, 8, 0.5)], per: 'time' } },
-        'wobble fast-slow': { volMult: { array: [this.multWave(4, 16, 0.5)], per: 'time' } },
-        'wobble med-fast': { volMult: { array: [this.multWave(8, 4, 0.5)], per: 'time' } },
-        'wobble med': { volMult: { array: [this.multWave(8, 8, 0.5)], per: 'time' } },
-        'wobble med-slow': { volMult: { array: [this.multWave(8, 16, 0.5)], per: 'time' } },
-        'wobble slow-fast': { volMult: { array: [this.multWave(16, 4, 0.5)], per: 'time' } },
-        'wobble slow-med' : { volMult: { array: [this.multWave(16, 8, 0.5)], per: 'time' } },
-        'wobble slow': { volMult: { array: [this.multWave(16, 16, 0.5)], per: 'time' } },
-        'nonmod pitch alternate': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } },
-        'stagger pitch': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } },
-        'stagger pitch 1:2': { pitchAdd: { array: [1, 0, 0], per: 'note', type: 'cycle' } },
-        'stagger pitch 1:3': { pitchAdd: { array: [1, 0, 0, 0], per: 'note', type: 'cycle' } },
-        'stagger pitch 2:1': { pitchAdd: { array: [1, 1, 0], per: 'note', type: 'cycle' } },
-        'stagger pitch 3:1': { pitchAdd: { array: [1, 1, 1, 0], per: 'note', type: 'cycle' } },
-        'staircase pitch up': { pitchAdd: { array: ['num'], per: 'note', type: 'cycle' } },
-        'staircase pitch down': { pitchAdd: { array: ['-num'], per: 'note', type: 'cycle' } },
-        
-    } satisfies { [key: string]: IStepData };
-
     /** Cumulatively performs volume/pitch changes to existing and/or new pins.
      * 
      * See the step function in changesNoteOps.ts.
      * @param data The arrays and how they interact.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
     */
-    public noteStepAcross(data: (keyof typeof this.stepAcrossPresets | IStepData), pitchIndex?: number): void {
+    public noteStepAcross(data: IStepData, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._changeNoteOperations.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                    typeof data !== 'string' ? data : this.stepAcrossPresets[data] as IStepData,
-                    undefined, undefined, pitchIndex));
+                this._changeNoteOperations.append(new ChangeStepAcross(this._doc, channelIndex, pattern, data, undefined, undefined, pitchIndex));
 			}
         }
 

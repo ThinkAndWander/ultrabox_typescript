@@ -372,8 +372,7 @@ export interface IStepData {
 /** Adjusts volume/pitch across the given range using arrays of expressions & numbers to add and multiply.
  * 
  * You supply value(s) to multiply or add, in that order, and they're applied according to the interpretation behavior,
- * multiplied by current/total fraction. See stepAcrossPresets in Selection.ts for many examples.
- * See IStepData and IStepArray for details.
+ * multiplied by current/total fraction. See IStepData and IStepArray for details.
  * 
  * @param data Any of a few arrays to multiply or add (in that order) volume and pitch.
  * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.

@@ -9,46 +9,40 @@ import { Config } from "../synth/SynthConfig";
 const { button, div, label, input, option, optgroup, select } = HTML;
 
 type TipHandler = (tipName: string) => void;
-type stepPresetsVolType = 'Fade out every note' | 'Stagger volume on/off' | 'Stagger volume up/down' |
-    'Volume wobble slow' | 'Volume wobble slow to med' | 'Volume wobble slow to fast' |
-    'Volume wobble med to slow' | 'Volume wobble medium' | 'Volume wobble med to fast' |
-    'Volume wobble fast to slow' | 'Volume wobble fast to med' | 'Volume wobble fast' |
-    'Volume up' | 'Volume down' | 'Double volume contrast' | 'Halve volume contrast' |
-    'Flip volume' | 'Invert volume' | 'Random volume interrupts';
-type stepPresetsPitchType = 'Stagger pitch' | 'Stagger pitch 1:2' | 'Stagger pitch 1:3' |
-    'Stagger pitch 2:1' | 'Stagger pitch 3:1' | 'Staircase pitch up' | 'Staircase pitch down';
 
-const stepPresetsVol = {
-    VolumeFadePerNote: 'Fade out every note',
-    VolumeWobbleSlow: 'Volume wobble slow',
-    VolumeWobbleSlowMed: 'Volume wobble slow to med',
-    VolumeWobbleSlowFast: 'Volume wobble slow to fast',
-    VolumeWobbleMedSlow: 'Volume wobble med to slow',
-    VolumeWobbleMed: 'Volume wobble medium',
-    VolumeWobbleMedFast: 'Volume wobble med to fast',
-    VolumeWobbleFastSlow: 'Volume wobble fast to slow',
-    VolumeWobbleFastMed: 'Volume wobble fast to med',
-    VolumeWobbleFast: 'Volume wobble fast',
-    VolumeStepUp: 'Volume up',
-    VolumeStepDown: 'Volume down',
-    VolumeDoubleContrast: 'Double volume contrast',
-    VolumeHalveContrast: 'Halve volume contrast',
-    StaggerVolOnOff: 'Stagger volume on/off',
-    StaggerVolUpDown: 'Stagger volume up/down',
-    InvertVolume: 'Invert volume',
-    FlipVolume: 'Flip volume',
-    RandomVolumeInterrupts: 'Random volume interrupts'
-} satisfies { [key: string]: stepPresetsVolType };
+const wave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
+const stepPresetsVol: { [key: string]: IStepData } = {
+    'Fade out every note': { volMult: { array: [ '1 - num / len'], per: 'pin' }, onlyExistingPins: true },
+    'Wobble slow': { volMult: { array: [wave(16, 16, 0.5)], per: 'time' } },
+    'Wobble slow to medium': { volMult: { array: [wave(16, 8, 0.5)], per: 'time' } },
+    'Wobble slow to fast': { volMult: { array: [wave(16, 4, 0.5)], per: 'time' } },
+    'Wobble medium to slow': { volMult: { array: [wave(8, 16, 0.5)], per: 'time' } },
+    'Wobble medium': { volMult: { array: [wave(8, 8, 0.5)], per: 'time' } },
+    'Wobble medium to fast': { volMult: { array: [wave(8, 4, 0.5)], per: 'time' } },
+    'Wobble fast to slow': { volMult: { array: [wave(4, 16, 0.5)], per: 'time' } },
+    'Wobble fast to medium': { volMult: { array: [wave(4, 8, 0.5)], per: 'time' } },
+    'Wobble fast': { volMult: { array: [wave(4, 4, 0.5)], per: 'time' } },
+    'Raise by 1': { volAdd: { array: [1], per: 'pin' }, onlyExistingPins: true },
+    'Lower by 1': { volAdd: { array: [-1], per: 'pin' }, onlyExistingPins: true },
+    'Double contrast': { volAdd: { array: ['((x - average) * 2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
+    'Halve contrast': { volAdd: { array: ['((x - average) * -0.5) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
+    'Stagger on/off': { volMult: { array: [0, 1], per: 'note', type: 'cycle' } },
+    'Stagger up/down': { volAdd: { array: ['(num % 2 === 0 ? 1 : -1)'], per: 'note', type: 'cycle' }, onlyExistingPins: true },
+    'Invert': { volAdd: { array: ['(1 - x - x) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
+    'Flip': { volAdd: { array: ['((x - average) * -2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
+    'Random interrupts': { volMult: { array: ['random() > 0.5 ? 0.5 : 1'], per: 'time' } }
+};
 
-const stepPresetsPitch = {
-    StaggerPitch: 'Stagger pitch',
-    StaggerPitch12: 'Stagger pitch 1:2',
-    StaggerPitch13: 'Stagger pitch 1:3',
-    StaggerPitch21: 'Stagger pitch 2:1',
-    StaggerPitch31: 'Stagger pitch 3:1',
-    StaircasePitchUp: 'Staircase pitch up',
-    StaircasePitchDown: 'Staircase pitch down',
-} satisfies { [key: string]: stepPresetsPitchType };
+const stepPresetsPitch: { [key: string]: IStepData } = {
+    'Stagger every other': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } },
+    'Stagger every 1 to 2': { pitchAdd: { array: [1, 0, 0], per: 'note', type: 'cycle' } },
+    'Stagger every 1 to 3': { pitchAdd: { array: [1, 0, 0, 0], per: 'note', type: 'cycle' } },
+    'Stagger every 2 to 1': { pitchAdd: { array: [1, 1, 0], per: 'note', type: 'cycle' } },
+    'Stagger every 3 to 1': { pitchAdd: { array: [1, 1, 1, 0], per: 'note', type: 'cycle' } },
+    'Staircase up': { pitchAdd: { array: ['num'], per: 'note', type: 'cycle' } },
+    'Staircase down': { pitchAdd: { array: ['-num'], per: 'note', type: 'cycle' } },
+    'Random shifts': { pitchAdd: { array: ['random() > 0.5 ? 1 : 0'], per: 'time' } }
+}
 
 /** This contains the controls for the Selection tab in the song editor. */
 export class EditorTabSelection {
@@ -154,10 +148,10 @@ export class EditorTabSelection {
         this._stepFunctionSelect = select();
         this._stepFunctionSelect.appendChild(option({ value: "Choose...", selected: 'selected' }, "Choose..."));
         this._stepFunctionSelect.appendChild(optgroup({ label: "Volume Presets" },
-            ...(Object.keys(stepPresetsVol).map((key) => option({value: key}, stepPresetsVol[key as keyof typeof stepPresetsVol])))
+            ...(Object.keys(stepPresetsVol).map((key) => option({ value: key }, key)))
         ));
         this._stepFunctionSelect.appendChild(optgroup({ label: "Pitch Presets" },
-            ...(Object.keys(stepPresetsPitch).map((key) => option({value: key}, stepPresetsPitch[key as keyof typeof stepPresetsPitch])))
+            ...(Object.keys(stepPresetsPitch).map((key) => option({ value: key }, key)))
         ));
 
         this._stepFunctionSelect.addEventListener('change', this._setStepFunction);
@@ -295,87 +289,36 @@ export class EditorTabSelection {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked)
         } else if (event.target === this._volUp) {
-			this._doc.selection.noteStepAcross('volume double', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volMult: { array: [2], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volDown) {
-			this._doc.selection.noteStepAcross('volume halve', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volMult: { array: [0.5], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeOut) {
-			this._doc.selection.noteStepAcross('fade out', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volMult: { array: [1, 0], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeIn) {
-			this._doc.selection.noteStepAcross('fade in', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volMult: { array: [0, 1], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross('gain end', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volAdd: { array: ['(num === 1 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [1, 2], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross('gain start', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volAdd: { array: ['(num === 0 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [2, 1], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel ? 'mod-studio fade out' : 'studio fade out', modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel
+                ? { volMult: { array: ['1 - pow(num / (len - 1), 2)'], per: 'time' } }
+                : { volMult: { array: [1, 0.5625, 0.25, 0.0625, 0], per: 'time' } },
+                modTrackIndex);
 		} else if (event.target === this._volStudioFadeIn) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel ? 'mod-studio fade in' : 'studio fade in', modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel
+                ? { volMult: { array: ['pow(num / (len - 1), 2)'], per: 'time' } }
+                : { volMult: { array: [0, 0.0625, 0.25, 0.5625, 1], per: 'time' } },
+                modTrackIndex);
 		} else if (event.target === this._volContrastMax) {
-			this._doc.selection.noteStepAcross('max contrast', modTrackIndex);
+			this._doc.selection.noteStepAcross({ volAdd: { array: ['(x / biggest * (1 - biggest)) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
 		}
     }
 
     private _setStepFunction = (): void => {
-        switch (this._stepFunctionSelect.value as keyof typeof stepPresetsVol | keyof typeof stepPresetsPitch) {
-            case 'InvertVolume':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['invert']); break;
-            case 'FlipVolume':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['flip volume']); break;
-            case 'StaggerPitch':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['stagger pitch']); break;
-            case 'StaggerPitch12':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['stagger pitch 1:2']); break;
-            case 'StaggerPitch13':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['stagger pitch 1:3']); break;
-            case 'StaggerPitch21':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['stagger pitch 2:1']); break;
-            case 'StaggerPitch31':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['stagger pitch 3:1']); break;
-            case 'StaircasePitchUp':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['staircase pitch up']); break;
-            case 'StaircasePitchDown':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['staircase pitch down']); break;
-            case 'StaggerVolOnOff':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['volume alternate']); break;
-            case 'StaggerVolUpDown':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['volume toggle']); break;
-            case 'VolumeFadePerNote':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['fade every note']); break;
-            case 'VolumeWobbleSlow':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble slow']); break;
-            case 'VolumeWobbleSlowMed':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble slow-med']); break;
-            case 'VolumeWobbleSlowFast':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble slow-fast']); break;
-            case 'VolumeWobbleMedSlow':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble med-slow']); break;
-            case 'VolumeWobbleMed':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble med']); break;
-            case 'VolumeWobbleMedFast':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble med-fast']); break;
-            case 'VolumeWobbleFastSlow':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble fast-slow']); break;
-            case 'VolumeWobbleFastMed':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble fast-med']); break;
-            case 'VolumeWobbleFast':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['wobble fast']); break;
-            case 'VolumeStepUp':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['volume up']); break;
-            case 'VolumeStepDown':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['volume down']); break;
-            case 'VolumeDoubleContrast':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['contrast double']); break;
-            case 'VolumeHalveContrast':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['contrast halve']); break;
-            case 'RandomVolumeInterrupts':
-                this._getStepFunctionGUI(this._doc.selection.stepAcrossPresets['volume interrupt']); break;
-            default:
-                this._stepFunctionParameterGroup?.replaceChildren();
-                break;
-        }
-
+        this._getStepFunctionGUI(stepPresetsVol[this._stepFunctionSelect.value] ?? stepPresetsPitch[this._stepFunctionSelect.value]);
         this._stepFunctionRun.removeEventListener("click", this._stepFunctionCurried);
         this._stepFunctionRun.addEventListener("click", this._stepFunctionCurried);
         this._updateStepFunctionDisabled();
@@ -545,11 +488,11 @@ export class EditorTabSelection {
         const addRow = button({}, "Add row");
         addRow.addEventListener("click", () => {
             rows.push(createRow());
-            this._stepFunctionParameterGroup.lastElementChild?.before(...rows[rows.length - 1].generated);
+            this._stepFunctionParameterGroup?.lastElementChild?.before(...rows[rows.length - 1].generated);
             // no effects, skip updatePerform
         })
 
-        this._stepFunctionParameterGroup.replaceChildren(
+        this._stepFunctionParameterGroup?.replaceChildren(
             ...rows.flatMap(rows => rows.generated),
             div({ class: "inlineblock" }, addRow));
         updatePerform();
