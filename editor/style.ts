@@ -363,10 +363,18 @@ input.tab-settings-radio + div {
 	pointer-events: none;
 }
 
+.selectionOps-checkbox:disabled {
+    opacity: 0.5;
+}
+
 .beepboxEditor button.selectionOps-actionbutton + .tip,
 .beepboxEditor button.selectionOps-actionbutton + .selectionOps-actionbutton,
 .beepboxEditor .checkbox-container + .checkbox-container {
 	margin-left: 0.2rem;
+}
+
+.beepboxEditor .editor-controls + .selectionOps-action {
+    margin-top: 0.2rem;
 }
 
 .beepboxEditor .selectionOps-row-inside + .selectionOps-row-inside {
@@ -958,6 +966,9 @@ input.tab-settings-radio + div {
 	mask-repeat: no-repeat;
 	mask-position: center;
 }
+.beepboxEditor .selectContainer:not(.menu):has(select:disabled)::after {
+    background: color-mix(in srgb, currentColor 50%, transparent);
+}
 .beepboxEditor .selectContainer.menu::after {
 	content: "";
 	flex-shrink: 0;
@@ -993,6 +1004,10 @@ input.tab-settings-radio + div {
 	-webkit-appearance:none;
 	-moz-appearance: none;
 	appearance: none;
+}
+.beepboxEditor select:disabled {
+    opacity: 0.5;
+	pointer-events: none;
 }
 .beepboxEditor select option:disabled {
 	color: ${ColorConfig.linkAccent};
