@@ -3,45 +3,63 @@ import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Slider } from "./HTMLWrapper";
 import { PatternEditor, SelectionMode } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
-import { IStepArray, IStepData } from "./changesNoteOps";
+import { IStepData } from "./changesNoteOps";
 import { Config } from "../synth/SynthConfig";
 
 const { button, div, label, input, option, optgroup, select } = HTML;
 
 type TipHandler = (tipName: string) => void;
 
-const wave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
-const stepPresetsVol: { [key: string]: IStepData } = {
-    'Fade out every note': { volMult: { array: [ '1 - num / len'], per: 'pin' }, onlyExistingPins: true },
-    'Wobble slow': { volMult: { array: [wave(16, 16, 0.5)], per: 'time' } },
-    'Wobble slow to medium': { volMult: { array: [wave(16, 8, 0.5)], per: 'time' } },
-    'Wobble slow to fast': { volMult: { array: [wave(16, 4, 0.5)], per: 'time' } },
-    'Wobble medium to slow': { volMult: { array: [wave(8, 16, 0.5)], per: 'time' } },
-    'Wobble medium': { volMult: { array: [wave(8, 8, 0.5)], per: 'time' } },
-    'Wobble medium to fast': { volMult: { array: [wave(8, 4, 0.5)], per: 'time' } },
-    'Wobble fast to slow': { volMult: { array: [wave(4, 16, 0.5)], per: 'time' } },
-    'Wobble fast to medium': { volMult: { array: [wave(4, 8, 0.5)], per: 'time' } },
-    'Wobble fast': { volMult: { array: [wave(4, 4, 0.5)], per: 'time' } },
-    'Raise by 1': { volAdd: { array: [1], per: 'pin' }, onlyExistingPins: true },
-    'Lower by 1': { volAdd: { array: [-1], per: 'pin' }, onlyExistingPins: true },
-    'Double contrast': { volAdd: { array: ['((x - average) * 2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-    'Halve contrast': { volAdd: { array: ['((x - average) * -0.5) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-    'Stagger on/off': { volMult: { array: [0, 1], per: 'note', type: 'cycle' } },
-    'Stagger up/down': { volAdd: { array: ['(num % 2 === 0 ? 1 : -1)'], per: 'note', type: 'cycle' }, onlyExistingPins: true },
-    'Invert': { volAdd: { array: ['(1 - x - x) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-    'Flip': { volAdd: { array: ['((x - average) * -2) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true },
-    'Random interrupts': { volMult: { array: ['random() > 0.5 ? 0.5 : 1'], per: 'time' } }
-};
+// Function presets based on various or ad-hoc functions.
+enum funcSpecialPresets {
+    AdjustChoruses,
+    AdvancedBridge,
+    DeleteZeroVolNotes,
+    NotesFromFormula,
+    ShrinkNotes,
+    SplitPitchBends,
+}
+const funcSpecialPresetsMap = {
+    'Adjust choruses': funcSpecialPresets.AdjustChoruses,
+    'Advanced bridge': funcSpecialPresets.AdvancedBridge,
+    'Create from formula': funcSpecialPresets.NotesFromFormula,
+    'Delete zero-volume notes': funcSpecialPresets.DeleteZeroVolNotes,
+    'Shrink Notes': funcSpecialPresets.ShrinkNotes,
+    'Split at pitch bends': funcSpecialPresets.SplitPitchBends,
+}
 
-const stepPresetsPitch: { [key: string]: IStepData } = {
-    'Stagger every other': { pitchAdd: { array: [-1, 1], per: 'note', type: 'cycle' } },
-    'Stagger every 1 to 2': { pitchAdd: { array: [1, 0, 0], per: 'note', type: 'cycle' } },
-    'Stagger every 1 to 3': { pitchAdd: { array: [1, 0, 0, 0], per: 'note', type: 'cycle' } },
-    'Stagger every 2 to 1': { pitchAdd: { array: [1, 1, 0], per: 'note', type: 'cycle' } },
-    'Stagger every 3 to 1': { pitchAdd: { array: [1, 1, 1, 0], per: 'note', type: 'cycle' } },
-    'Staircase up': { pitchAdd: { array: ['num'], per: 'note', type: 'cycle' } },
-    'Staircase down': { pitchAdd: { array: ['-num'], per: 'note', type: 'cycle' } },
-    'Random shifts': { pitchAdd: { array: ['random() > 0.5 ? 1 : 0'], per: 'time' } }
+// Function presets based on the step function.
+const wave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
+const funcVolPresets: { [key: string]: IStepData } = {
+    'Fade out every note': { affect: 'vol', per: 'pin', mult: [ '1 - num / len'], onlyExistingPins: true },
+    'Wobble slow': { affect: 'vol', per: 'time', mult: [wave(16, 16, 0.5)] },
+    'Wobble slow to medium': { affect: 'vol', per: 'time', mult: [wave(16, 8, 0.5)] },
+    'Wobble slow to fast': { affect: 'vol', per: 'time', mult: [wave(16, 4, 0.5)] },
+    'Wobble medium to slow': { affect: 'vol', per: 'time', mult: [wave(8, 16, 0.5)] },
+    'Wobble medium': { affect: 'vol', per: 'time', mult: [wave(8, 8, 0.5)] },
+    'Wobble medium to fast': { affect: 'vol', per: 'time', mult: [wave(8, 4, 0.5)] },
+    'Wobble fast to slow': { affect: 'vol', per: 'time', mult: [wave(4, 16, 0.5)] },
+    'Wobble fast to medium': { affect: 'vol', per: 'time', mult: [wave(4, 8, 0.5)] },
+    'Wobble fast': { affect: 'vol', per: 'time', mult: [wave(4, 4, 0.5)] },
+    'Raise by 1': { affect: 'vol', per: 'pin', add: [1], onlyExistingPins: true },
+    'Lower by 1': { affect: 'vol', per: 'pin', add: [-1], onlyExistingPins: true },
+    'Double contrast': { affect: 'vol', per: 'pin', add: ['((x - average) * 2) * (maxval - minval)'], onlyExistingPins: true },
+    'Halve contrast': { affect: 'vol', per: 'pin', add: ['((x - average) * -0.5) * (maxval - minval)'], onlyExistingPins: true },
+    'Stagger on/off': { affect: 'vol', per: 'note', type: 'cycle', mult: [0, 1], onlyExistingPins: true },
+    'Stagger up/down': { affect: 'vol', per: 'note', type: 'cycle', add: ['(num % 2 === 0 ? 1 : -1)'], onlyExistingPins: true },
+    'Invert': { affect: 'vol', per: 'pin', add: ['(1 - x - x) * (maxval - minval)'], onlyExistingPins: true },
+    'Flip': { affect: 'vol', per: 'pin', add: ['((x - average) * -2) * (maxval - minval)'], onlyExistingPins: true },
+    'Random interrupts': { affect: 'vol', per: 'time', mult: ['random() > 0.5 ? 0.5 : 1'] }
+};
+const funcPitchPresets: { [key: string]: IStepData } = {
+    'Stagger every other': { affect: 'pitch', type: 'cycle', per: 'note', add: [-1, 1] },
+    'Stagger every 1 to 2': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 0, 0] },
+    'Stagger every 1 to 3': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 0, 0, 0] },
+    'Stagger every 2 to 1': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 1, 0] },
+    'Stagger every 3 to 1': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 1, 1, 0] },
+    'Staircase up': { affect: 'pitch', type: 'cycle', per: 'note', add: ['num'] },
+    'Staircase down': { affect: 'pitch', type: 'cycle', per: 'note', add: ['-num'] },
+    'Random shifts': { affect: 'pitch', per: 'time', add: ['random()'] }
 }
 
 /** This contains the controls for the Selection tab in the song editor. */
@@ -59,8 +77,10 @@ export class EditorTabSelection {
     private _merge : HTMLButtonElement;
     private _mergeAll : HTMLInputElement;
     private _bridge : HTMLButtonElement;
+    private _bridgeGrow : HTMLInputElement;
     private _bridgeBend : HTMLInputElement;
     private _spread : HTMLButtonElement;
+    private _spreadStack: HTMLInputElement;
     private _spreadPitch : HTMLInputElement;
     private _flatten : HTMLButtonElement;
     private _flattenPitch : HTMLInputElement;
@@ -75,12 +95,12 @@ export class EditorTabSelection {
     private _splitAbsolute : HTMLInputElement;
     private _splitAcross : HTMLInputElement;
     private _splitLabel : HTMLDivElement;
-    private _stepFunctionSelect: HTMLSelectElement;
-    private _stepFunctionRun : HTMLButtonElement;
-    private _stepFunctionParameterGroup : HTMLDivElement;
-    private _stepFunction = () => {};
-    private _stepFunctionCurried = () => { this._stepFunction(); }
-    private _stepTargetsPitch = false; /* For mod channels, disables running if true. */
+    private _functionSelect: HTMLSelectElement;
+    private _functionRun : HTMLButtonElement;
+    private _functionParameterGroup : HTMLDivElement;
+    private _specialFunction = () => {};
+    private _specialFunctionCurried = () => { this._specialFunction(); }
+    private _functionTargetsPitch = false; /* For mod channels, disables running if true. */
     private _monitoredChannel: number = -1
 	private _volDropdown: HTMLButtonElement;
 	private _volDropdownGroup: HTMLDivElement;
@@ -122,8 +142,10 @@ export class EditorTabSelection {
         this._merge = button({ class: "selectionOps-actionbutton noteOpMerge" });
         this._mergeAll = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._bridge = button({ class: "selectionOps-actionbutton noteOpBridge" });
+        this._bridgeGrow = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._bridgeBend = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._spread = button({ class: "selectionOps-actionbutton noteOpSpread" });
+        this._spreadStack = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._spreadPitch = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._mirrorH = button({ class: "selectionOps-actionbutton noteOpMirror" });
         this._mirrorV = button({ class: "selectionOps-actionbutton noteOpMirror", style: 'transform: rotate(90deg);' });
@@ -145,19 +167,22 @@ export class EditorTabSelection {
 		this._volStudioFadeIn = button({ class: "selectionOps-actionbutton noteOpVolCrossfade", style: 'transform: scaleX(-1);' });
 		this._volContrastMax = button({ class: "selectionOps-actionbutton noteOpVolContrastMax" });
 
-        this._stepFunctionSelect = select();
-        this._stepFunctionSelect.appendChild(option({ value: "Choose...", selected: 'selected' }, "Choose..."));
-        this._stepFunctionSelect.appendChild(optgroup({ label: "Volume Presets" },
-            ...(Object.keys(stepPresetsVol).map((key) => option({ value: key }, key)))
+        this._functionSelect = select();
+        this._functionSelect.appendChild(option({ value: "Choose...", selected: 'selected' }, "Choose..."));
+        this._functionSelect.appendChild(optgroup({ label: "Special" },
+            ...(Object.keys(funcSpecialPresetsMap).map((key) => option({ value: key }, key)))
         ));
-        this._stepFunctionSelect.appendChild(optgroup({ label: "Pitch Presets" },
-            ...(Object.keys(stepPresetsPitch).map((key) => option({ value: key }, key)))
+        this._functionSelect.appendChild(optgroup({ label: "Volume Presets" },
+            ...(Object.keys(funcVolPresets).map((key) => option({ value: key }, key)))
+        ));
+        this._functionSelect.appendChild(optgroup({ label: "Pitch Presets" },
+            ...(Object.keys(funcPitchPresets).map((key) => option({ value: key }, key)))
         ));
 
-        this._stepFunctionSelect.addEventListener('change', this._setStepFunction);
-        this._stepFunctionRun = button({ class: "selectionOps-actionbutton noteOpFunction" });
-        this._stepFunctionRun.addEventListener("click", this._stepFunction);
-        this._setStepFunction(); // set defaults
+        this._functionSelect.addEventListener('change', this._setFunction);
+        this._functionRun = button({ class: "selectionOps-actionbutton noteOpFunction" });
+        this._functionRun.addEventListener("click", this._specialFunction);
+        this._setFunction(); // set defaults
 
         this._splitSliderInputBox = input({ type: "number", step: "1", min: 1, max: Math.floor(this._doc.song.partsPerPattern / 2), value: "1" });
         this._splitSlider = new Slider(
@@ -180,7 +205,7 @@ export class EditorTabSelection {
 				this._volStudioFadeIn,
 				this._volContrastMax));
 
-        this._stepFunctionParameterGroup = div();
+        this._functionParameterGroup = div();
 
         const _selectionOps = [
             this._affectModChannelContainer,
@@ -191,10 +216,12 @@ export class EditorTabSelection {
             div({ class: "selectionOps-action"},
                 this._bridge,
                 div({ class: "tip", onclick: () => this._tipHandler("selectionBridge") }, "Bridge"),
+                label({ class: "checkbox-container" }, this._bridgeGrow, "Grow"),
                 label({ class: "checkbox-container" }, this._bridgeBend, "Bend")),
             div({ class: "selectionOps-action"},
                 this._spread,
                 div({ class: "tip", onclick: () => this._tipHandler("selectionSpread") }, "Spread"),
+                label({ class: "checkbox-container" }, this._spreadStack, "Stack"),
                 label({ class: "checkbox-container" }, this._spreadPitch, "Pitch")),
             div({ class: "selectionOps-action"},
                 this._mirrorH,
@@ -219,11 +246,11 @@ export class EditorTabSelection {
                 this._volDropdown),
 			this._volDropdownGroup,
             div({ class: "selectionOps-action"},
-                this._stepFunctionRun,
+                this._functionRun,
                 div({ class: "tip", onclick: () => this._tipHandler("selectionFunction") }, "Function"),
-                div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._stepFunctionSelect)
+                div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._functionSelect)
             ),
-            this._stepFunctionParameterGroup
+            this._functionParameterGroup
         ];
 
         _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Move));
@@ -276,9 +303,9 @@ export class EditorTabSelection {
         if (event.target === this._merge) {
             this._doc.selection.noteMerge(!this._mergeAll.checked);
         } else if (event.target === this._bridge) {
-            this._doc.selection.noteBridge(this._bridgeBend.checked);
+            this._doc.selection.noteBridge(this._bridgeGrow.checked, this._bridgeBend.checked);
         } else if (event.target === this._spread) {
-            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked);
+            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked, this._spreadStack.checked);
         } else if (event.target === this._flatten) {
             this._doc.selection.noteFlattenAcross(!this._flattenPitch.checked, this._flattenVolume.checked, modTrackIndex);
         } else if (event.target === this._mirrorH) {
@@ -289,46 +316,49 @@ export class EditorTabSelection {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked)
         } else if (event.target === this._volUp) {
-			this._doc.selection.noteStepAcross({ volMult: { array: [2], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : x'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volDown) {
-			this._doc.selection.noteStepAcross({ volMult: { array: [0.5], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxval - minval) + 0.001) ? -x : -x/2'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeOut) {
-			this._doc.selection.noteStepAcross({ volMult: { array: [1, 0], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [1, 0], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeIn) {
-			this._doc.selection.noteStepAcross({ volMult: { array: [0, 1], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [0, 1], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross({ volAdd: { array: ['(num === 1 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [1, 2], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '(x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : 0) + ((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross({ volAdd: { array: ['(num === 0 ? 1 : 0) * (maxval - minval)'], per: 'time' }, volMult: { array: [2, 1], per: 'time' }, onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['(x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : 0) + ((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))', 0], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
 			this._doc.selection.noteStepAcross(isModChannel
-                ? { volMult: { array: ['1 - pow(num / (len - 1), 2)'], per: 'time' } }
-                : { volMult: { array: [1, 0.5625, 0.25, 0.0625, 0], per: 'time' } },
+                ? { affect: 'vol', per: 'time', mult: ['1 - pow(num / (len - 1), 2)'] }
+                : { affect: 'vol', per: 'time', mult: [1, 0.5625, 0.25, 0.0625, 0] },
                 modTrackIndex);
 		} else if (event.target === this._volStudioFadeIn) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
 			this._doc.selection.noteStepAcross(isModChannel
-                ? { volMult: { array: ['pow(num / (len - 1), 2)'], per: 'time' } }
-                : { volMult: { array: [0, 0.0625, 0.25, 0.5625, 1], per: 'time' } },
+                ? { affect: 'vol', per: 'time', mult: ['pow(num / (len - 1), 2)'] }
+                : { affect: 'vol', per: 'time', mult: [0, 0.0625, 0.25, 0.5625, 1] },
                 modTrackIndex);
 		} else if (event.target === this._volContrastMax) {
-			this._doc.selection.noteStepAcross({ volAdd: { array: ['(x / biggest * (1 - biggest)) * (maxval - minval)'], per: 'pin' }, onlyExistingPins: true }, modTrackIndex);
+            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))'], onlyExistingPins: true }, modTrackIndex);
 		}
     }
 
-    private _setStepFunction = (): void => {
-        this._getStepFunctionGUI(stepPresetsVol[this._stepFunctionSelect.value] ?? stepPresetsPitch[this._stepFunctionSelect.value]);
-        this._stepFunctionRun.removeEventListener("click", this._stepFunctionCurried);
-        this._stepFunctionRun.addEventListener("click", this._stepFunctionCurried);
-        this._updateStepFunctionDisabled();
+    private _setFunction = (): void => {
+        const specialFunction = funcSpecialPresetsMap[this._functionSelect.value as keyof typeof funcSpecialPresetsMap];
+        if (specialFunction) {
+            this._getSpecialFunctionGUI(specialFunction);
+        } else {
+            this._getStepFunctionGUI(funcVolPresets[this._functionSelect.value] ?? funcPitchPresets[this._functionSelect.value]);
+        }
+        
+        this._functionRun.removeEventListener("click", this._specialFunctionCurried);
+        this._functionRun.addEventListener("click", this._specialFunctionCurried);
+        this._updateFunctionDisabled();
     }
 
-	/**
-     * Constructs an IStepData object from user input, using commas to delimit items in the add/multiply arrays.
-     * If an IStepData object is supplied, the GUI is constructed to match it.
-    */
-	private _getStepFunctionGUI(from?: IStepData) {
+	/** Creates an IStepData object and GUI from given options. Commas delimit entries in the array textboxes. */
+	private _getStepFunctionGUI(preset?: IStepData) {
 		interface IRowData {
             rowAffect: HTMLSelectElement;
             rowBehavior: HTMLSelectElement;
@@ -343,10 +373,9 @@ export class EditorTabSelection {
 
         const behaviors = {
             cycle: "cycle",
-            stretch: "normal",
+            stretch: "stretch",
             step: "step"
-        } satisfies { [key: string]: IStepArray['type'] }
-
+        }
         const affects = {
             vpn: "volume per note",
             vpp: "volume per pin",
@@ -354,48 +383,32 @@ export class EditorTabSelection {
             ppn: "pitch per note",
         };
 
-        // Simplified conversion of IStepData that only works if array type is uniform in all arrays and only pich or
-        // volume are provided, exclusively.
-        let fromBehavior: IStepArray['type'] | undefined;
         let fromAffects: keyof typeof affects | undefined;
         let fromAdd: string | undefined;
         let fromMultiply: string | undefined;
 
-        if (from) {
-            fromBehavior =
-                (from?.volAdd?.type === 'cycle' || from?.volMult?.type === 'cycle' ||
-                from?.pitchAdd?.type === 'cycle' || from?.pitchMult?.type === 'cycle') ? 'cycle' :
-                (from?.volAdd?.type === 'normal' || from?.volMult?.type === 'normal' ||
-                from?.pitchAdd?.type === 'normal' || from?.pitchMult?.type === 'normal') ? 'normal' :
-                (from?.volAdd?.type === 'step' || from?.volMult?.type === 'step' ||
-                from?.pitchAdd?.type === 'step' || from?.pitchMult?.type === 'step') ? 'step' :
+        if (preset) {
+            fromAffects = 
+                (preset.affect === 'vol' && preset.per === 'note') ? 'vpn' :
+                (preset.affect === 'vol' && preset.per === 'pin') ? 'vpp' :
+                (preset.affect === 'vol' && preset.per === 'time') ? 'vbt' :
+                (preset.affect === 'pitch') ? 'ppn' :
                 undefined;
 
-            fromAffects =
-                (from?.volAdd?.per === 'note' || from?.volMult?.per === 'note') ? 'vpn' :
-                (from?.volAdd?.per === 'pin' || from?.volMult?.per === 'pin') ? 'vpp' :
-                (from?.volAdd?.per === 'time' || from?.volMult?.per === 'time') ? 'vbt' :
-                (from?.pitchAdd?.per === 'note' || from?.pitchMult?.per === 'note') ? 'ppn' :
-                undefined;
-
-            if (from?.volAdd?.array || from?.pitchAdd?.array) {
-                fromAdd = (from?.volAdd?.array ?? from?.pitchAdd?.array ?? []).join(',');    
-            }
-            if (from?.volMult?.array || from?.pitchMult?.array) {
-                fromMultiply = (from?.volMult?.array ?? from?.pitchMult?.array ?? []).join(',');
-            }
+            if (preset.add) { fromAdd = preset.add.join(','); }
+            if (preset.mult) { fromMultiply = preset.mult.join(','); }
         }
 
         /** Reads control values to update the action when user runs the function. */
         const updatePerform = () => {
-            this._stepTargetsPitch = rows.some(row => row.rowAffect.value === 'ppn');
-            this._updateStepFunctionDisabled();
+            this._functionTargetsPitch = rows.some(row => row.rowAffect.value === 'ppn');
+            this._updateFunctionDisabled();
 
-            this._stepFunction = () => {
+            this._specialFunction = () => {
                 for (let row of rows) {
-                    const stepData: IStepData = { onlyExistingPins: row.rowOnlyExistingPins.checked };
                     const type = row.rowAffect.value as keyof typeof affects;
-                    const behavior = row.rowBehavior?.value ? behaviors[row.rowBehavior.value as keyof typeof behaviors] : behaviors['cycle'];
+                    const behavior = (row.rowBehavior?.value ?? 'cycle') as IStepData['type'];
+                    const stepData: IStepData = { affect: 'vol', type: behavior, onlyExistingPins: row.rowOnlyExistingPins.checked };
                     const scale = (str: string) => type === 'ppn' || str === '0' ? `(${str})` : `((${str}) / (maxval - minval))`;
                     const withDefault = (str: string, defaultVal: string) => str === "" ? defaultVal : str;
 
@@ -410,15 +423,10 @@ export class EditorTabSelection {
                         multArr.push('1')
                     }
 
-                    if (type === 'vbt' || type === 'vpn' || type === 'vpp') {
-                        const per = type === 'vpn' ? "note" : type === 'vpp' ? "pin" : "time";
-                        stepData.volAdd = { array: addArr, type: behavior, per: per },
-                        stepData.volMult = { array: multArr, type: behavior, per: per }
-                    } else if (type === 'ppn') {
-                        stepData.pitchAdd = { array: addArr, type: behavior, per: 'note' },
-                        stepData.pitchMult = { array: multArr, type: behavior, per: 'note' }
-                    }
-
+                    stepData.per = (type === 'vpn' || type === 'ppn') ? "note" : type === 'vpp' ? "pin" : "time";
+                    stepData.affect = (type === 'vpn' || type === 'vbt' || type === 'vpp') ? 'vol' : 'pitch';
+                    stepData.add = addArr;
+                    stepData.mult = multArr;
                     this._doc.selection.noteStepAcross(stepData, Config.modCount - this._affectModChannelNum.valueAsNumber);
                 }
             }
@@ -435,15 +443,17 @@ export class EditorTabSelection {
             const multiplyBy = input({ class: "selectionOps-textbox", placeholder: "1", type: "text" });
             const remove = button({ style: "margin-right: 4px;" }, "remove row");
 
-            // Populate values from the passed-in preset, if any.
-            affect.value = fromAffects ?? 'ppn' satisfies keyof typeof affects;
-            behavior.value = fromBehavior ?? behaviors.cycle
+            // Populate values from the passed-in preset.
+            affect.value = isFirstRow && fromAffects
+                ? fromAffects satisfies keyof typeof affects
+                : 'vpn';
+            behavior.value = isFirstRow && preset?.type
+                ? preset.type
+                : behaviors.cycle
 
-            if (fromAdd) { add.value = fromAdd; }
-            if (fromMultiply) { multiplyBy.value = fromMultiply; }
-            if (from?.onlyExistingPins !== undefined) {
-                onlyExistingPins.checked = from?.onlyExistingPins;
-            }
+            if (fromAdd) { add.value = isFirstRow ? fromAdd : ''; }
+            if (fromMultiply) { multiplyBy.value = isFirstRow ? fromMultiply : ''; }
+            onlyExistingPins.checked = isFirstRow ? (preset?.onlyExistingPins ?? false) : false
 
             // Clicking remove on a row finds itself in the rows and removes itself that way.
             if (!isFirstRow) {
@@ -488,14 +498,35 @@ export class EditorTabSelection {
         const addRow = button({}, "Add row");
         addRow.addEventListener("click", () => {
             rows.push(createRow());
-            this._stepFunctionParameterGroup?.lastElementChild?.before(...rows[rows.length - 1].generated);
+            this._functionParameterGroup?.lastElementChild?.before(...rows[rows.length - 1].generated);
             // no effects, skip updatePerform
         })
 
-        this._stepFunctionParameterGroup?.replaceChildren(
+        this._functionParameterGroup?.replaceChildren(
             ...rows.flatMap(rows => rows.generated),
             div({ class: "inlineblock" }, addRow));
         updatePerform();
+	}
+
+    /** Creates an IStepData object and GUI from given options. Commas delimit entries in the array textboxes. */
+	private _getSpecialFunctionGUI(name: funcSpecialPresets) {
+
+        /**
+         * 
+         * Creates notes to match the given function
+         * 
+         * Note count: [ slider up to 96 ]
+         * Pitch:  [ expression textbox ]
+         * Volume: [ expression textbox ]
+         * Merged? [X]
+         * 
+         * First, if pitch is non-empty, it replaces existing notes with new ones
+         * Then, iterate all notes in range and replace their volumes
+         */
+
+        //if (name === funcSpecialPresets.NotesFromFormula) {
+            //
+        //}
 	}
 
     private _updateSplitSliderParts = (source: HTMLInputElement) => (): void => {
@@ -524,7 +555,16 @@ export class EditorTabSelection {
             const incompatWithModulation = [this._mirrorV, ...incompatCheckboxes];
 
             if (this._doc.song.getChannelIsMod(this._doc.channel)) {
-                incompatWithModulation.forEach(el => el.setAttribute("disabled", "true"));
+                incompatWithModulation.forEach(el => {
+                    // Disabling the focused element defaults to body, which won't run key handling, so avoid breaking
+                    // that. Notably, scrolling past a mod channel with focus on a disable-able control will cause
+                    // arrowkeys to get "stuck" because of this.
+                    if (document.activeElement === el) { 
+                        document.querySelector<HTMLButtonElement>('button.noteOpMerge')?.focus();
+                    }
+
+                    el.setAttribute("disabled", "true")
+                });
                 this._affectModChannelContainer.style.display = "";
 
                 // Disable pitch-related GUI in the step function when on a mod channel, and push to an
@@ -544,19 +584,19 @@ export class EditorTabSelection {
                 this._affectModChannelContainer.style.display = "none";
             }
 
-            this._updateStepFunctionDisabled();
+            this._updateFunctionDisabled();
             this._monitoredChannel = this._doc.channel;
         }
     }
 
-    private _updateStepFunctionDisabled = () => {
+    private _updateFunctionDisabled = () => {
         if (
-            (this._doc.song.getChannelIsMod(this._doc.channel) && this._stepTargetsPitch) ||
-            (!Object.hasOwn(stepPresetsVol, this._stepFunctionSelect.value) &&
-            !Object.hasOwn(stepPresetsPitch, this._stepFunctionSelect.value))) {
-            this._stepFunctionRun.setAttribute("disabled", "true");
+            (this._doc.song.getChannelIsMod(this._doc.channel) && this._functionTargetsPitch) ||
+            (!Object.hasOwn(funcVolPresets, this._functionSelect.value) &&
+            !Object.hasOwn(funcPitchPresets, this._functionSelect.value))) {
+            this._functionRun.setAttribute("disabled", "true");
         } else {
-            this._stepFunctionRun.removeAttribute("disabled");
+            this._functionRun.removeAttribute("disabled");
         }
     }
 }

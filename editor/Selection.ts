@@ -6,8 +6,7 @@ import { SongDocument } from "./SongDocument";
 import { ChangeGroup } from "./Change";
 import { ColorConfig } from "./ColorConfig";
 import { ChangeTrackSelection, ChangeChannelBar, ChangeAddChannel, ChangeRemoveChannel, ChangeChannelOrder, ChangeDuplicateSelectedReusedPatterns, ChangeNoteAdded, ChangeNoteTruncate, ChangePatternNumbers, ChangePatternSelection, ChangeInsertBars, ChangeDeleteBars, ChangeEnsurePatternExists, ChangeNoteLength, ChangePaste, ChangeSetPatternInstruments, ChangeViewInstrument, ChangeModChannel, ChangeModInstrument, ChangeModSetting, ChangeModFilter, ChangePatternsPerChannel, ChangePatternRhythm, ChangePatternScale, ChangeTranspose, ChangeRhythm, comparePatternNotes, unionOfUsedNotes, generateScaleMap, discardInvalidPatternInstruments, patternsContainSameInstruments } from "./changes";
-import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeStretchHorizontal, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross } from "./changesNoteOps";
-import { PatternEditor } from "./PatternEditor";
+import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeStretchHorizontal, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross, ChangeStackLeftAcross, ChangeStackBottomAcross } from "./changesNoteOps";
 
 interface PatternCopy {
     instruments: number[];
@@ -910,18 +909,19 @@ export class Selection {
     /** Creates notes between notes.
      * 
      * See the bridge function in changesNoteOps.ts.
+     * @param grow if true, instead of creating new notes in the gap, extends the existing note
      * @param doBends Copy pitch/volume of adjacent following note
      * @param copyEnds Copy volume of start & end of previous note. If not provided, this defaults to true when it's a
      * noise channel, because that is extremely common (and in-line with how noise channels work), else false.
      */
-    public noteBridge(doBends: boolean): void {
+    public noteBridge(grow: boolean, doBends: boolean): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
             if (this._doc.song.getChannelIsMod(channelIndex)) { continue; }
             const isNoise = this._doc.song.getChannelIsNoise(channelIndex);
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                const bridgeOp = new ChangeBridgeAcross(this._doc, pattern, doBends, isNoise);
+                const bridgeOp = new ChangeBridgeAcross(this._doc, pattern, grow, doBends, isNoise);
                 this._changeNoteOperations.append(bridgeOp);
 			}
         }
@@ -989,13 +989,12 @@ export class Selection {
                         if (vol) {
                             if (this._doc.song.getChannelIsNoise(channelIndex)) {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    { volAdd: { array: [1, 0], per: 'note' } },
+                                    { affect: 'vol', per: 'note', add: [1, 0] },
                                     undefined, undefined, pitchIndex
                                 ))
                             } else {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    { volAdd: { array: ['maxval - minval'], per: 'note' } },
-                                    undefined, undefined, pitchIndex
+                                    { affect: 'vol', per: 'note', add: ['maxval - minval'] }, undefined, undefined, pitchIndex
                                 ))
                             }
                         } else {
@@ -1014,16 +1013,25 @@ export class Selection {
      * 
      * See the spread horizontal/vertical functions in changesNoteOps.ts.
      * @param spreadPitch Performs a pitch spread instead of regular spread.
+     * @param stackOnly If true, stacks left instead of between, or along bottom if pitch is true.
     */
-    public noteSpreadAcross(spreadPitch: boolean): void {
+    public noteSpreadAcross(spreadPitch: boolean, stackOnly: boolean): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                if (spreadPitch) {
-                    this._changeNoteOperations.append(new ChangeSpreadVertical(this._doc, pattern));
+                if (stackOnly) {
+                    if (spreadPitch) {
+                        this._changeNoteOperations.append(new ChangeStackBottomAcross(this._doc, pattern));
+                    } else {
+                        this._changeNoteOperations.append(new ChangeStackLeftAcross(this._doc, pattern));
+                    }
                 } else {
-                    this._changeNoteOperations.append(new ChangeSpreadAcross(this._doc, pattern));
+                    if (spreadPitch) {
+                        this._changeNoteOperations.append(new ChangeSpreadVertical(this._doc, pattern));
+                    } else {
+                        this._changeNoteOperations.append(new ChangeSpreadAcross(this._doc, pattern));
+                    }
                 }
 			}
         }
@@ -1047,7 +1055,7 @@ export class Selection {
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Cumulatively performs volume/pitch changes to existing and/or new pins.
+    /** Cumulatively performs changes to notes or pins, possibly generating new pins.
      * 
      * See the step function in changesNoteOps.ts.
      * @param data The arrays and how they interact.

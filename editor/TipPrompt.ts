@@ -37,7 +37,8 @@ export class TipPrompt implements Prompt {
 			case "selectionBridge": {
 				this.messages = [div(
 					h2("Bridge"),
-					p("This creates notes in the empty space to the right of other notes. If \"Bend\" is active, the new notes will end at the starting pitch of the next note."),
+					p("This creates notes in the empty space to the right of other notes, or extends existing ones if \"Grow\" is active. If \"Bend\" is active, "
+						+ "the new notes will end at the starting pitch of the next note."),
 					p("It affects only notes in the selected range, or all notes on the pattern(s) if none are selected.")
 				)];
 				break;
@@ -47,6 +48,7 @@ export class TipPrompt implements Prompt {
 					h2("Spread"),
 					p("This spreads notes to be evenly-spaced in the selection. If only one note is selected, it centers it."),
 					p("If \"Pitch\" is active, it spreads the notes vertically like a staircase going up (crescendo) or down (decrescendo), whichever is closer."),
+					p("If \"Stack\" is active, it removes all spaces between notes, stacking on the left side of the selection, or bottom if \"Pitch\" is also active."),
 					p("Spread affects on-screen notes that fit within your selection. It also works across channel selections.")
 				)];
 			} break;
@@ -99,15 +101,10 @@ export class TipPrompt implements Prompt {
 				), div(
 					h2("Expressions"),
 					p("Anywhere a function takes a number, it can take an expression, like \"2 * sin(x)\". The presets give lots of examples of this. If the expression isn't valid, it won't do anything."),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "x "), "The value of the current note or pin"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "num "), "The note or pin #, or time value of the current note or pin contained in the selection, if any"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "len "), "The total number of notes or pins or amount of time contained in the selection, if any"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "maxval "), "The maximum volume (or value) of the current channel"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "minval "), "The smallest volume (or value) of the current channel, which can be negative in modulation channels"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "smallest "), "The smallest volume (or value) anywhere in the current note when in the selection, if any"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "biggest "), "The largest volume (or value) anywhere in the current note when in the selection, if any"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "average "), "All pins in the current note that fit in the selection, summed and divided by how many pins there are"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "prev "), "The value of the prior note or pin (meaning to the left of this one)"),
+					p({}, span({ style: "text-decoration: dotted underline;" }, "x, prev "), "The current or previous volume/pitch value"),
+					p({}, span({ style: "text-decoration: dotted underline;" }, "num, len "), "Number and length form a ratio of current:total for the note, pin #, or time value of the current note or pin in the selection, if any"),
+					p({}, span({ style: "text-decoration: dotted underline;" }, "maxval, minval "), "The max or min volume/pitch of the current channel. Minval can be negative in modulation channels"),
+					p({}, span({ style: "text-decoration: dotted underline;" }, "smallest, biggest, average "), "The smallest, biggest and average volume/pitch anywhere in the selection, if any"),
 				), div(
 					h2("Expressions cont'd"),
 					p("Any function in the Javascript \"Math\" object can be used, with parentheses like sin(5):"),
@@ -116,28 +113,33 @@ export class TipPrompt implements Prompt {
 					p({}, span({ style: "text-decoration: dotted underline;" }, "ceil(x), round(x), floor(x) "), "The rounding functions. Ceiling only rounds up and floor rounds down"),
 					p({}, span({ style: "text-decoration: dotted underline;" }, "pow(x,y) "), "Takes two numbers and raises the first to the power of the second. Equivalent to \"x ** y\""),
 					p({}, span({ style: "text-decoration: dotted underline;" }, "max(x,y), min(x,y) "), "Maximum and minimum, which compare two numbers and returns the greatest or smallest value. Useful to cap values"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "random() "), "Takes no numbers. Generates a random value between 0 and 1 like 0.3542. Useful for creating intermittent effects"),
+					p({}, span({ style: "text-decoration: dotted underline;" }, "random() "), "Takes no numbers. Generates a random value between 0 and 1 like 0.3542. Useful for random variation."),
 				)];
 			} break;
 			case "selectionStepAffect": {
 				this.messages = [div(
 					h2("Affect"),
-					p("You can change the volume/value of notes, or affect pitch in non-modulation channels."),
-					p("To manage scale, there are limits on how many pitches and volume values exist, which affects output quality."),
-					p(`Volume goes up to ${Config.noteSizeMax} except in mod channels where it depends on the target (and can be negative, too).`),
+					p("You can change the volume/pitch of notes, or affect pitch in non-modulation channels. Note: there are limits on how many pitches and volume values exist, which affects output quality."),
+					p(`Volume goes up to ${Config.noteSizeMax} except in mod channels where it depends on the target and can be negative.`),
 					p(`Pitch goes up to ${Config.maxPitch} in pitch channels, ${Config.drumCount - 1} in drum channels, and is disabled in mod channels. The whole note moves at once.`)
 				)];
 			} break;
 			case "selectionStepBehavior": {
 				this.messages = [div(
 					h2("Behavior"),
-					p("This")
+					p("This decides which number to use in the add/multiply list of values."),
+					p("\"Step\" gives an even amount of time to use each number in the array, from left to right. adding \"x, 1\" would add x until halfway when it switches to 1."),
+					p("\"Stretch\" is like Step, but it blends the results, e.g. adding \"x, 1\" would add x at first, averaging to 1 at the end."),
+					p("\"Cycle\" doesn't give an even amount of time to each number. Instead, it just picks the next number in the list, wrapping around. E.g. \"x, 1\" would pick x,1,x,1,...")
 				)];
 			} break;
 			case "selectionStepArrays": {
 				this.messages = [div(
 					h2("Add and Multiply by"),
-					p("These ")
+					p("These are the instructions on what to add or multiply by as the function runs."),
+					p("Each array can have any number of expressions separated by commas. It can be as simple as a number \"5\" or as complex as \"sin(num)\". "
+						+ "Multiple values would look something like \"5, 7, sin(x) + 1, 6\"."),
+					p("First, multiplication is performed, and then addition.")
 				)];
 			} break;
 			case "key": {
