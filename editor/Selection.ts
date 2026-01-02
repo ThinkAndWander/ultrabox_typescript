@@ -1009,7 +1009,7 @@ export class Selection {
         this._doc.record(this._changeFlatten);
     }
 
-    /** Spread notes evenly across a horizontal range, or vertical detected pitch bounds.
+    /** Spread notes evenly, or stack them, across a horizontal range, or vertical detected pitch bounds.
      * 
      * See the spread horizontal/vertical functions in changesNoteOps.ts.
      * @param spreadPitch Performs a pitch spread instead of regular spread.

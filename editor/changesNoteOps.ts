@@ -484,7 +484,7 @@ export class ChangeStepAcross extends ChangeSequence {
                     return data.type === 'step' ? numbersLR[0] : numbersLR[0] + fraction * (numbersLR[1] - numbersLR[0])
                 }
                 
-                return resolve(stepArray[index % stepArray.length], val, index, lengths[slot], info);
+                return resolve(stepArray[index % stepArray.length], val, current, lengths[slot], info);
             }
 
             return undefined;

@@ -142,6 +142,11 @@ export class TipPrompt implements Prompt {
 					p("First, multiplication is performed, and then addition.")
 				)];
 			} break;
+			case "selectionModTarget": {
+				this.messages = [div(
+					p("Which modulation channel to affect, #1 is the top track, #2 is the track below it, and so on.")
+				)]
+			} break;
 			case "key": {
 				this.messages = [div(
 					h2("Song Key"),

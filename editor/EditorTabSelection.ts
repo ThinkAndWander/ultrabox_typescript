@@ -12,20 +12,10 @@ type TipHandler = (tipName: string) => void;
 
 // Function presets based on various or ad-hoc functions.
 enum funcSpecialPresets {
-    AdjustChoruses,
-    AdvancedBridge,
-    DeleteZeroVolNotes,
-    NotesFromFormula,
-    ShrinkNotes,
-    SplitPitchBends,
+    TapNotes,
 }
 const funcSpecialPresetsMap = {
-    'Adjust choruses': funcSpecialPresets.AdjustChoruses,
-    'Advanced bridge': funcSpecialPresets.AdvancedBridge,
-    'Create from formula': funcSpecialPresets.NotesFromFormula,
-    'Delete zero-volume notes': funcSpecialPresets.DeleteZeroVolNotes,
-    'Shrink Notes': funcSpecialPresets.ShrinkNotes,
-    'Split at pitch bends': funcSpecialPresets.SplitPitchBends,
+    'Naturalize note positions': funcSpecialPresets.TapNotes,
 }
 
 // Function presets based on the step function.
@@ -346,8 +336,8 @@ export class EditorTabSelection {
 
     private _setFunction = (): void => {
         const specialFunction = funcSpecialPresetsMap[this._functionSelect.value as keyof typeof funcSpecialPresetsMap];
-        if (specialFunction) {
-            this._getSpecialFunctionGUI(specialFunction);
+        if (specialFunction !== undefined) {
+            this._setSpecialFunction(specialFunction);
         } else {
             this._getStepFunctionGUI(funcVolPresets[this._functionSelect.value] ?? funcPitchPresets[this._functionSelect.value]);
         }
@@ -509,24 +499,14 @@ export class EditorTabSelection {
 	}
 
     /** Creates an IStepData object and GUI from given options. Commas delimit entries in the array textboxes. */
-	private _getSpecialFunctionGUI(name: funcSpecialPresets) {
+	private _setSpecialFunction(specialFunction: funcSpecialPresets) {
+        this._functionParameterGroup?.replaceChildren();
+        this._functionTargetsPitch = false;
+        this._updateFunctionDisabled();
 
-        /**
-         * 
-         * Creates notes to match the given function
-         * 
-         * Note count: [ slider up to 96 ]
-         * Pitch:  [ expression textbox ]
-         * Volume: [ expression textbox ]
-         * Merged? [X]
-         * 
-         * First, if pitch is non-empty, it replaces existing notes with new ones
-         * Then, iterate all notes in range and replace their volumes
-         */
-
-        //if (name === funcSpecialPresets.NotesFromFormula) {
-            //
-        //}
+        if (specialFunction === funcSpecialPresets.TapNotes) {
+            this._specialFunction = () => this._doc.selection.noteTapAcross();
+        }
 	}
 
     private _updateSplitSliderParts = (source: HTMLInputElement) => (): void => {
@@ -592,7 +572,8 @@ export class EditorTabSelection {
     private _updateFunctionDisabled = () => {
         if (
             (this._doc.song.getChannelIsMod(this._doc.channel) && this._functionTargetsPitch) ||
-            (!Object.hasOwn(funcVolPresets, this._functionSelect.value) &&
+            (!Object.hasOwn(funcSpecialPresetsMap, this._functionSelect.value) &&
+            !Object.hasOwn(funcVolPresets, this._functionSelect.value) &&
             !Object.hasOwn(funcPitchPresets, this._functionSelect.value))) {
             this._functionRun.setAttribute("disabled", "true");
         } else {
