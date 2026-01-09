@@ -171,8 +171,8 @@ export class ChangeBridgeAcross extends ChangeSequence {
         let notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length <= 1) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2)); }
 
         let note: Note;
         let prevNote: Note | null;
@@ -263,12 +263,8 @@ export class ChangeBridgeAcross extends ChangeSequence {
  * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeSplitAcross extends ChangeSequence {
-    private _pattern: Pattern;
-    private _splitNotes: Note[] = [];
-    private _cuts: number[] = [];
     constructor(doc: SongDocument, pattern: Pattern, numCuts: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
-        this._pattern = pattern;
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
@@ -280,8 +276,9 @@ export class ChangeSplitAcross extends ChangeSequence {
 
         let cutIndices: number[] = [];
 
-        if (numCuts === 1) { cutIndices.push(Math.round((x1 + x2) / 2)); }
-        else {
+        if (numCuts === 1) {
+            cutIndices.push(Math.round((x1 + x2) / 2));
+        } else {
             const chunk = Math.max(range / (numCuts + 1), 1); // Never less than 1 for time.
             let cut: number;
             for (let i = 1; i < numCuts + 1; i++) {
@@ -293,38 +290,14 @@ export class ChangeSplitAcross extends ChangeSequence {
             }
         }
 
-        let splitOp: ChangeSplitNotesAtPoint;
         for (let i = 0; i < cutIndices.length; i++) {
-            splitOp = new ChangeSplitNotesAtPoint(doc, pattern, cutIndices[i], pitchIndex);
-            this.append(splitOp);
-            this._splitNotes.push(splitOp.leftNote, splitOp.rightNote);
+            this.append(new ChangeSplitNotesAtPoint(pattern, cutIndices[i], pitchIndex));
         }
-
-        // Split occurs across any note(s) so there may be duplicates and it's easiest to just iterate to remove them.
-        this._cuts = cutIndices;
-        this._splitNotes = this._splitNotes.filter(function(item, pos, self) {
-            return self.indexOf(item) == pos;
-        })
 
         if (cutIndices.length > 0) {
             doc.notifier.changed();
             this._didSomething();    
         }
-    }
-
-    /** Performs a callback for each cut position, providing its position. */
-    public perCut(callback: (cutPosition: number) => boolean | void) {
-        if (callback === null) { return; }
-        this._cuts.every(cut => { callback(cut) !== true })
-    }
-
-    /**
-     * Performs a callback per-note for all splits created. Only includes matching notes.
-     * Return true anytime to exit early.
-     */
-    public perNote(callback: (note: Note) => boolean | void) {
-        if (callback === null) { return; }
-        this._splitNotes.every(note => !(this._pattern.notes.includes(note) && callback(note) === true))
     }
 }
 
@@ -345,8 +318,8 @@ export class ChangeStackLeftAcross extends ChangeSequence {
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex)); }
 
         let firstNote = false;
         for (let i = 0; i < notesArray.length; i++) {
@@ -870,8 +843,8 @@ export class ChangeSpreadAcross extends ChangeSequence {
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex)); }
 
         // Get the total free space available and number of notes in the range.
         let note: Note;
@@ -938,8 +911,8 @@ export class ChangeSpreadVertical extends ChangeSequence {
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length <= 1) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2)); }
 
         // Get the note count, the min/max pitch of every note + overall min/max, and detect slope.
         let note: Note;
@@ -1042,8 +1015,8 @@ export class ChangeStackBottomAcross extends ChangeSequence {
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length <= 1) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2)); }
 
         // Get the note count, the min/max pitch of every note + overall min/max, and detect slope.
         let note: Note;
@@ -1133,8 +1106,8 @@ export class ChangeTapNotesAcross extends ChangeSequence {
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex)); }
 
         let canTapLeft: boolean;
         let canTapRight: boolean;
@@ -1178,8 +1151,8 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex)); }
 
         let note: Note;
         const firstNote = notesArray[0].clone();
@@ -1256,8 +1229,8 @@ export class ChangeStretchHorizontal extends ChangeSequence {
             return;
         }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex)); }
 
         if (x2b < x1b) {
             this.append(new ChangeMirrorHorizontal(doc, pattern, true, x1, x2, pitchIndex));
@@ -1495,10 +1468,10 @@ export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x
 
     if (appendSplits) {
         if (indices.L !== -1) {
-            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex));
+            appendSplits.append(new ChangeSplitNotesAtPoint(pattern, x1, pitchIndex));
         }
         if (indices.R !== -1) {
-            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex));
+            appendSplits.append(new ChangeSplitNotesAtPoint(pattern, x2, pitchIndex));
         }
         // Rightmost index moves due to split operation(s).
         if (indices.R !== -1) {

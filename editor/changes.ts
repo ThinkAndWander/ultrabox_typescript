@@ -4292,12 +4292,10 @@ export class ChangeNoteTruncate extends ChangeSequence {
 }
 
 export class ChangeSplitNotesAtPoint extends ChangeSequence {
-    public oldNote: Note;
-    public leftNote: Note;
-    public rightNote: Note;
-    constructor(doc: SongDocument, pattern: Pattern, cutPoint: number, pitchIndex?: number) {
+    constructor(pattern: Pattern, cutPoint: number, pitchIndex?: number) {
         super();
 
+        let splitNote: Note;
         for (let i = pattern.notes.length - 1; i >= 0; i--) {
             const note: Note = pattern.notes[i];
 
@@ -4313,22 +4311,23 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                 const cutRelativeToNote = cutPoint - note.start
                 const cutIndex = note.pins.findIndex((pin) => pin.time > cutRelativeToNote)
                 if (cutIndex != -1) {
-                    this.leftNote = note.clone();
-                    this.leftNote.end = cutPoint;
-                    this.leftNote.pins = [...note.pins.slice(0, cutIndex)];
-                    this.rightNote = note.clone();
-                    this.rightNote.continuesLastPattern = false;
-                    this.rightNote.start = cutPoint;
-                    this.rightNote.pins = [...note.pins.slice(cutIndex)];
-                    this.rightNote.pins.forEach((pin) => {
+                    splitNote = note.clone();
+
+                    note.end = cutPoint;
+                    note.pins = [...note.pins.slice(0, cutIndex)];
+
+                    splitNote.continuesLastPattern = false;
+                    splitNote.start = cutPoint;
+                    splitNote.pins = [...splitNote.pins.slice(cutIndex)];
+                    splitNote.pins.forEach((pin) => {
                         pin.time -= cutRelativeToNote;
                     });
 
                     // This note used to continuously go from its left pin values to its right pin values, by
                     // linear interpolation (lerp). So if we consider their distance to the cutpoint, we can find
                     // its exact pitch and volume, which is a lerp between those pins.
-                    const leftPin = this.leftNote.pins[this.leftNote.pins.length - 1];
-                    const rightPin = this.rightNote.pins[0];
+                    const leftPin = note.pins[note.pins.length - 1];
+                    const rightPin = splitNote.pins[0];
                     const spaceToLeftPin = cutRelativeToNote - leftPin.time;
                     const spaceBetweenPins = spaceToLeftPin + rightPin.time;
                     const percentBetweenPins = spaceBetweenPins > 0
@@ -4345,23 +4344,19 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                     );
 
                     // We can now normalize the pitch and pin intervals of the right note.
-                    this.rightNote.pitches = this.rightNote.pitches.map((pitch) => pitch + cutPin.interval)
-                    this.rightNote.pins.forEach((pin) => pin.interval -= cutPin.interval);
+                    splitNote.pitches = splitNote.pitches.map((pitch) => pitch + cutPin.interval)
+                    splitNote.pins.forEach((pin) => pin.interval -= cutPin.interval);
 
                     // Notes need pins at their exact start/end. We cut the pins left and right earlier, but now
                     // insert the cut pin as needed to the end of left note and start of right note.
                     if (leftPin.time != cutRelativeToNote) {
-                        this.leftNote.pins.push(cutPin);
+                        note.pins.push(cutPin);
                     }
                     if (rightPin.time > 0) {
-                        this.rightNote.pins.unshift(makeNotePin(0, 0, cutPin.size))
+                        splitNote.pins.unshift(makeNotePin(0, 0, cutPin.size))
                     }
 
-                    // Delete the old note and append the modified notes in its place.
-                    this.append(new ChangeNoteAdded(doc, pattern, note, i, true));
-                    this.append(new ChangeNoteAdded(doc, pattern, this.rightNote, i, false));
-                    this.append(new ChangeNoteAdded(doc, pattern, this.leftNote, i, false));
-                    this.oldNote = note;
+                    pattern.notes.splice(i + 1, 0, splitNote);
                 }
 
                 break;
@@ -4603,12 +4598,14 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
 
         if (parts == 0 && transpose == 0) return;
 
-        if (doc.selection.patternSelectionActive) {
-            this.append(new ChangeSplitNotesAtSelection(doc, pattern));
-        }
-
         const oldStart: number = doc.selection.patternSelectionStart;
         const oldEnd: number = doc.selection.patternSelectionEnd;
+
+        if (doc.selection.patternSelectionActive) {
+            this.append(new ChangeSplitNotesAtPoint(pattern, oldStart));
+            this.append(new ChangeSplitNotesAtPoint(pattern, oldEnd));
+        }
+        
         const newStart: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldStart + parts));
         const newEnd: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldEnd + parts));
         if (newStart == newEnd) {
