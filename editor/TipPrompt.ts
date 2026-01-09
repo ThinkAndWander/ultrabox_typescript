@@ -37,9 +37,9 @@ export class TipPrompt implements Prompt {
 			case "selectionBridge": {
 				this.messages = [div(
 					h2("Bridge"),
-					p("This creates notes in the empty space to the right of other notes, or extends existing ones if \"Grow\" is active. If \"Bend\" is active, "
-						+ "the new notes will end at the starting pitch of the next note."),
-					p("It affects only notes in the selected range, or all notes on the pattern(s) if none are selected.")
+					p("This creates notes in the empty space to the right of other notes, or extends existing ones if \"Grow\" is active."),
+					p("If \"Bend\" is active, the new notes will end at the starting pitch of the next note except in drum channels, which always fade out."),
+					p("Bridge affects only notes in the selected range, or all notes on the pattern(s) if none are selected.")
 				)];
 				break;
 			}
@@ -62,14 +62,18 @@ export class TipPrompt implements Prompt {
 			case "selectionFlatten": {
 				this.messages = [div(
 					h2("Flatten"),
-					p("This removes all pitch bends from notes. If \"Pitch\" is active, it also sets the notes to the average of their pitches."),
+					p("This removes all pitch bends from notes."),
+					p("If \"Pitch\" is active, it also sets the notes to the average of their pitches."),
+					p("If \"Vol\" is active, it resets all parts of notes to the default volume and does nothing else."),
 					p("Flatten affects on-screen notes that fit within your selection. It also works across channel selections.")
 				)];
 			} break;
 			case "selectionSplit": {
 				this.messages = [div(
 					h2("Split"),
-					p("This makes a number of evenly-spaced cuts across the selected range, which separate notes."),
+					p("This makes a number of evenly-spaced cuts in the selected range, which separate notes. Normally it just cuts every note into even pieces."),
+					p("If \"Across\" is active, instead of cutting each note X times, it makes X cuts in total across the selection."),
+					p("If \"Absolute\" is active, it makes cuts every X parts instead of making X cuts, e.g. '4' would make a cut every four time units instead of making only four cuts."),
 					p("Split affects on-screen notes that fit within your selection. It also works across channel selections.")
 				)];
 			} break;
@@ -78,15 +82,15 @@ export class TipPrompt implements Prompt {
 					h2("Volume operations"),
 					p("These buttons adjust volume for the whole pattern, or the selection, even selections that include parts of notes."),
 					p("These are the operations in order from top-left to bottom-right:"),
-					div({ style: "text-decoration: dotted underline; padding-top: 12px" }, "Volume up/down"),
+					div({ style: "font-style: italic; padding-top: 12px" }, "Volume up/down"),
 					div("Doubles or halves the volume"),
-					div({ style: "text-decoration: dotted underline; padding-top: 12px" }, "Volume fade out/in"),
+					div({ style: "font-style: italic; padding-top: 12px" }, "Volume fade out/in"),
 					div("Fade the selection to zero at the end or start"),
-					div({ style: "text-decoration: dotted underline; padding-top: 12px" }, "Volume gain end/start"),
+					div({ style: "font-style: italic; padding-top: 12px" }, "Volume gain end/start"),
 					div("Doubles volume of the selection at the end or start (opposite of fade)"),
-					div({ style: "text-decoration: dotted underline; padding-top: 12px" }, "Volume studio fade out/in"),
+					div({ style: "font-style: italic; padding-top: 12px" }, "Volume studio fade out/in"),
 					div("Like the volume fade operations, but with a quadratic curve so the fade is strong at the center, gradual at the ends"),
-					div({ style: "text-decoration: dotted underline; padding-top: 12px" }, "Maximize contrast"),
+					div({ style: "font-style: italic; padding-top: 12px" }, "Maximize contrast"),
 					div("Stretches the loudest notes to max volume, quietest notes to total silence, and everything between accordingly.")
 				)];
 			} break;
@@ -95,33 +99,37 @@ export class TipPrompt implements Prompt {
 					h2("Function"),
 					p("Select a preset and click the triangle (run) button to perform it. Try out the presets, or click the names of settings for a rundown on how they work."),
 					h3("How it works"),
-					p("Basically, a function works with volume or pitch, affecting the whole note at once or parts of it (see the tip for \"Affect\")."),
-					p("How it works is to use any number of values or expressions, separated by commas, like \"1\" or \"1,2,3\". But it also needs to know \*how\* to apply those values (see the tip for \"Behavior\")."),
-					p("The function does multiplication first, then addition.")
+					p("Basically, a function works with note volumes, pitch bends, or overall pitch of a note. See the tip for \"Affect\"."),
+					p("How it works is to use any number of values or expressions, separated by commas, like \"1\" or \"1,2,3\". But it also needs to know \*how\* to apply those values. See the tip for \"Behavior\"."),
 				), div(
-					h2("Expressions"),
-					p("Anywhere a function takes a number, it can take an expression, like \"2 * sin(x)\". The presets give lots of examples of this. If the expression isn't valid, it won't do anything."),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "x, prev "), "The current or previous volume/pitch value"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "num, len "), "Number and length form a ratio of current:total for the note, pin #, or time value of the current note or pin in the selection, if any"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "maxval, minval "), "The max or min volume/pitch of the current channel. Minval can be negative in modulation channels"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "smallest, biggest, average "), "The smallest, biggest and average volume/pitch anywhere in the selection, if any"),
+					h2("Expression variables"),
+					p("You can mix math into the number arrays, like \"1, 2 * sin(x), 0\" just like the presets. Invalid math is ignored. You can also use these special variables!"),
+					p({}, span({ style: "font-style: italic;" }, "x, prev "), "The current or previous volume, bend or pitch, where prev is -1 for the first value"),
+					p({}, span({ style: "font-style: italic;" }, "num, len "), "Number and length form a ratio of current/total for the note, pin #, or time value"),
+					p({}, span({ style: "font-style: italic;" }, "low, high, avg "), "The smallest, biggest and average volume, bend or pitch in the selection, if any"),
+					p({}, span({ style: "font-style: italic;" }, "maxrange, minrange "), "The max or min allowed volume or pitch, where minrange can be negative for modulation"),
 				), div(
-					h2("Expressions cont'd"),
+					h2("Expression advanced"),
+					p("Other variables are composed of a few words at a time, like \"pitchesmax\" or \"vol\". These let you work with detailed info."),
+					p("Use (pitches or bends or vols) then (max or min or avg) such as volsmin, pitchesmax, bendsavg, etc."),
+					p("Use (pitch or bend or vol) then optionally (max or min or avg or prev) such as pitch or bendmax or volprev. Using the base word like pitch gets the current value. The current/previous volume/bend are only available when targeting either of those.")
+				), div(
+					h2("Expression math"),
 					p("Any function in the Javascript \"Math\" object can be used, with parentheses like sin(5):"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "pi, sin(x), cos(x), tan(x) "), "The constant PI and the sine, cosine and tangent functions. Useful for wobbles"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "abs(x), sign(x) "), "The absolute value function and sign functions. Useful for forcing or detecting if a value is positive"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "ceil(x), round(x), floor(x) "), "The rounding functions. Ceiling only rounds up and floor rounds down"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "pow(x,y) "), "Takes two numbers and raises the first to the power of the second. Equivalent to \"x ** y\""),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "max(x,y), min(x,y) "), "Maximum and minimum, which compare two numbers and returns the greatest or smallest value. Useful to cap values"),
-					p({}, span({ style: "text-decoration: dotted underline;" }, "random() "), "Takes no numbers. Generates a random value between 0 and 1 like 0.3542. Useful for random variation."),
+					p({}, span({ style: "font-style: italic;" }, "pi, sin(x), cos(x), tan(x) "), "The constant PI and the sine, cosine and tangent functions. Useful for wobbles"),
+					p({}, span({ style: "font-style: italic;" }, "abs(x), sign(x) "), "The absolute value function and sign functions. Useful for forcing or detecting if a value is positive"),
+					p({}, span({ style: "font-style: italic;" }, "ceil(x), round(x), floor(x) "), "The rounding functions. Ceiling only rounds up and floor rounds down"),
+					p({}, span({ style: "font-style: italic;" }, "pow(x,y) "), "Takes two numbers and raises the first to the power of the second. Equivalent to \"x ** y\""),
+					p({}, span({ style: "font-style: italic;" }, "max(x,y), min(x,y) "), "Maximum and minimum, which compare two numbers and returns the greatest or smallest value. Useful to cap values"),
+					p({}, span({ style: "font-style: italic;" }, "random() "), "Takes no numbers. Generates a random value between 0 and 1 like 0.3542. Useful for random variation."),
 				)];
 			} break;
 			case "selectionStepAffect": {
 				this.messages = [div(
 					h2("Affect"),
-					p("You can change the volume/pitch of notes, or affect pitch in non-modulation channels. Note: there are limits on how many pitches and volume values exist, which affects output quality."),
+					p("You can change the volume/pitch and pitch bends of notes, or affect pitch in non-modulation channels. Note: there are limits on how many pitches and volume values exist, which affects output quality."),
 					p(`Volume goes up to ${Config.noteSizeMax} except in mod channels where it depends on the target and can be negative.`),
-					p(`Pitch goes up to ${Config.maxPitch} in pitch channels, ${Config.drumCount - 1} in drum channels, and is disabled in mod channels. The whole note moves at once.`)
+					p(`Pitch goes up to ${Config.maxPitch} in pitch channels, ${Config.drumCount - 1} in drum channels, and is disabled in mod channels. Base pitch affects whole notes at once, while pitch bends can change pins.`)
 				)];
 			} break;
 			case "selectionStepBehavior": {
@@ -144,6 +152,7 @@ export class TipPrompt implements Prompt {
 			} break;
 			case "selectionModTarget": {
 				this.messages = [div(
+					h2("Modulation track to affect"),
 					p("Which modulation channel to affect, #1 is the top track, #2 is the track below it, and so on.")
 				)]
 			} break;

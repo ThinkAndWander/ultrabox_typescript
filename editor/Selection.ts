@@ -6,7 +6,7 @@ import { SongDocument } from "./SongDocument";
 import { ChangeGroup } from "./Change";
 import { ColorConfig } from "./ColorConfig";
 import { ChangeTrackSelection, ChangeChannelBar, ChangeAddChannel, ChangeRemoveChannel, ChangeChannelOrder, ChangeDuplicateSelectedReusedPatterns, ChangeNoteAdded, ChangeNoteTruncate, ChangePatternNumbers, ChangePatternSelection, ChangeInsertBars, ChangeDeleteBars, ChangeEnsurePatternExists, ChangeNoteLength, ChangePaste, ChangeSetPatternInstruments, ChangeViewInstrument, ChangeModChannel, ChangeModInstrument, ChangeModSetting, ChangeModFilter, ChangePatternsPerChannel, ChangePatternRhythm, ChangePatternScale, ChangeTranspose, ChangeRhythm, comparePatternNotes, unionOfUsedNotes, generateScaleMap, discardInvalidPatternInstruments, patternsContainSameInstruments } from "./changes";
-import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeStretchHorizontal, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross, ChangeStackLeftAcross, ChangeStackBottomAcross } from "./changesNoteOps";
+import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross, ChangeStackLeftAcross, ChangeStackBottomAcross } from "./changesNoteOps";
 
 interface PatternCopy {
     instruments: number[];
@@ -883,45 +883,51 @@ export class Selection {
         this._doc.record(this._changeTrack, canReplaceLastChange);
     }
 
-    /** Merges notes, optionally only adjacent ones.
+    /**
+     * Merges notes, optionally only adjacent ones. This requires adjacent mode on mod channels.
      * 
      * See the merge functions in changesNoteOps.ts.
      * @param adjacentOnly If true, uses adjacent merge, else uses normal merge.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
      */
-    public noteMerge(adjacentOnly: boolean): void {
+    public noteMerge(adjacentOnly: boolean, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
-            // Mod channels aren't supported.
-            if (this._doc.song.getChannelIsMod(channelIndex)) {
-                continue;
-            }
-
+            const pitchIfMod = this._doc.song.getChannelIsMod(channelIndex) ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                if (adjacentOnly) this._changeNoteOperations.append(new ChangeMergeAcrossAdjacent(this._doc, pattern)); 
-                else this._changeNoteOperations.append(new ChangeMergeAcross(this._doc, pattern));
+                if (adjacentOnly || this._doc.song.getChannelIsMod(channelIndex)) {
+                    this._changeNoteOperations.append(new ChangeMergeAcrossAdjacent(this._doc, pattern, undefined, undefined, pitchIfMod)); 
+                } else {
+                    this._changeNoteOperations.append(new ChangeMergeAcross(this._doc, pattern, undefined, undefined, pitchIfMod));
+                }
 			}
         }
 
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Creates notes between notes.
+    /**
+     * Creates notes between notes. This disables doBends on mod channels.
      * 
      * See the bridge function in changesNoteOps.ts.
      * @param grow if true, instead of creating new notes in the gap, extends the existing note
      * @param doBends Copy pitch/volume of adjacent following note
      * @param copyEnds Copy volume of start & end of previous note. If not provided, this defaults to true when it's a
      * noise channel, because that is extremely common (and in-line with how noise channels work), else false.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
      */
-    public noteBridge(grow: boolean, doBends: boolean): void {
+    public noteBridge(grow: boolean, doBends: boolean, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
-            if (this._doc.song.getChannelIsMod(channelIndex)) { continue; }
+            const isMod = this._doc.song.getChannelIsMod(channelIndex);
             const isNoise = this._doc.song.getChannelIsNoise(channelIndex);
+            const pitchIfMod = isMod ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                const bridgeOp = new ChangeBridgeAcross(this._doc, pattern, grow, doBends, isNoise);
+                const bridgeOp = new ChangeBridgeAcross(this._doc, pattern, grow, doBends && !isMod, isNoise, undefined, undefined, pitchIfMod);
                 this._changeNoteOperations.append(bridgeOp);
 			}
         }
@@ -929,14 +935,17 @@ export class Selection {
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Splits at regular intervals.
+    /**
+     * Splits at regular intervals.
      * 
      * See the split function in changesNoteOps.ts.
      * @param cuts The number of cuts (not absolute), or, how many parts between each cut (absolute).
      * @param absolute See cuts.
      * @param perNote If perNote, a copy of split runs per-note.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
      */
-    public noteSplitAcross(cuts: number, absolute?: boolean, perNote?: boolean): void {
+    public noteSplitAcross(cuts: number, absolute?: boolean, perNote?: boolean, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
         let x1 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0;
         let x2 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern;
@@ -947,18 +956,22 @@ export class Selection {
         }
 
         for (const channelIndex of this._eachSelectedChannel()) {
+            const pitchIfMod = this._doc.song.getChannelIsMod(channelIndex) ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
                 if (perNote) {
-                    const notesCopy = pattern.notes.concat() // prevents recursive splitting
+                    const notesCopy = pitchIfMod === undefined
+                        ? pattern.notes.concat()
+                        : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIfMod);
+
                     for (const note of notesCopy) {
                         const adjustedX1 = Math.max(x1 as number, note.start);
                         const adjustedX2 = Math.min(x2 as number, note.end);
                         const adjustedCuts = absolute ? Math.max(Math.floor((adjustedX2 - adjustedX1) / cuts) - 1, 1) : cuts;
 
-                        this._changeNoteOperations.append(new ChangeSplitAcross(this._doc, pattern, adjustedCuts, adjustedX1, adjustedX2));
+                        this._changeNoteOperations.append(new ChangeSplitAcross(this._doc, pattern, adjustedCuts, adjustedX1, adjustedX2, pitchIfMod));
                     }
                 } else {
-                    this._changeNoteOperations.append(new ChangeSplitAcross(this._doc, pattern, cuts, x1, x2));
+                    this._changeNoteOperations.append(new ChangeSplitAcross(this._doc, pattern, cuts, x1, x2, pitchIfMod));
                 }
 			}
         }
@@ -966,40 +979,47 @@ export class Selection {
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Eliminates pitch bends and optionally, sets to an averaged pitch or sets volume to 1.
+    /**
+     * Eliminates pitch bends and optionally, sets to an averaged pitch or sets volume to 1.
+     * Pitch options are disabled in mod channels.
      * 
      * See the stretch vertical relative function in changesNoteOps.ts.
-     * @param avgPitch If true, flattens notes without averaging their base pitch between all notes.
+     * @param dontAveragePitch If true, flattens notes without averaging their base pitch between all notes.
      * @param vol If true, flattens the volume to full (100%) which is considered the most useful behavior.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
     */
-    public noteFlattenAcross(avgPitch?: boolean, vol?: boolean, pitchIndex?: number): void {
+    public noteFlattenAcross(dontAveragePitch?: boolean, vol?: boolean, pitchIndex?: number): void {
         this._changeFlatten = new ChangeGroup();
 
         const x1 = (this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0);
         const x2 = (this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern);
 
         for (const channelIndex of this._eachSelectedChannel()) {
-            if (this._doc.song.getChannelIsMod(channelIndex)) { continue; } // Mod channels unsupported.
+            const isMod = this._doc.song.getChannelIsMod(channelIndex);
+            const isNoise = this._doc.song.getChannelIsNoise(channelIndex);
+            const pitchIfMod = isMod ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                let bounds = avgPitch ? undefined : getVerticalBounds(pattern.notes, x1, x2);
+                let bounds = dontAveragePitch ? undefined : getVerticalBounds(pattern.notes, x1, x2);
 
                 for (let i = 0; i < pattern.notes.length; i++) {
                     const note = pattern.notes[i];
                     if (note.end > x1 && note.start < x2) {
                         if (vol) {
-                            if (this._doc.song.getChannelIsNoise(channelIndex)) {
+                            if (isNoise) {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    { affect: 'vol', per: 'note', add: [1, 0] },
-                                    undefined, undefined, pitchIndex
+                                    { affect: 'vol', per: 'note', add: [1, 0], onlyExistingPins: true },
+                                    undefined, undefined, pitchIfMod
                                 ))
                             } else {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    { affect: 'vol', per: 'note', add: ['maxval - minval'] }, undefined, undefined, pitchIndex
+                                    { affect: 'vol', per: 'note', add: ['maxrange - minrange'], onlyExistingPins: true },
+                                    undefined, undefined, pitchIfMod
                                 ))
                             }
-                        } else {
+                        } else if (!isMod) {
                             this._changeFlatten.append(new ChangeStretchVerticalRelative(
-                                this._doc, channelIndex, pattern, 0, 0, avgPitch, note.start, note.end, bounds));
+                                this._doc, channelIndex, pattern, 0, 0, dontAveragePitch, note.start, note.end, bounds));
                         }
                     }
                 }
@@ -1009,29 +1029,35 @@ export class Selection {
         this._doc.record(this._changeFlatten);
     }
 
-    /** Spread notes evenly, or stack them, across a horizontal range, or vertical detected pitch bounds.
+    /**
+     * Spread notes evenly, or stack them, across a horizontal range, or vertical detected pitch bounds.
+     * Spreading pitch is disabled for mod channels.
      * 
      * See the spread horizontal/vertical functions in changesNoteOps.ts.
      * @param spreadPitch Performs a pitch spread instead of regular spread.
      * @param stackOnly If true, stacks left instead of between, or along bottom if pitch is true.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
     */
-    public noteSpreadAcross(spreadPitch: boolean, stackOnly: boolean): void {
+    public noteSpreadAcross(spreadPitch: boolean, stackOnly: boolean, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
+            const isMod = this._doc.song.getChannelIsMod(this._doc.channel);
+            const pitchIfMod = isMod ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
                 if (stackOnly) {
-                    if (spreadPitch) {
+                    if (spreadPitch && !isMod) {
                         this._changeNoteOperations.append(new ChangeStackBottomAcross(this._doc, pattern));
-                    } else {
-                        this._changeNoteOperations.append(new ChangeStackLeftAcross(this._doc, pattern));
                     }
-                } else {
-                    if (spreadPitch) {
-                        this._changeNoteOperations.append(new ChangeSpreadVertical(this._doc, pattern));
-                    } else {
-                        this._changeNoteOperations.append(new ChangeSpreadAcross(this._doc, pattern));
+                    else if (!spreadPitch) {
+                        this._changeNoteOperations.append(new ChangeStackLeftAcross(this._doc, pattern, undefined, undefined, pitchIfMod));
                     }
+                } else if (spreadPitch && !isMod) {
+                    this._changeNoteOperations.append(new ChangeSpreadVertical(this._doc, pattern));
+                }
+                else if (!spreadPitch) {
+                    this._changeNoteOperations.append(new ChangeSpreadAcross(this._doc, pattern, undefined, undefined, pitchIfMod));
                 }
 			}
         }
@@ -1039,23 +1065,27 @@ export class Selection {
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Shifts notes by 1 unit of time left or right at random, if there's space.
+    /**
+     * Shifts notes by 1 unit of time left or right at random, if there's space. See the tap function in changesNoteOps.ts.
      * 
-     * See the tap function in changesNoteOps.ts.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
     */
-    public noteTapAcross(): void {
+    public noteTapAcross(pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
+            const pitchIfMod = this._doc.song.getChannelIsMod(channelIndex) ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._changeNoteOperations.append(new ChangeTapNotesAcross(this._doc, pattern));
+                this._changeNoteOperations.append(new ChangeTapNotesAcross(this._doc, pattern, undefined, undefined, pitchIfMod));
 			}
         }
 
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Cumulatively performs changes to notes or pins, possibly generating new pins.
+    /**
+     * Cumulatively performs changes to notes or pins, possibly generating new pins.
      * 
      * See the step function in changesNoteOps.ts.
      * @param data The arrays and how they interact.
@@ -1066,20 +1096,25 @@ export class Selection {
         this._changeNoteOperations = new ChangeGroup();
 
         for (const channelIndex of this._eachSelectedChannel()) {
+            const pitchIfMod = this._doc.song.getChannelIsMod(channelIndex) ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._changeNoteOperations.append(new ChangeStepAcross(this._doc, channelIndex, pattern, data, undefined, undefined, pitchIndex));
+                this._changeNoteOperations.append(new ChangeStepAcross(this._doc, channelIndex, pattern, data, undefined, undefined, pitchIfMod));
 			}
         }
 
         this._doc.record(this._changeNoteOperations);
     }
 
-    /** Mirrors notes horizontally/vertically within the horizontal selection or vertical detected bounds.
+    /**
+     * Mirrors notes horizontally/vertically within the horizontal selection or vertical detected bounds.
+     * Vertical mirror is disabled in mod channels.
      * 
      * See the mirror horizontal function, or relative vertical stretch function in changesNoteOps.ts.
      * @param isVertical If true, mirrors the selection vertically, else horizontally.
+     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
+     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
      */
-    public noteMirrorAcross(isVertical: boolean): void {
+    public noteMirrorAcross(isVertical: boolean, pitchIndex?: number): void {
         this._changeNoteOperations = new ChangeGroup();
 
         const range = {
@@ -1088,61 +1123,21 @@ export class Selection {
         };
 
         for (const channelIndex of this._eachSelectedChannel()) {
-            if (this._doc.song.getChannelIsMod(channelIndex)) { continue; } // mod channels aren't supported
+            const isMod = this._doc.song.getChannelIsMod(channelIndex);
+            const pitchIfMod = isMod ? pitchIndex : undefined;
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
                 const vertRange = getVerticalBounds(pattern.notes, range.start, range.end);
 
-                if (isVertical) {
+                if (isVertical && !isMod) {
                     this._changeNoteOperations.append(new ChangeStretchVertical(this._doc, channelIndex, pattern, vertRange.max, vertRange.min));
-                } else {
-                    this._changeNoteOperations.append(new ChangeMirrorHorizontal(this._doc, pattern, false, range.start, range.end));
+                }
+                if (!isVertical) {
+                    this._changeNoteOperations.append(new ChangeMirrorHorizontal(this._doc, pattern, false, range.start, range.end, pitchIfMod));
                 }
             }
         }
 
         this._doc.record(this._changeNoteOperations);
-    }
-
-    /** Stretches all notes in the horizontal selection to fit the new selection defined by newX1, newX2.
-     * 
-     * See the horizontal stretch function in changesNoteOps.ts.
-     */
-    public noteStretchHorizontal(newX1: number, newX2: number): void {
-        const canReplaceLastChange: boolean = this._doc.lastChangeWas(this._ChangeStretchHorizontal);
-        this._ChangeStretchHorizontal = new ChangeGroup();
-
-        for (const channelIndex of this._eachSelectedChannel()) {
-            for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._ChangeStretchHorizontal.append(new ChangeStretchHorizontal(this._doc, pattern, newX1, newX2));
-            }
-        }
-
-        this._doc.record(this._ChangeStretchHorizontal, canReplaceLastChange);
-    }
-
-    /** Stretches all notes in the horizontal selection from their detected vertical bounds to fit the new vertical
-     * range defined by yMin, yMax.
-     * 
-     * See the stretch vertical function in changesNoteOps.ts.
-    */
-    public noteStretchVertical(yMin: number, yMax: number): void {
-        const canReplaceLastChange: boolean = this._doc.lastChangeWas(this._changeFlatten);
-        this._changeFlatten = new ChangeGroup();
-
-        const bounds = {
-            start: this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0,
-            end: this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern
-        };
-
-        for (const channelIndex of this._eachSelectedChannel()) {
-            if (this._doc.song.getChannelIsMod(channelIndex)) { continue; } // mod channels aren't supported
-            for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                this._changeFlatten.append(new ChangeStretchVertical(
-                    this._doc, channelIndex, pattern, yMin, yMax, undefined, bounds.start, bounds.end));
-            }
-        }
-
-        this._doc.record(this._changeFlatten, canReplaceLastChange);
     }
 
     /** Moves notes left and right (or up/down) by a full step (or octave). */

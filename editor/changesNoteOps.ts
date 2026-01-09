@@ -6,21 +6,25 @@ import { ChangeNotesAdded, ChangeSplitNotesAtPoint, removeRedundantPins } from "
 /** Merges adjacent notes that share the same pitches in the given range.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeMergeAcrossAdjacent extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length <= 1) { return; }
+
+        let notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length <= 1) { return; }
 
         let note: Note;
         let prevNote: Note | null = null;
-        for (let i = 1; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
-            prevNote = pattern.notes[i - 1];
+        for (let i = 1; i < notesArray.length; i++) {
+            note = notesArray[i];
+            prevNote = notesArray[i - 1];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { break; }
@@ -30,7 +34,11 @@ export class ChangeMergeAcrossAdjacent extends ChangeSequence {
             if (note.start === prevNote.end
                 && note.pitches.length === prevNote.pitches.length
                 && (new Set(note.pitches) as any).isSubsetOf(new Set(prevNote.pitches.map(pitch => pitch + lastInterval)))) {
-                this.append(new ChangeMergeAcross(doc, pattern, prevNote.start, note.end));
+
+                // sync again with for loop to pick up changes in main array and avoid recursive lock
+                // sync before the new change so that it lags behind by 1 the same as the regular array.
+                notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+                this.append(new ChangeMergeAcross(doc, pattern, prevNote.start, note.end, pitchIndex));
                 prevNote = null;
                 i -= 1;
             }
@@ -42,34 +50,39 @@ export class ChangeMergeAcrossAdjacent extends ChangeSequence {
 }
 
 /** Merges notes in the given range, and will even push by 1, or delete pins to guarantee a merge.
+ * This is incompatible with mod channels.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeMergeAcross extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length <= 1) { return; }
+
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length <= 1) { return; }
 
         let note: Note;
         let firstNote: Note | null = null;
         let lastNote: Note | null = null;
-        let firstPitch = 0, notePitch = 0;
+        let basePitch = 0, notePitch = 0;
         const notesMergedOver: Note[] = [];
         let notePinList: NotePin[] = [];
 
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            note = notesArray[i];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { break; }
 
             if (!firstNote) {
                 firstNote = note;
-                firstPitch = firstNote.pitches.reduce((a, b) => Math.min(a, b));
+                basePitch = Math.min(...firstNote.pitches);
 
                 notesMergedOver.push(note);
                 notePinList = firstNote.pins;
@@ -80,7 +93,7 @@ export class ChangeMergeAcross extends ChangeSequence {
             }
 
             if (note !== firstNote) {
-                notePitch = note.pitches.reduce((a, b) => Math.min(a, b));
+                notePitch = Math.min(...note.pitches);
 
                 // Accumulate pins across notes (adjust relative values based on first note)
                 let newPin: NotePin;
@@ -88,7 +101,7 @@ export class ChangeMergeAcross extends ChangeSequence {
                 let pinBeforeLast: NotePin | null;
                 for (const pin of note.pins) {
                     newPin = {
-                        interval: notePitch + pin.interval - firstPitch,
+                        interval: notePitch + pin.interval - basePitch,
                         size: pin.size,
                         time: note.start - firstNote.start + pin.time
                     };
@@ -135,23 +148,28 @@ export class ChangeMergeAcross extends ChangeSequence {
 
 /** Creates single notes to span the empty space between any two notes in the given range.
  * These notes have the pitch array of the note to their left.
+ * doBends is unavailable for mod channels.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * @param grow If true, instead of creating bridge notes, extends the existing notes.
  * @param doBends If true, the bridge notes end with the right note's starting pitch and volume.
  * @param copyEnds If true, the bridge notes copy the left note's start volume; also end unless bends are performed.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeBridgeAcross extends ChangeSequence {
     private _notesInserted: Note[] = [];
     private _pattern: Pattern;
-    constructor(doc: SongDocument, pattern: Pattern, grow: boolean, doBends: boolean, copyEnds: boolean, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, grow: boolean, doBends: boolean, copyEnds: boolean, x1?: number, x2?: number, pitchIndex?: number) {
         super();
         this._pattern = pattern;
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length <= 1) { return; }
+
+        let notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length <= 1) { return; }
 
         if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
         if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
@@ -161,8 +179,8 @@ export class ChangeBridgeAcross extends ChangeSequence {
         let noteLeftOfSelection: number | null = null;
         let startSize: number;
         let newNote: Note;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            note = notesArray[i];
 
             // Skip out-of-bounds notes
             if (note.end <= x1) { noteLeftOfSelection = i; continue; }
@@ -172,7 +190,7 @@ export class ChangeBridgeAcross extends ChangeSequence {
             if (i - 1 == noteLeftOfSelection) { continue; }
 
             if (i > 0) {
-                prevNote = pattern.notes[i - 1];
+                prevNote = notesArray[i - 1];
                 if (note.start - prevNote.end > 0) {
                     startSize = copyEnds ? prevNote.pins[0].size : prevNote.pins[prevNote.pins.length - 1].size;
                     newNote = new Note(-1, prevNote.end, note.start, startSize, false);
@@ -188,7 +206,7 @@ export class ChangeBridgeAcross extends ChangeSequence {
                         doBends ? note.pins[0].size :
                         newNote.pins[1].size;
 
-                    if (doBends) {
+                    if (pitchIndex === undefined && doBends) {
                         newNote.pins[1].interval = note.pitches[0] - newNote.pitches[0] + note.pins[0].interval;
                     }
 
@@ -204,12 +222,17 @@ export class ChangeBridgeAcross extends ChangeSequence {
         this.append(new ChangeNotesAdded(doc, pattern, [], this._notesInserted));
 
         if (grow) {
+            // Update again, even recreating the filtered view for mod channels as we compare indices from earlier.
+            notesArray = pitchIndex === undefined
+                ? pattern.notes
+                : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+
             for (let i = this._notesInserted.length - 1; i >= 0; i--) {
-                const index = this._pattern.notes.indexOf(this._notesInserted[i]);
+                const index = notesArray.indexOf(this._notesInserted[i]);
                 if (index !== -1) {
                     this.append(new ChangeMergeAcrossAdjacent(doc, pattern,
-                        this._pattern.notes[index - 1].start,
-                        this._pattern.notes[index].end));
+                        notesArray[index - 1].start,
+                        notesArray[index].end, pitchIndex));
                 }
             }
         }
@@ -236,18 +259,20 @@ export class ChangeBridgeAcross extends ChangeSequence {
  * 
  * x1, x2 defaults to active selection. This is intended to be overridden to control where the operation works.
  * @param numCuts How many.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeSplitAcross extends ChangeSequence {
     private _pattern: Pattern;
     private _splitNotes: Note[] = [];
     private _cuts: number[] = [];
-    constructor(doc: SongDocument, pattern: Pattern, numCuts: number, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, numCuts: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
         this._pattern = pattern;
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
-        if (pattern.notes.length === 0) { return; }
+        if (pattern.notes.length === 0) { return; } // Don't need to filter for pitchIndex since this function just calls others that do.
 
         const range = x2 - x1;
         numCuts = Math.min(numCuts, x2 - x1 - 1);
@@ -270,7 +295,7 @@ export class ChangeSplitAcross extends ChangeSequence {
 
         let splitOp: ChangeSplitNotesAtPoint;
         for (let i = 0; i < cutIndices.length; i++) {
-            splitOp = new ChangeSplitNotesAtPoint(doc, pattern, cutIndices[i]);
+            splitOp = new ChangeSplitNotesAtPoint(doc, pattern, cutIndices[i], pitchIndex);
             this.append(splitOp);
             this._splitNotes.push(splitOp.leftNote, splitOp.rightNote);
         }
@@ -306,22 +331,26 @@ export class ChangeSplitAcross extends ChangeSequence {
 /** Stacks all notes in range to the left side so that they're all touching.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeStackLeftAcross extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length === 0) { return; }
+
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
         let firstNote = false;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            const note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            const note = notesArray[i];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { break; }
@@ -331,7 +360,7 @@ export class ChangeStackLeftAcross extends ChangeSequence {
                 note.start = x1;
                 note.end = note.start + note.pins[note.pins.length - 1].time;
             } else if (i > 0) {
-                note.start = pattern.notes[i - 1].end;
+                note.start = notesArray[i - 1].end;
                 note.end = note.start + note.pins[note.pins.length - 1].time;
             }
         }
@@ -347,8 +376,8 @@ export class ChangeStackLeftAcross extends ChangeSequence {
  * set to iteratively edit. Only one entry in add/mult are used in computation at a time, and the index is determined
  * based on Type, while Per determines the current:length ratio passed into variables used by many of the presets.
  * 
- * @param add Numbers or string math expressions like "round(x + maxval/2)". When applied, results will safely clamp.
- * If volume is affected, these values get multiplied by (maxval - minval). First multiply is performed, then add.
+ * @param add Numbers or string math expressions like "round(x + maxrange/2)". When applied, results will safely clamp.
+ * If volume is affected, these values get multiplied by (maxrange - minrange). First multiply is performed, then add.
  * @param mult See add.
  * @param affects Whether to affect note pin volumes, or note base pitch (no pitch bends). Pitch edits are unavailable
  * for modulation channels and disabled in the GUI.
@@ -367,7 +396,7 @@ export class ChangeStackLeftAcross extends ChangeSequence {
 export interface IStepData {
     add?: (number|string)[]
     mult?: (number|string)[]
-    affect: 'vol'|'pitch'
+    affect: 'vol'|'pitch'|'bends'
     type?: 'stretch'|'step'|'cycle'
     per?: 'note'|'pin'|'time'
     onlyExistingPins?: boolean
@@ -386,58 +415,19 @@ export class ChangeStepAcross extends ChangeSequence {
     constructor(doc: SongDocument, channelIndex: number, pattern: Pattern, data: IStepData, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
-
-        if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length === 0) { return; }
-
-        // Usually, volume goes from 0 to Config.noteSizeMax. But both min and max can be different for mod channels,
-        // so use the range of the one nearest the mouse, or if there isn't one nearby, pick the first (highest pitch).
-        let minVolume = 0;
-        let maxVolume = Config.noteSizeMax;
-        let isModChannel = doc.song.getChannelIsMod(channelIndex);
-
-        if (isModChannel) {
-            const modTrack = pitchIndex ? Config.modCount - pitchIndex - 1 : 0;
-            let mod = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modulators[modTrack];
-            minVolume = Config.modulators[mod].convertRealFactor;
-            maxVolume = minVolume + doc.song.getVolumeCapForSetting(true, mod, doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modFilterTypes[modTrack]);
-        }
-        let volRange = maxVolume - minVolume;
-
-        // Split now and re-merge later if needed.
-        let intersects = getIntersects(doc, pattern, x1, x2, this);
-
-        // Find the start/end indices to find how many notes are in range.
-        let note: Note;
-        let prevNote: Note | undefined;
-        let firstIndex = intersects.L !== -1 ? intersects.L + 1 : -1;
-        let endIndex = intersects.R !== -1 ? intersects.R - 1 : -1;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
-
-            if (isModChannel && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) { continue; }
-            if (note.end <= x1) { continue; }
-            if (note.start >= x2) { endIndex = i - 1; break; }
-            if (firstIndex === -1) { firstIndex = i; }
-        }
-        if (endIndex === -1 && isModChannel) {
-            endIndex = pattern.notes.findLastIndex((note) => note.pitches.length === 1 && note.pitches[0] === pitchIndex);
-        }
-        if (endIndex === -1) { endIndex = pattern.notes.length - 1; }
-
-        type noteData = { min: number, max: number, avg: number, prev: number }
-
         // Runs guaranteed-safe eval on expressions in the array with variable substitutions.
         // whitelist is 0-9A-Za-z space and .!&|+-*/%=<>?:,() except the function sequences () and =>.
         const matchVariables = /(?<!\w)([a-zA-Z]+)\w*/g
         const matchNotWhitelist = /[^0-9A-Za-z. !&|+\-*\/%=<>?:,()]|=\s*>/g
-        const resolve = (entry: string | number, val: number, current: number, endNum: number, info: noteData) => {
+
+        /** Given one expression or number, injects all variables and resolves everything to a number, or 0 on failure. */
+        function resolve(entry: string | number, curr: number, stepInLength: number, endNum: number, info: noteData) {
             if (typeof entry === 'number') { return entry; }
-            const scaleFactor = (data.affect === 'vol')
-                ? maxVolume - minVolume
-                : 1
+            const scaleForVol = (data.affect === 'vol') ? volRange : 1
+            const relPrev = (data.affect === 'vol') ? info.notePinSize.prev : (data.affect === 'bends') ? info.notePinInterval.prev : info.notePitch.prev
+            const relMin = (data.affect === 'vol') ? info.notePinSize.min : (data.affect === 'bends') ? info.notePinInterval.min : info.notePitch.min
+            const relMax = (data.affect === 'vol') ? info.notePinSize.max : (data.affect === 'bends') ? info.notePinInterval.max : info.notePitch.max
+            const relAvg = (data.affect === 'vol') ? info.notePinSize.avg : (data.affect === 'bends') ? info.notePinInterval.avg : info.notePitch.avg
 
             try {
                 entry = entry
@@ -448,13 +438,39 @@ export class ChangeStepAcross extends ChangeSequence {
                         return Object.hasOwn(Math, match) ? `Math.${match}`
                             : Object.hasOwn(Math, match.toUpperCase()) ? `Math.${match.toUpperCase()}`
                             // Allow substitutions with current values, for user to use
-                            : match === 'x' ? String(val) : match === 'num' ? String(current)
+                            : match === 'x' ? String(curr)
+                            : match === 'prev' ? String((relPrev ?? 0) / scaleForVol)
+                            : match === 'num' ? String(stepInLength)
                             : match === 'len' ? String(endNum === 0 ? 1 : endNum)
-                            : match === 'maxval' ? String(maxVolume) : match === 'minval' ? String(minVolume)
-                            : match === 'smallest' ? String(info.min / scaleFactor)
-							: match === 'biggest' ? String(info.max / scaleFactor)
-                            : match === 'average' ? String(info.avg / scaleFactor)
-							: match === 'prev' ? String(info.prev / scaleFactor)
+                            : match === 'high' ? String((relMax ?? 0) / scaleForVol)
+							: match === 'low' ? String((relMin ?? 0) / scaleForVol)
+                            : match === 'avg' ? String((relAvg ?? 0) / scaleForVol)
+                            : match === 'maxrange' ? String(data.affect === 'vol' ? maxVolume : pitchLimit)
+                            : match === 'minrange' ? String(data.affect === 'vol' ? minVolume : 0)
+                            : match === 'pitchesavg' ? String(info.allLowPitch?.avg ?? 0)
+                            : match === 'pitchesmax' ? String(info.allLowPitch?.max ?? 0)
+                            : match === 'pitchesmin' ? String(info.allLowPitch?.min ?? 0)
+                            : match === 'pitchavg' ? String(info.notePitch?.avg ?? 0)
+                            : match === 'pitchmax' ? String(info.notePitch?.max ?? 0)
+                            : match === 'pitchmin' ? String(info.notePitch?.min ?? 0)
+                            : match === 'pitch' ? String(info.notePitch?.curr ?? 0) // only for "pitch"
+                            : match === 'pitchprev' ? String(info.notePitch?.prev ?? 0) // only for "pitch"
+                            : match === 'bendsavg' ? String(info.allPinInterval?.avg ?? 0)
+                            : match === 'bendsmax' ? String(info.allPinInterval?.max ?? 0)
+                            : match === 'bendsmin' ? String(info.allPinInterval?.min ?? 0)
+                            : match === 'bendavg' ? String(info.notePinInterval?.avg ?? 0)
+                            : match === 'bendmax' ? String(info.notePinInterval?.max ?? 0)
+                            : match === 'bendmin' ? String(info.notePinInterval?.min ?? 0)
+                            : match === 'bend' ? String(info.notePinInterval?.curr ?? 0) // only for "vol" or "bends"
+                            : match === 'bendprev' ? String(info.notePinInterval?.prev ?? 0) // only for "vol" or "bends"
+                            : match === 'volsage' ? String((info.allPinSize?.avg ?? 0) / volRange)
+                            : match === 'volsmax' ? String((info.allPinSize?.max ?? 0) / volRange)
+                            : match === 'volsmin' ? String((info.allPinSize?.min ?? 0) / volRange)
+                            : match === 'volavg' ? String((info.notePinSize?.avg ?? 0) / volRange)
+                            : match === 'volmax' ? String((info.notePinSize?.max ?? 0) / volRange)
+                            : match === 'volmin' ? String((info.notePinSize?.min ?? 0) / volRange)
+                            : match === 'vol' ? String((info.notePinSize?.curr ?? 0) / volRange) // only for "vol" or "bends"
+                            : match === 'volprev' ? String((info.notePinSize?.prev ?? 0) / volRange) // only for "vol" or "bends"
                             : ''});
                 entry = entry.replaceAll(matchNotWhitelist, ''); // symbols except +-*/?:!()%&|. Clears () and =>
                 entry = +(Function('return ' + entry)()); // Execute. Same as eval without the warning
@@ -465,8 +481,8 @@ export class ChangeStepAcross extends ChangeSequence {
             }
         }
 
-        // This subfunction picks the ratio based on desired type, and gets the actual value from the array.
-        const getArrayValue = (val: number, index: number, ratios: number[], lengths: number[], data: IStepData, stepArray: (number|string)[] | undefined, info: noteData) => {
+        /** Resolves the index to an array, then that expression or number, and returns the final number or undefined on failure. */
+        function getArrayValue(val: number, index: number, ratios: number[], lengths: number[], data: IStepData, stepArray: (number|string)[] | undefined, info: noteData) {
             if (!stepArray) { return undefined; }
             if (ratios.length === 3 && stepArray?.length !== 0) {
                 const slot =
@@ -490,7 +506,103 @@ export class ChangeStepAcross extends ChangeSequence {
             return undefined;
         }
 
-        const pitchLimit = doc.song.getChannelIsNoise(channelIndex) ? Config.drumCount - 1 : Config.maxPitch;
+        x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+
+        if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
+        if (pattern.notes.length === 0) { return; }
+
+        // Usually, volume goes from 0 to Config.noteSizeMax. But both min and max can be different for mod channels,
+        // so use the range of the one nearest the mouse, or if there isn't one nearby, pick the first (highest pitch).
+        let minVolume = 0;
+        let maxVolume = Config.noteSizeMax;
+        let isModChannel = doc.song.getChannelIsMod(channelIndex);
+
+        if (isModChannel) {
+            const modTrack = pitchIndex ? Config.modCount - pitchIndex - 1 : 0;
+            let mod = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modulators[modTrack];
+            minVolume = Config.modulators[mod].convertRealFactor;
+            maxVolume = minVolume + doc.song.getVolumeCapForSetting(true, mod, doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modFilterTypes[modTrack]);
+        }
+        let volRange = maxVolume - minVolume;
+
+        // Split now and re-merge later if needed.
+        let intersects = getIntersects(doc, pattern, x1, x2, pitchIndex, this);
+
+        // Find the start/end indices to find how many notes are in range.
+        let note: Note;
+        let prevNote: Note | undefined;
+        let firstIndex = intersects.L !== -1 ? intersects.L + 1 : -1;
+        let endIndex = intersects.R !== -1 ? intersects.R - 1 : -1;
+        for (let i = 0; i < pattern.notes.length; i++) {
+            note = pattern.notes[i];
+
+            if (isModChannel && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) { continue; }
+            if (note.end <= x1) { continue; }
+            if (note.start >= x2) { endIndex = i - 1; break; }
+            if (firstIndex === -1) { firstIndex = i; }
+        }
+        if (endIndex === -1 && isModChannel) {
+            endIndex = pattern.notes.findLastIndex((note) => note.pitches.length === 1 && note.pitches[0] === pitchIndex);
+        }
+        if (endIndex === -1) { endIndex = pattern.notes.length - 1; }
+
+        type noteData = {
+            notePinSize: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            allPinSize: { min?: number, max?: number, avg?: number },
+            notePinInterval: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            allPinInterval: { min?: number, max?: number, avg?: number }
+            notePitch: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            allLowPitch: { min?: number, max?: number, avg?: number }
+        }
+
+        // Collects cross-note measurements to pass to the algorithm.
+        const init = { min: Number.MAX_SAFE_INTEGER, max: Number.MIN_SAFE_INTEGER, avg: 0 }
+        const noteData: noteData = {
+            allPinSize: { ...init }, notePinSize: { ...init },
+            allLowPitch: { ...init }, notePitch: { ...init },
+            allPinInterval: { ...init }, notePinInterval: { ...init }
+        };
+
+        let noteCount = 0;
+        for (let i = firstIndex; i < endIndex + 1; i++) {
+            note = pattern.notes[i];
+            if (isModChannel && (
+                    note.pitches.length !== 1 ||
+                    note.pitches[0] !== pitchIndex ||
+                    note.pins.some(pin => pin.interval !== 0))) {
+                continue;
+            }
+
+            const basePitch = Math.min(...note.pitches);
+            noteData.allLowPitch.min = Math.min(noteData.allLowPitch.min!, basePitch);
+            noteData.allLowPitch.max = Math.max(noteData.allLowPitch.max!, basePitch);
+            noteData.allLowPitch.avg = noteData.allLowPitch.avg! + basePitch;
+
+            let pinAvg = 0;
+            const pinSizes = note.pins.map(p => { pinAvg += p.size; return p.size; });
+            noteData.allPinSize.min = Math.min(...pinSizes, noteData.allPinSize.min!);
+            noteData.allPinSize.max = Math.max(...pinSizes, noteData.allPinSize.max!);
+            noteData.allPinSize.avg = noteData.allPinSize.avg! + (pinAvg / pinSizes.length);
+
+            pinAvg = 0;
+            const pinIntervals = note.pins.map(p => { pinAvg += p.interval; return p.interval; });
+            noteData.allPinInterval.min = Math.min(...pinIntervals, noteData.allPinInterval.min!);
+            noteData.allPinInterval.max = Math.max(...pinIntervals, noteData.allPinInterval.max!);
+            noteData.allPinInterval.avg = noteData.allPinInterval.avg! + (pinAvg / pinIntervals.length);
+
+            noteCount++;
+        }
+        noteData.allLowPitch.avg = noteData.allLowPitch.avg! / noteCount;
+        noteData.allPinSize.avg = noteData.allPinSize.avg! / noteCount;
+        noteData.allPinInterval.avg = noteData.allPinInterval.avg! / noteCount;
+
+        let prevLowPitch = -1;
+
+        const pitchLimit =
+            doc.song.getChannelIsMod(channelIndex) ? Config.modCount :
+            doc.song.getChannelIsNoise(channelIndex) ? Config.drumCount - 1 :
+            Config.maxPitch;
         const noteEndNum = endIndex - firstIndex;
         let multValue = 1;
         let addValue = 0;
@@ -501,79 +613,84 @@ export class ChangeStepAcross extends ChangeSequence {
         let endNums: number[];
         let ratios: number[];
 
-        const noteData: noteData = { min: Number.MAX_SAFE_INTEGER, max: Number.MIN_SAFE_INTEGER, avg: 0 } as noteData; // prevVal set later
-
         for (let i = firstIndex; i < endIndex + 1; i++) {
             note = pattern.notes[i];
             prevNote = (i > 0) ? pattern.notes[i - 1] : undefined;
 
-            if (isModChannel && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
+            if (isModChannel && (
+                    note.pitches.length !== 1 ||
+                    note.pitches[0] !== pitchIndex ||
+                    note.pins.some(pin => pin.interval !== 0))) {
                 continue;
             }
 
-            // Collects the min, max, and avg measurements of volume or pitch depending on data type to affect.
-            let pinAvg = 0;
-            if (data.affect === 'vol') {
-                note.pins.forEach(pin => {
-                    pinAvg += pin.size;
-                    noteData.min = Math.min(noteData.min, pin.size);
-                    noteData.max = Math.max(noteData.max, pin.size);
-                });
-                pinAvg /= note.pins.length;
-            } else if (data.affect === 'pitch') {
-                note.pitches.forEach((pitch) => {
-                    pinAvg += pitch;
-                    noteData.min = Math.min(noteData.min, pitch);
-                    noteData.max = Math.max(noteData.max, pitch);
-                })
-                pinAvg /= note.pitches.length;
-            }
-            noteData.avg += pinAvg;
-        }
-
-        noteData.avg /= (endIndex + 1 - firstIndex);
-        
-        for (let i = firstIndex; i < endIndex + 1; i++) {
-            note = pattern.notes[i];
-
-            if (isModChannel && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
-                continue;
-            }
+            // Collects this-note measurements to pass to the algorithm, except previous pin values.
+            let avgSize = 0;
+            let avgInterval = 0;
+            note.pins.forEach(pin => {
+                avgSize += pin.size;
+                noteData.notePinSize.min = Math.min(noteData.notePinSize.min!, pin.size);
+                noteData.notePinSize.max = Math.max(noteData.notePinSize.max!, pin.size);
+                noteData.notePinSize.avg = noteData.notePinSize.avg! + pin.size;
+                avgInterval += pin.interval;
+                noteData.notePinInterval.min = Math.min(noteData.notePinInterval.min!, pin.interval);
+                noteData.notePinInterval.max = Math.max(noteData.notePinInterval.max!, pin.interval);
+                noteData.notePinInterval.avg = noteData.notePinInterval.avg! + pin.interval;
+            });
+            noteData.notePinSize.avg = noteData.notePinSize.avg! / note.pins.length;
+            noteData.notePinInterval.avg = noteData.notePinInterval.avg! / note.pins.length;
+            noteData.notePitch.min = Math.min(...note.pitches);
+            noteData.notePitch.max = Math.max(...note.pitches);
+            noteData.notePitch.avg = note.pitches.reduce((prev, curr) => prev + curr) / note.pitches.length;
+            noteData.notePitch.curr = noteData.notePitch.min;
+            noteData.notePitch.prev = prevLowPitch
+            prevLowPitch = noteData.notePitch.min;
 
             noteRatio = noteEndNum === 0 ? 1 : (i - firstIndex) / noteEndNum;
 
-            // Automatically insert minimum pins needed so that ramps can be smoothly interpolated. Assume non-pitch cycle arrays,
-            // num being used, or single values in the array affect all pins. Otherwise, find the array with the most
-            // entries and add pins to all those locations.
-            if (!data.onlyExistingPins && data.affect !== 'pitch') {
+            // Automatically insert pins to fill all unoccupied slots in the note. Redundant pins will be removed later.
+            // This makes it easy to never mess up for an algorithm or have to worry about hand-crafted timing, but it
+            // comes with the caveat that two pins in a row will be preserved to allow holding a value, which means e.g.
+            // a pitch or volume change across inserted pins will be near-instant, occurring between a time difference of
+            // usually 1 unit. In other words, it creates a stepping effect, which is a drawback only because while the
+            // actual values that can be saved are highly restrictive, the engine lerps between values and so it's best
+            // to default to it. I think this can be modified to enable that if you track the pre-existing and inserted
+            // pins and run a more aggressive version of remove redundant pins which does not allow two in a row, across
+            // all of the ranges of inserted pins. But I won't be going that far. It's also worth mentioning that there
+            // can be valuable changes in volume that causes similar stepping effects in pitch, and vice versa, since
+            // pins couple both volume and pitch (I believe this to be a design flaw now).
+
+            if (!data.onlyExistingPins && (data.affect === 'vol' || data.affect === 'bends')) {
                 let pin: NotePin;
-                let prevPin: NotePin;
+                let prev: NotePin;
                 let timeSince: number;
                 let lerpTime: number;
 
-                const arrays = [data.add, data.mult];
-                const allPins = !data.onlyExistingPins && data.type === 'cycle' ||
-                    arrays.some(o => o?.some(p => typeof p === 'string' && p.match(/num|random|\?.*?:/gi)))
-                const allPinInserts = allPins ? [] : arrays.map(o => Math.round(doc.song.partsPerPattern / (o?.length ?? 1)));
+                // Cycle and many of the variables change across time, but the rest is redundant and we don't add pins for them.
+                const regex = /num|random|prev|x|\?.*?:/gi;
+                const allPins = (data.type === 'cycle' ||
+                    [data.add, data.mult].some(arr => arr?.some(p => typeof p === 'string' && p.match(regex))));
+                const allPinInserts = allPins ? []
+                    : [data.add, data.mult].map(arr => Math.round(doc.song.partsPerPattern / (arr?.length ?? 1)));
 
-                for (let j = 1; j < note.pins.length; j++) {
-                    pin = note.pins[j];
-                    prevPin = note.pins[j - 1];
-                    timeSince = pin.time - prevPin.time;
+                for (let pind = 1; pind < note.pins.length; pind++) {
+                    pin = note.pins[pind];
+                    prev = note.pins[pind - 1];
+                    timeSince = pin.time - prev.time;
 
                     let time: number;
-                    for (let k = 1; k < timeSince; k++) {
-                        lerpTime = k/timeSince;
-                        time = prevPin.time + k;
+                    for (let step = 1; step < timeSince; step++) {
+                        lerpTime = step/timeSince;
+                        time = prev.time + step;
 
                         if (allPins || allPinInserts.some(o => time % o === 0)) {
-                            note.pins.splice(j, 0, {
-                                ...prevPin,
-                                interval: Math.round(prevPin.interval + lerpTime * (pin.interval - prevPin.interval)),
-                                size: Math.round(prevPin.size + lerpTime * (pin.size - prevPin.size)),
-                                time: prevPin.time + k
+                            note.pins.splice(pind, 0, {
+                                ...prev,
+                                interval: Math.round(prev.interval + lerpTime * (pin.interval - prev.interval)),
+                                size: Math.round(prev.size + lerpTime * (pin.size - prev.size)),
+                                time: prev.time + step
                             })
-                            j++;
+                            pind++;
                         }
                     }
                 }
@@ -581,7 +698,7 @@ export class ChangeStepAcross extends ChangeSequence {
 
             let indexToPass;
 
-            // Pins
+            // Affect the pin sizes (volumes).
             if (data.affect === 'vol') {
                 endNums = [noteEndNum, note.pins.length - 1, pattern.notes[endIndex].end - pattern.notes[firstIndex].start]
 
@@ -590,9 +707,15 @@ export class ChangeStepAcross extends ChangeSequence {
                     timeRatio = (note.start - pattern.notes[firstIndex].start + note.pins[j].time) / endNums[2];
                     ratios = [noteRatio, notePinOrPitchRatio, timeRatio];
     
-                    noteData.prev = (j !== 0)
+                    noteData.notePinSize.curr = note.pins[j].size;
+                    noteData.notePinInterval.curr = note.pins[j].interval;
+                    noteData.notePinSize.prev = (j !== 0)
                         ? note.pins[j - 1].size : (prevNote)
                         ? prevNote.pins[prevNote.pins.length - 1].size
+                        : -1;
+                    noteData.notePinInterval.prev = (j !== 0)
+                        ? note.pins[j - 1].interval : (prevNote)
+                        ? prevNote.pins[prevNote.pins.length - 1].interval
                         : -1;
 
                     indexToPass = data.per === 'note' ? i - firstIndex : j;
@@ -606,7 +729,7 @@ export class ChangeStepAcross extends ChangeSequence {
                 }
             }
 
-            // Pitches
+            // Affect the base (lowest) pitches and/or the current note's pitches.
             else if (!isModChannel && data.affect === 'pitch') {
                 endNums = [noteEndNum, Math.max(note.pitches.length - 1, 1), pattern.notes[endIndex].end - pattern.notes[firstIndex].start]
                 timeRatio = (note.start - pattern.notes[firstIndex].start + note.pins[note.pins.length - 1].time) / endNums[2];
@@ -616,10 +739,12 @@ export class ChangeStepAcross extends ChangeSequence {
                     notePinOrPitchRatio = j / endNums[1];
                     ratios = [noteRatio, notePinOrPitchRatio, timeRatio];
 
-                    noteData.prev = (j !== 0) ? note.pitches[j] : -1;
+                    noteData.notePitch.curr = note.pitches[j];
+                    noteData.notePitch.prev = (j !== 0) ? note.pitches[j] : -1;
+
                     indexToPass = data.per === 'note' ? i - firstIndex : j;
-                    multValue = getArrayValue(note.pitches[j], indexToPass, ratios, endNums, data, data.mult, noteData) ?? multValue;
-                    addValue = getArrayValue(note.pitches[j], indexToPass, ratios, endNums, data, data.add, noteData) ?? addValue;
+                    multValue = getArrayValue(noteData.notePitch.curr, indexToPass, ratios, endNums, data, data.mult, noteData) ?? multValue;
+                    addValue = getArrayValue(noteData.notePitch.curr, indexToPass, ratios, endNums, data, data.add, noteData) ?? addValue;
 
                     // Perform.
                     note.pitches[j] *= multValue;
@@ -637,26 +762,89 @@ export class ChangeStepAcross extends ChangeSequence {
                 })
 
                 note.pins.forEach(pin => {
-                    pin.interval = pin.interval;
                     if (note.pitches[indLow] + pin.interval < 0) { pin.interval += Math.abs(note.pitches[indLow] + pin.interval); }
                     if (note.pitches[indHi] + pin.interval > pitchLimit) { pin.interval -= (note.pitches[indHi] + pin.interval - pitchLimit); }
                 })
             }
 
-            // If pins were interacted with, remove excess pins to keep UI clean.
-            if (data.affect === 'vol') {
-                removeRedundantPins(note.pins);
-            }
-        }
+            // Affect the changes in pitch (the pitch bends).
+            // Note pin size/interval reports the previous note value.
+            else if (!isModChannel && data.affect === 'bends') {
+                endNums = [noteEndNum, note.pins.length - 1, pattern.notes[endIndex].end - pattern.notes[firstIndex].start]
 
-        // Notes should only remain split if pitch was edited, otherwise re-merge them.
-        if (!isModChannel && data.affect !== 'pitch') {
-            if (intersects.L !== -1) {
-                this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.L].start, pattern.notes[intersects.L + 1].end))
-                intersects.R--;
+                // The first pitch bend to consider is at the first pin, which due to logic restrictions means the
+                // interval = 0 and previous pin size/interval the last note's ending pin. Any add/mult value besides
+                // zero gets applied to every pitch on the note, and the change is recorded to a variable because every
+                // subsequent pin then has to be offset by it in order to preserve this change.
+                let indLow = -1;
+                let indHi = -1;
+                let basePitchShift = 0;
+                for (let j = 0; j < note.pitches.length; j++) {
+                    const origValue = note.pitches[j];
+
+                    if (j === 0) {
+                        timeRatio = (note.start - pattern.notes[firstIndex].start + note.pins[0].time) / endNums[2];
+                        ratios = [noteRatio, 0, timeRatio];
+                        indexToPass = data.per === 'note' ? i - firstIndex : 0;
+
+                        noteData.notePinSize.curr = note.pins[j].size;
+                        noteData.notePinInterval.curr = note.pins[j].interval;
+                        noteData.notePinSize.prev = prevNote?.pins[prevNote.pins.length - 1].size ?? -1;
+                        noteData.notePinInterval.prev = prevNote?.pins[prevNote.pins.length - 1].interval ?? -1;
+
+                        // interval of 1st pin is zero, so multiplying with it is pointless. Skip.
+                        addValue = getArrayValue(0, indexToPass, ratios, endNums, data, data.add, noteData) ?? addValue;
+                    }
+                    
+                    note.pitches[j] = Math.round(note.pitches[j] + addValue);
+                    note.pitches[j] = Math.max(Math.min(note.pitches[j], pitchLimit), 0);
+
+                    if (j === 0) { basePitchShift = note.pitches[0] - origValue; }
+                    if (indLow === -1 || note.pitches[j] < note.pitches[indLow]) { indLow = j; }
+                    if (indHi === -1 || note.pitches[j] > note.pitches[indHi]) { indHi = j; }
+                }
+                note.pitches = [...new Set(note.pitches)]; // Keep unique.
+
+                // Continue evaluating each pin starting with the 2nd.
+                for (let j = 1; j < note.pins.length; j++) {
+                    notePinOrPitchRatio = j / endNums[1];
+                    timeRatio = (note.start - pattern.notes[firstIndex].start + note.pins[j].time) / endNums[2];
+                    ratios = [noteRatio, notePinOrPitchRatio, timeRatio];
+    
+                    noteData.notePinSize.curr = note.pins[j].size;
+                    noteData.notePinInterval.curr = note.pins[j].interval;
+                    noteData.notePinSize.prev = note.pins[j - 1].size;
+                    noteData.notePinInterval.prev = note.pins[j - 1].interval;
+
+                    indexToPass = data.per === 'note' ? i - firstIndex : j;
+                    multValue = getArrayValue(note.pins[j].interval, indexToPass, ratios, endNums, data, data.mult, noteData) ?? multValue;
+                    addValue = getArrayValue(note.pins[j].interval, indexToPass, ratios, endNums, data, data.add, noteData) ?? addValue;
+
+                    note.pins[j].interval = Math.round(note.pins[j].interval * multValue + addValue - basePitchShift);
+                    if (note.pitches[indLow] + note.pins[j].interval < 0) {
+                        note.pins[j].interval += Math.abs(note.pitches[indLow] + note.pins[j].interval);
+                    }
+                    if (note.pitches[indHi] + note.pins[j].interval > pitchLimit) {
+                        note.pins[j].interval -= (note.pitches[indHi] + note.pins[j].interval - pitchLimit);
+                    }
+                }
             }
-            if (intersects.R > -1) {
-                this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.R - 1].start, pattern.notes[intersects.R].end))
+
+            // If pins were interacted with, remove excess pins to keep UI clean.
+            if (data.affect === 'vol' || data.affect === 'bends') {
+                removeRedundantPins(note.pins);
+
+                // When pins are edited, notes should re-merge at the ends of the selection in case it was split, as pin edits
+                // don't logically involve splitting notes, but it was necessary to greatly simplify iterating the notes.
+                if (!isModChannel) {
+                    if (intersects.L !== -1) {
+                        this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.L].start, pattern.notes[intersects.L + 1].end, pitchIndex))
+                        intersects.R--;
+                    }
+                    if (intersects.R > -1) {
+                        this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.R - 1].start, pattern.notes[intersects.R].end, pitchIndex))
+                    }
+                }
             }
         }
 
@@ -668,26 +856,30 @@ export class ChangeStepAcross extends ChangeSequence {
 /** Spreads notes horizontally across the given range such that they have equal space between. Centers single notes.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
 */
 export class ChangeSpreadAcross extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length === 0) { return; }
+
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
         // Get the total free space available and number of notes in the range.
         let note: Note;
         let totalSpace = 0;
         let firstIndex = -1;
         let finalIndex = -1;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            note = notesArray[i];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { finalIndex = i - 1; break; }
@@ -696,21 +888,21 @@ export class ChangeSpreadAcross extends ChangeSequence {
                 firstIndex = i;
                 totalSpace += note.start - x1;
             } else {
-                totalSpace += note.start - pattern.notes[i - 1].end;
+                totalSpace += note.start - notesArray[i - 1].end;
             }
         }
-        if (finalIndex === -1) { finalIndex = pattern.notes.length - 1; }
-        totalSpace += x2 - pattern.notes[finalIndex].end;
+        if (finalIndex === -1) { finalIndex = notesArray.length - 1; }
+        totalSpace += x2 - notesArray[finalIndex].end;
 
         if (totalSpace === 0) { return; }
 
         // Stack left, leaving no space.
         const spaceBetween = totalSpace / (finalIndex - firstIndex);
-        this.append(new ChangeStackLeftAcross(doc, pattern, x1, x2));
+        this.append(new ChangeStackLeftAcross(doc, pattern, x1, x2, pitchIndex));
 
         // Add space between.
         for (let i = firstIndex; i < finalIndex + 1; i++) {
-            note = pattern.notes[i];
+            note = notesArray[i];
 
             if (i === firstIndex) {
                 // Center an individual note, if only one.
@@ -927,31 +1119,35 @@ export class ChangeStackBottomAcross extends ChangeSequence {
  * several touching notes.)
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
 */
 export class ChangeTapNotesAcross extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length === 0) { return; }
+
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
         let canTapLeft: boolean;
         let canTapRight: boolean;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            const note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            const note = notesArray[i];
 
             if (note.start < x2 && note.end > x1) {
                 canTapLeft = note.start > x1
-                    && (i == 0 || note.start - pattern.notes[i - 1].end > 0);
+                    && (i == 0 || note.start - notesArray[i - 1].end > 0);
 
                 canTapRight = note.end < x2
                     && note.end < doc.song.partsPerPattern
-                    && (i === pattern.notes.length - 1 || pattern.notes[i + 1].start - note.end > 0);
+                    && (i === notesArray.length - 1 || notesArray[i + 1].start - note.end > 0);
 
                 if (canTapLeft && Math.random() >= 0.5) { note.start--; note.end--; }
                 if (canTapRight && Math.random() >= 0.5) { note.start++; note.end++; }
@@ -963,32 +1159,37 @@ export class ChangeTapNotesAcross extends ChangeSequence {
     }
 }
 
-/** Horizontally flips notes notes in the given range, or flips them in-place.
+/**
+ * Horizontally flips notes in the given range, or flips them in-place.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * @param inPlace If true, reverses pins without changing any note positions.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeMirrorHorizontal extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, inPlace?: boolean, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, inPlace?: boolean, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
-        if (pattern.notes.length === 0) { return; }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length === 0) { return; }
+
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
         let note: Note;
-        const firstNote = pattern.notes[0].clone();
+        const firstNote = notesArray[0].clone();
         let startDist: number;
         let endDist: number;
 
         const center = (x1 + x2) / 2;
 
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            note = notesArray[i];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { break; }
@@ -1014,13 +1215,18 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
                 note.end = note.start + note.pins[note.pins.length - 1].time;
             }
         }
-        pattern.notes.sort((a, b) => a.start - b.start);
+
+        // For mod channels, this sorts only same-pitch notes and leaves as zero otherwise to preserve order of other notes. 
+        pattern.notes.sort((a, b) =>
+            pitchIndex === undefined || (a.pitches.length === 1 && b.pitches.length === 1 && a.pitches[0] === b.pitches[0] && a.pitches[0] === pitchIndex)
+                ? a.start - b.start
+                : 0);
 
         // Restore last pattern continuation if the mirrored note starts at x=0 and has same pitches.
-        if (!inPlace && firstNote.start === 0
-            && pattern.notes[0].start === 0
-            && pattern.notes[0].pitches.every((pitch, index) => pitch === firstNote.pitches[index])) {
-                pattern.notes[0].continuesLastPattern = firstNote.continuesLastPattern;
+        if (pitchIndex === undefined && !inPlace && firstNote.start === 0
+            && notesArray[0].start === 0
+            && notesArray[0].pitches.every((pitch, index) => pitch === firstNote.pitches[index])) {
+            notesArray[0].continuesLastPattern = firstNote.continuesLastPattern;
         }
 
         doc.notifier.changed();
@@ -1034,9 +1240,11 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * 
  * x1b, x2b define the location of the new range.
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
 */
 export class ChangeStretchHorizontal extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1b: number, x2b: number, x1?: number, x2?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1b: number, x2b: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
         x2b = Math.min(x2b, doc.song.partsPerPattern);
@@ -1048,16 +1256,17 @@ export class ChangeStretchHorizontal extends ChangeSequence {
             return;
         }
 
-        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1)); }
-        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2)); }
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
         if (x2b < x1b) {
-            this.append(new ChangeMirrorHorizontal(doc, pattern, true, x1, x2));
+            this.append(new ChangeMirrorHorizontal(doc, pattern, true, x1, x2, pitchIndex));
             [x1b, x2b] = [x2b, x1b] //swap
         }
 
         const newNotes: Note[] = [];
         const scaleFactor = (x2b - x1b) / (x2 - x1);
+        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
 
         // Construct stretched notes
         let note: Note;
@@ -1066,8 +1275,8 @@ export class ChangeStretchHorizontal extends ChangeSequence {
         let oldRangeStart = -1, oldRangeEnd = -1;
         let newRangeStart = -1, newRangeEnd = -1;
         let minCompressedSize = 0;
-        for (let i = 0; i < pattern.notes.length; i++) {
-            note = pattern.notes[i];
+        for (let i = 0; i < notesArray.length; i++) {
+            note = notesArray[i];
 
             // Track which notes are in the deletion ranges. All notes to be stretched will be in the old range.
             if (note.start >= x2 && note.start >= x2b) { break; }
@@ -1121,12 +1330,12 @@ export class ChangeStretchHorizontal extends ChangeSequence {
         }
 
         // When there are no notes to the right of the range(s).
-        if (oldRangeEnd === -1) { oldRangeEnd = pattern.notes.length; }
-        if (newRangeEnd === -1) { newRangeEnd = pattern.notes.length; }
+        if (oldRangeEnd === -1) { oldRangeEnd = notesArray.length; }
+        if (newRangeEnd === -1) { newRangeEnd = notesArray.length; }
 
         // Delete the notes in the old range, then replace the notes in the new range.
-        const oldRangeToDelete = pattern.notes.slice(oldRangeStart, oldRangeEnd);
-        const newRangeToDelete = pattern.notes.slice(newRangeStart, newRangeEnd).filter((note) => !oldRangeToDelete.includes(note));
+        const oldRangeToDelete = notesArray.slice(oldRangeStart, oldRangeEnd);
+        const newRangeToDelete = notesArray.slice(newRangeStart, newRangeEnd).filter((note) => !oldRangeToDelete.includes(note));
         this.append(new ChangeNotesAdded(doc, pattern, oldRangeToDelete, []));
         this.append(new ChangeNotesAdded(doc, pattern, newRangeToDelete, newNotes));
         doc.notifier.changed();
@@ -1137,6 +1346,7 @@ export class ChangeStretchHorizontal extends ChangeSequence {
 /** Stretch/shrink note pitches proportionate to the selected range containing them using their center pitch as the
  * origin for stretching. The stretch factor is a multiply and/or added value, both which may be negative. Negative
  * stretch will mirror the notes across their pitch.
+ * Incompatible with mod channels.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * @param multBy A multiplier, which if negative will mirror the notes across their computed center pitch.
@@ -1184,7 +1394,9 @@ export class ChangeStretchVerticalRelative extends ChangeSequence {
     }
 }
 
-/** Stretch/shrink a section of notes vertically to fit a new vertical range. yMax < yMin can mirror notes.
+/**
+ * Stretch/shrink a section of notes vertically to fit a new vertical range. yMax < yMin can mirror notes.
+ * Incompatible with mod channels.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * 
@@ -1236,7 +1448,7 @@ export class ChangeStretchVertical extends ChangeSequence {
     }
 }
 
-/** Returns the pitches of the lowest and highest point among all notes in the given range. */
+/** Returns the pitches of the lowest and highest point among all notes in the given range. Incompatible with mod channels. */
 export function getVerticalBounds(notes: Note[], x1: number, x2: number) {
     let absoluteMax = 0;
     let absoluteMin = Number.MAX_SAFE_INTEGER;
@@ -1269,7 +1481,7 @@ export function getVerticalBounds(notes: Note[], x1: number, x2: number) {
  * that side does not cross boundaries. x1,x2 define the range.
  * @param appendSplits Splits at the bounds for convenience, and adjusts indices.R accordingly.
  */
-export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x2: number, appendSplits?: ChangeSequence) {
+export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x2: number, pitchIndex?: number, appendSplits?: ChangeSequence) {
     const indices = {L: -1, R: -1};
     for (let i = 0; i < pattern.notes.length; i++) {
         if (indices.L === -1 && (pattern.notes[i].start < x1 && pattern.notes[i].end > x1)) {
@@ -1283,10 +1495,10 @@ export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x
 
     if (appendSplits) {
         if (indices.L !== -1) {
-            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x1));
+            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex));
         }
         if (indices.R !== -1) {
-            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x2));
+            appendSplits.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex));
         }
         // Rightmost index moves due to split operation(s).
         if (indices.R !== -1) {

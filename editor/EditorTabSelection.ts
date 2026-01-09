@@ -33,24 +33,46 @@ const funcVolPresets: { [key: string]: IStepData } = {
     'Wobble fast': { affect: 'vol', per: 'time', mult: [wave(4, 4, 0.5)] },
     'Raise by 1': { affect: 'vol', per: 'pin', add: [1], onlyExistingPins: true },
     'Lower by 1': { affect: 'vol', per: 'pin', add: [-1], onlyExistingPins: true },
-    'Double contrast': { affect: 'vol', per: 'pin', add: ['((x - average) * 2) * (maxval - minval)'], onlyExistingPins: true },
-    'Halve contrast': { affect: 'vol', per: 'pin', add: ['((x - average) * -0.5) * (maxval - minval)'], onlyExistingPins: true },
-    'Stagger on/off': { affect: 'vol', per: 'note', type: 'cycle', mult: [0, 1], onlyExistingPins: true },
-    'Stagger up/down': { affect: 'vol', per: 'note', type: 'cycle', add: ['(num % 2 === 0 ? 1 : -1)'], onlyExistingPins: true },
-    'Invert': { affect: 'vol', per: 'pin', add: ['(1 - x - x) * (maxval - minval)'], onlyExistingPins: true },
-    'Flip': { affect: 'vol', per: 'pin', add: ['((x - average) * -2) * (maxval - minval)'], onlyExistingPins: true },
-    'Random interrupts': { affect: 'vol', per: 'time', mult: ['random() > 0.5 ? 0.5 : 1'] }
+    'Double contrast': { affect: 'vol', per: 'pin', add: ['((x - avg) * 2) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Halve contrast': { affect: 'vol', per: 'pin', add: ['((x - avg) * -0.5) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Stagger volume': { affect: 'vol', per: 'note', add: ['(num % 2 === 0 ? 1 : -1)'], onlyExistingPins: true },
+    'Invert': { affect: 'vol', per: 'pin', add: ['(1 - x - x) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Flip': { affect: 'vol', per: 'pin', add: ['((x - avg) * -2) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Random quiver': { affect: 'vol', per: 'time', mult: ['random() > 0.5 ? 0.5 : 1'] },
+    'Random quiver at ends': { affect: 'vol', per: 'time', add: ['(random() > 0.5 ? -(maxrange-minrange) : 0) * (num/len)'] },
 };
 const funcPitchPresets: { [key: string]: IStepData } = {
-    'Stagger every other': { affect: 'pitch', type: 'cycle', per: 'note', add: [-1, 1] },
-    'Stagger every 1 to 2': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 0, 0] },
-    'Stagger every 1 to 3': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 0, 0, 0] },
-    'Stagger every 2 to 1': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 1, 0] },
-    'Stagger every 3 to 1': { affect: 'pitch', type: 'cycle', per: 'note', add: [1, 1, 1, 0] },
-    'Staircase up': { affect: 'pitch', type: 'cycle', per: 'note', add: ['num'] },
-    'Staircase down': { affect: 'pitch', type: 'cycle', per: 'note', add: ['-num'] },
-    'Random shifts': { affect: 'pitch', per: 'time', add: ['random()'] }
-}
+    'Stagger pitch': { affect: 'pitch', per: 'note', add: [-1, 1] },
+    'Stagger 1:2': { affect: 'pitch', per: 'note', add: [1, 0, 0] },
+    'Stagger 1:3': { affect: 'pitch', per: 'note', add: [1, 0, 0, 0] },
+    'Stagger 2:1': { affect: 'pitch', per: 'note', add: [1, 1, 0] },
+    'Stagger 3:1': { affect: 'pitch', per: 'note', add: [1, 1, 1, 0] },
+    'Staircase up': { affect: 'pitch', per: 'note', add: ['num'] },
+    'Staircase down': { affect: 'pitch', per: 'note', add: ['-num'] },
+    'Shift notes': { affect: 'pitch', per: 'time', add: ['random()'] },
+    'Align center': { affect: 'pitch', add: ['pitchesavg - pitch'] },
+    'Align invert': { affect: 'pitch', add: ['2 * (pitchesavg - pitch)'] },
+    'Fade to top': { affect: 'pitch', add: ['(pitchesmax - pitch) * (num/len)'] },
+    'Fade to center': { affect: 'pitch', add: ['(pitchesavg - pitch) * (num/len)'] },
+    'Fade to center + bend': { affect: 'bends', per: 'time', add: ['(pitchesavg - pitch) * (num/len)'], onlyExistingPins: true },
+    'Fade to bottom': { affect: 'pitch', add: ['(pitchesmin - pitch) * (num/len)'] },
+    'More contrast': { affect: 'pitch', add: ['sign(pitch - pitchesavg)'] },
+    'Less contrast': { affect: 'pitch', add: ['sign(pitchesavg - pitch)'] },
+};
+const funcBendsPresets: { [key: string]: IStepData } = {
+    'Bend notes to avg pitch': { affect: 'bends', per: 'pin', type: 'stretch', add: [0, 'pitchesavg - pitch - x'], onlyExistingPins: true },
+    'Tremolo slow': { affect: 'bends', per: 'time', add: [wave(16, 16, 0.5)] },
+    'Tremolo slow to medium': { affect: 'bends', per: 'time', add: [wave(16, 8, 0.5)] },
+    'Tremolo slow to fast': { affect: 'bends', per: 'time', add: [wave(16, 4, 0.5)] },
+    'Tremolo medium to slow': { affect: 'bends', per: 'time', add: [wave(8, 16, 0.5)] },
+    'Tremolo medium': { affect: 'bends', per: 'time', add: [wave(8, 8, 0.5)] },
+    'Tremolo medium to fast': { affect: 'bends', per: 'time', add: [wave(8, 4, 0.5)] },
+    'Tremolo fast to slow': { affect: 'bends', per: 'time', add: [wave(4, 16, 0.5)] },
+    'Tremolo fast to medium': { affect: 'bends', per: 'time', add: [wave(4, 8, 0.5)] },
+    'Tremolo fast': { affect: 'bends', per: 'time', add: [wave(4, 4, 0.5)] },
+    'Tremolo max': { affect: 'bends', per: 'pin', add: [-1, 1] },
+    'Random bends': { affect: 'bends', per: 'pin', add: ['random() > 0.95 ? 1 : 0'] },
+};
 
 /** This contains the controls for the Selection tab in the song editor. */
 export class EditorTabSelection {
@@ -167,6 +189,9 @@ export class EditorTabSelection {
         ));
         this._functionSelect.appendChild(optgroup({ label: "Pitch Presets" },
             ...(Object.keys(funcPitchPresets).map((key) => option({ value: key }, key)))
+        ));
+        this._functionSelect.appendChild(optgroup({ label: "Pitch bend Presets" },
+            ...(Object.keys(funcBendsPresets).map((key) => option({ value: key }, key)))
         ));
 
         this._functionSelect.addEventListener('change', this._setFunction);
@@ -291,32 +316,32 @@ export class EditorTabSelection {
         const modTrackIndex = Config.modCount - this._affectModChannelNum.valueAsNumber;
 
         if (event.target === this._merge) {
-            this._doc.selection.noteMerge(!this._mergeAll.checked);
+            this._doc.selection.noteMerge(!this._mergeAll.checked, modTrackIndex);
         } else if (event.target === this._bridge) {
-            this._doc.selection.noteBridge(this._bridgeGrow.checked, this._bridgeBend.checked);
+            this._doc.selection.noteBridge(this._bridgeGrow.checked, this._bridgeBend.checked, modTrackIndex);
         } else if (event.target === this._spread) {
-            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked, this._spreadStack.checked);
+            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked, this._spreadStack.checked, modTrackIndex);
         } else if (event.target === this._flatten) {
             this._doc.selection.noteFlattenAcross(!this._flattenPitch.checked, this._flattenVolume.checked, modTrackIndex);
         } else if (event.target === this._mirrorH) {
-            this._doc.selection.noteMirrorAcross(false);
+            this._doc.selection.noteMirrorAcross(false, modTrackIndex);
         } else if (event.target === this._mirrorV) {
-            this._doc.selection.noteMirrorAcross(true);
+            this._doc.selection.noteMirrorAcross(true, modTrackIndex);
         } else if (event.target === this._split) {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
-            this._splitAbsolute.checked, !this._splitAcross.checked)
+            this._splitAbsolute.checked, !this._splitAcross.checked, modTrackIndex)
         } else if (event.target === this._volUp) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : x'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : x'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volDown) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxval - minval) + 0.001) ? -x : -x/2'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? -x : -x/2'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeOut) {
 			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [1, 0], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volFadeIn) {
 			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [0, 1], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '(x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : 0) + ((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '(x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : 0) + ((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))'], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['(x <= (1 / (maxval - minval) + 0.001) ? 1 / (maxval - minval) : 0) + ((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))', 0], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['(x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : 0) + ((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))', 0], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
 			this._doc.selection.noteStepAcross(isModChannel
@@ -330,7 +355,7 @@ export class EditorTabSelection {
                 : { affect: 'vol', per: 'time', mult: [0, 0.0625, 0.25, 0.5625, 1] },
                 modTrackIndex);
 		} else if (event.target === this._volContrastMax) {
-            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['((((x / biggest * (1 - biggest)) * (maxval - minval))) / (maxval - minval))'], onlyExistingPins: true }, modTrackIndex);
+            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))'], onlyExistingPins: true }, modTrackIndex);
 		}
     }
 
@@ -339,7 +364,10 @@ export class EditorTabSelection {
         if (specialFunction !== undefined) {
             this._setSpecialFunction(specialFunction);
         } else {
-            this._getStepFunctionGUI(funcVolPresets[this._functionSelect.value] ?? funcPitchPresets[this._functionSelect.value]);
+            this._getStepFunctionGUI(
+                funcVolPresets[this._functionSelect.value] ??
+                funcPitchPresets[this._functionSelect.value] ??
+                funcBendsPresets[this._functionSelect.value]);
         }
         
         this._functionRun.removeEventListener("click", this._specialFunctionCurried);
@@ -370,7 +398,10 @@ export class EditorTabSelection {
             vpn: "volume per note",
             vpp: "volume per pin",
             vbt: "volume by time",
-            ppn: "pitch per note",
+            ppn: "base pitch per note",
+            bpn: "pitch bends per note",
+            bpp: "pitch bends per pin",
+            bbt: "pitch bends by time"
         };
 
         let fromAffects: keyof typeof affects | undefined;
@@ -383,6 +414,9 @@ export class EditorTabSelection {
                 (preset.affect === 'vol' && preset.per === 'pin') ? 'vpp' :
                 (preset.affect === 'vol' && preset.per === 'time') ? 'vbt' :
                 (preset.affect === 'pitch') ? 'ppn' :
+                (preset.affect === 'bends' && preset.per === 'note') ? 'bpn' :
+                (preset.affect === 'bends' && preset.per === 'pin') ? 'bpp' :
+                (preset.affect === 'bends' && preset.per === 'time') ? 'bbt' :
                 undefined;
 
             if (preset.add) { fromAdd = preset.add.join(','); }
@@ -391,7 +425,8 @@ export class EditorTabSelection {
 
         /** Reads control values to update the action when user runs the function. */
         const updatePerform = () => {
-            this._functionTargetsPitch = rows.some(row => row.rowAffect.value === 'ppn');
+            this._functionTargetsPitch = rows.some(row => row.rowAffect.value === 'ppn' ||
+                row.rowAffect.value === 'bpn' || row.rowAffect.value === 'bpp' || row.rowAffect.value === 'bbt');
             this._updateFunctionDisabled();
 
             this._specialFunction = () => {
@@ -399,7 +434,9 @@ export class EditorTabSelection {
                     const type = row.rowAffect.value as keyof typeof affects;
                     const behavior = (row.rowBehavior?.value ?? 'cycle') as IStepData['type'];
                     const stepData: IStepData = { affect: 'vol', type: behavior, onlyExistingPins: row.rowOnlyExistingPins.checked };
-                    const scale = (str: string) => type === 'ppn' || str === '0' ? `(${str})` : `((${str}) / (maxval - minval))`;
+                    const scale = (str: string) => type === 'vpn' || type === 'vpp' || type === 'vbt'
+                        ? `((${str}) / (maxrange - minrange))`
+                        : `(${str})`;
                     const withDefault = (str: string, defaultVal: string) => str === "" ? defaultVal : str;
 
                     const addArr: string[] = row.rowAdd.value === '' ? ['0']
@@ -413,8 +450,12 @@ export class EditorTabSelection {
                         multArr.push('1')
                     }
 
-                    stepData.per = (type === 'vpn' || type === 'ppn') ? "note" : type === 'vpp' ? "pin" : "time";
-                    stepData.affect = (type === 'vpn' || type === 'vbt' || type === 'vpp') ? 'vol' : 'pitch';
+                    stepData.per = (type === 'vpn' || type === 'ppn' || type === 'bpn') ? "note"
+                        : type === 'vpp' || type === 'bpp' ? "pin"
+                        : "time";
+                    stepData.affect = (type === 'vpn' || type === 'vbt' || type === 'vpp') ? 'vol'
+                        : type === 'ppn' ? 'pitch'
+                        : 'bends';
                     stepData.add = addArr;
                     stepData.mult = multArr;
                     this._doc.selection.noteStepAcross(stepData, Config.modCount - this._affectModChannelNum.valueAsNumber);
@@ -505,7 +546,7 @@ export class EditorTabSelection {
         this._updateFunctionDisabled();
 
         if (specialFunction === funcSpecialPresets.TapNotes) {
-            this._specialFunction = () => this._doc.selection.noteTapAcross();
+            this._specialFunction = () => this._doc.selection.noteTapAcross(Config.modCount - this._affectModChannelNum.valueAsNumber);
         }
 	}
 
@@ -574,7 +615,8 @@ export class EditorTabSelection {
             (this._doc.song.getChannelIsMod(this._doc.channel) && this._functionTargetsPitch) ||
             (!Object.hasOwn(funcSpecialPresetsMap, this._functionSelect.value) &&
             !Object.hasOwn(funcVolPresets, this._functionSelect.value) &&
-            !Object.hasOwn(funcPitchPresets, this._functionSelect.value))) {
+            !Object.hasOwn(funcPitchPresets, this._functionSelect.value) &&
+            !Object.hasOwn(funcBendsPresets, this._functionSelect.value))) {
             this._functionRun.setAttribute("disabled", "true");
         } else {
             this._functionRun.removeAttribute("disabled");

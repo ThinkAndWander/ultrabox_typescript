@@ -4295,11 +4295,17 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
     public oldNote: Note;
     public leftNote: Note;
     public rightNote: Note;
-    constructor(doc: SongDocument, pattern: Pattern, cutPoint: number) {
+    constructor(doc: SongDocument, pattern: Pattern, cutPoint: number, pitchIndex?: number) {
         super();
 
         for (let i = pattern.notes.length - 1; i >= 0; i--) {
             const note: Note = pattern.notes[i];
+
+            // Skip notes not matching the pitch track of mod channels.
+            if (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
+                continue;
+            }
+
             if (note.start < cutPoint && cutPoint < note.end) {
                 // Separate the pins left and right of the cut point into two notes, also adjust the times.
                 // Right note pins will need to be normalized by pitch and interval, but that means knowing the
