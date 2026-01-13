@@ -33,11 +33,11 @@ const funcVolPresets: { [key: string]: IStepData } = {
     'Wobble fast': { affect: 'vol', per: 'time', mult: [wave(4, 4, 0.5)] },
     'Raise by 1': { affect: 'vol', per: 'pin', add: [1], onlyExistingPins: true },
     'Lower by 1': { affect: 'vol', per: 'pin', add: [-1], onlyExistingPins: true },
-    'Double contrast': { affect: 'vol', per: 'pin', add: ['((x - avg) * 2) * (maxrange - minrange)'], onlyExistingPins: true },
-    'Halve contrast': { affect: 'vol', per: 'pin', add: ['((x - avg) * -0.5) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Double contrast': { affect: 'vol', per: 'time', add: ['((x - volsavg) * 2) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Halve contrast': { affect: 'vol', per: 'time', add: ['((x - volsavg) * -0.5) * (maxrange - minrange)'], onlyExistingPins: true },
     'Stagger volume': { affect: 'vol', per: 'note', add: ['(num % 2 === 0 ? 1 : -1)'], onlyExistingPins: true },
     'Invert': { affect: 'vol', per: 'pin', add: ['(1 - x - x) * (maxrange - minrange)'], onlyExistingPins: true },
-    'Flip': { affect: 'vol', per: 'pin', add: ['((x - avg) * -2) * (maxrange - minrange)'], onlyExistingPins: true },
+    'Flip': { affect: 'vol', per: 'pin', add: ['((x - volsavg) * -2) * (maxrange - minrange)'], onlyExistingPins: true },
     'Random quiver': { affect: 'vol', per: 'time', mult: ['random() > 0.5 ? 0.5 : 1'] },
     'Random quiver at ends': { affect: 'vol', per: 'time', add: ['(random() > 0.5 ? -(maxrange-minrange) : 0) * (num/len)'] },
 };
@@ -355,7 +355,7 @@ export class EditorTabSelection {
                 : { affect: 'vol', per: 'time', mult: [0, 0.0625, 0.25, 0.5625, 1] },
                 modTrackIndex);
 		} else if (event.target === this._volContrastMax) {
-            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))'], onlyExistingPins: true }, modTrackIndex);
+            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['x / volsmax * (1 - volsmax)'], onlyExistingPins: true }, modTrackIndex);
 		}
     }
 

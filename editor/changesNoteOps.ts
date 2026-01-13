@@ -64,14 +64,15 @@ export class ChangeMergeAcross extends ChangeSequence {
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
-        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        const notesArray = pitchIndex === undefined
+            ? pattern.notes.concat()
+            : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
         if (notesArray.length <= 1) { return; }
 
         let note: Note;
         let firstNote: Note | null = null;
         let lastNote: Note | null = null;
         let basePitch = 0, notePitch = 0;
-        const notesMergedOver: Note[] = [];
         let notePinList: NotePin[] = [];
 
         for (let i = 0; i < notesArray.length; i++) {
@@ -83,16 +84,17 @@ export class ChangeMergeAcross extends ChangeSequence {
             if (!firstNote) {
                 firstNote = note;
                 basePitch = Math.min(...firstNote.pitches);
-
-                notesMergedOver.push(note);
                 notePinList = firstNote.pins;
             }
 
-            if (note.end <= x2 && (!lastNote || note.end > lastNote.end)) {
+            if (!lastNote || note.end > lastNote.end) {
                 lastNote = note;
             }
 
             if (note !== firstNote) {
+                notesArray.splice(i, 1);
+                i--;
+
                 notePitch = Math.min(...note.pitches);
 
                 // Accumulate pins across notes (adjust relative values based on first note)
@@ -126,8 +128,6 @@ export class ChangeMergeAcross extends ChangeSequence {
 
                     notePinList.push(newPin);
                 }
-
-                notesMergedOver.push(note);
             }
         }
 
@@ -137,10 +137,10 @@ export class ChangeMergeAcross extends ChangeSequence {
         }
 
         // Span the first note through all pins, assuming its pitches across the full length.
-        let firstNoteCopy = firstNote.clone();
-        firstNoteCopy.end = lastNote.end;
-        firstNoteCopy.pins = notePinList;
-        this.append(new ChangeNotesAdded(doc, pattern, notesMergedOver, [firstNoteCopy]));
+        firstNote.end = lastNote.end;
+        firstNote.pins = notePinList;
+        pattern.notes = notesArray;
+
         doc.notifier.changed();
         this._didSomething();
     }
@@ -426,24 +426,24 @@ export class ChangeStepAcross extends ChangeSequence {
                             : match === 'pitchavg' ? String(info.notePitch?.avg ?? 0)
                             : match === 'pitchmax' ? String(info.notePitch?.max ?? 0)
                             : match === 'pitchmin' ? String(info.notePitch?.min ?? 0)
-                            : match === 'pitch' ? String(info.notePitch?.curr ?? 0) // only for "pitch"
                             : match === 'pitchprev' ? String(info.notePitch?.prev ?? 0) // only for "pitch"
+                            : match === 'pitch' ? String(info.notePitch?.curr ?? 0) // only for "pitch"
                             : match === 'bendsavg' ? String(info.allPinInterval?.avg ?? 0)
                             : match === 'bendsmax' ? String(info.allPinInterval?.max ?? 0)
                             : match === 'bendsmin' ? String(info.allPinInterval?.min ?? 0)
                             : match === 'bendavg' ? String(info.notePinInterval?.avg ?? 0)
                             : match === 'bendmax' ? String(info.notePinInterval?.max ?? 0)
                             : match === 'bendmin' ? String(info.notePinInterval?.min ?? 0)
-                            : match === 'bend' ? String(info.notePinInterval?.curr ?? 0) // only for "vol" or "bends"
                             : match === 'bendprev' ? String(info.notePinInterval?.prev ?? 0) // only for "vol" or "bends"
-                            : match === 'volsage' ? String((info.allPinSize?.avg ?? 0) / volRange)
+                            : match === 'bend' ? String(info.notePinInterval?.curr ?? 0) // only for "vol" or "bends"
+                            : match === 'volsavg' ? String((info.allPinSize?.avg ?? 0) / volRange)
                             : match === 'volsmax' ? String((info.allPinSize?.max ?? 0) / volRange)
                             : match === 'volsmin' ? String((info.allPinSize?.min ?? 0) / volRange)
                             : match === 'volavg' ? String((info.notePinSize?.avg ?? 0) / volRange)
                             : match === 'volmax' ? String((info.notePinSize?.max ?? 0) / volRange)
                             : match === 'volmin' ? String((info.notePinSize?.min ?? 0) / volRange)
-                            : match === 'vol' ? String((info.notePinSize?.curr ?? 0) / volRange) // only for "vol" or "bends"
                             : match === 'volprev' ? String((info.notePinSize?.prev ?? 0) / volRange) // only for "vol" or "bends"
+                            : match === 'vol' ? String((info.notePinSize?.curr ?? 0) / volRange) // only for "vol" or "bends"
                             : ''});
                 entry = entry.replaceAll(matchNotWhitelist, ''); // symbols except +-*/?:!()%&|. Clears () and =>
                 entry = +(Function('return ' + entry)()); // Execute. Same as eval without the warning

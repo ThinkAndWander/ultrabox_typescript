@@ -1934,7 +1934,7 @@ export class PatternEditor {
                         start = this._cursor.start;
                         end = start + defaultLength;
                     }
-                    const continuesLastPattern: boolean = (start < 0 && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount);
+                    const continuesLastPattern: boolean = start < 0 && !this._doc.song.getChannelIsMod(this._doc.channel);
                     if (start < 0) start = 0;
                     if (end > this._doc.song.partsPerPattern) end = this._doc.song.partsPerPattern;
 
@@ -1978,7 +1978,7 @@ export class PatternEditor {
 
                     const shiftedPin: NotePin = this._cursor.curNote.pins[this._cursor.nearPinIndex];
                     let shiftedTime: number = Math.round((this._cursor.curNote.start + shiftedPin.time + shift) / minDivision) * minDivision;
-                    const continuesLastPattern: boolean = (shiftedTime < 0.0 && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount);
+                    const continuesLastPattern: boolean = shiftedTime < 0.0 && !this._doc.song.getChannelIsMod(this._doc.channel);
                     if (shiftedTime < 0) shiftedTime = 0;
                     if (shiftedTime > this._doc.song.partsPerPattern) shiftedTime = this._doc.song.partsPerPattern;
 
