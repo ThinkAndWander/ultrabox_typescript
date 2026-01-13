@@ -106,13 +106,13 @@ export class TipPrompt implements Prompt {
 					p("You can mix math into the number arrays, like \"1, 2 * sin(x), 0\" just like the presets. Invalid math is ignored. You can also use these special variables!"),
 					p({}, span({ style: "font-style: italic;" }, "x, prev "), "The current or previous volume, bend or pitch, where prev is -1 for the first value"),
 					p({}, span({ style: "font-style: italic;" }, "num, len "), "Number and length form a ratio of current/total for the note, pin #, or time value"),
-					p({}, span({ style: "font-style: italic;" }, "low, high, avg "), "The smallest, biggest and average volume, bend or pitch in the selection, if any"),
+					p({}, span({ style: "font-style: italic;" }, "avg "), "The average volume, bend or pitch in the selection, if any"),
 					p({}, span({ style: "font-style: italic;" }, "maxrange, minrange "), "The max or min allowed volume or pitch, where minrange can be negative for modulation"),
 				), div(
 					h2("Expression advanced"),
 					p("Other variables are composed of a few words at a time, like \"pitchesmax\" or \"vol\". These let you work with detailed info."),
-					p("Use (pitches or bends or vols) then (max or min or avg) such as volsmin, pitchesmax, bendsavg, etc."),
-					p("Use (pitch or bend or vol) then optionally (max or min or avg or prev) such as pitch or bendmax or volprev. Using the base word like pitch gets the current value. The current/previous volume/bend are only available when targeting either of those.")
+					p("For across-note data, use (pitches or bends or vols) then (max or min or avg) such as volsmin, pitchesmax, bendsavg, etc."),
+					p("For this-note data, use (pitch or bend or vol) then optionally (avg or prev) such as pitch or volprev. Use just the base word to get its value. Current/previous for bend or vol isn't available when affecting pitch.")
 				), div(
 					h2("Expression math"),
 					p("Any function in the Javascript \"Math\" object can be used, with parentheses like sin(5):"),

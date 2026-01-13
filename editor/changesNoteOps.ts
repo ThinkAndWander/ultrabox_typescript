@@ -398,8 +398,6 @@ export class ChangeStepAcross extends ChangeSequence {
             if (typeof entry === 'number') { return entry; }
             const scaleForVol = (data.affect === 'vol') ? volRange : 1
             const relPrev = (data.affect === 'vol') ? info.notePinSize.prev : (data.affect === 'bends') ? info.notePinInterval.prev : info.notePitch.prev
-            const relMin = (data.affect === 'vol') ? info.notePinSize.min : (data.affect === 'bends') ? info.notePinInterval.min : info.notePitch.min
-            const relMax = (data.affect === 'vol') ? info.notePinSize.max : (data.affect === 'bends') ? info.notePinInterval.max : info.notePitch.max
             const relAvg = (data.affect === 'vol') ? info.notePinSize.avg : (data.affect === 'bends') ? info.notePinInterval.avg : info.notePitch.avg
 
             try {
@@ -415,8 +413,6 @@ export class ChangeStepAcross extends ChangeSequence {
                             : match === 'prev' ? String((relPrev ?? 0) / scaleForVol)
                             : match === 'num' ? String(stepInLength)
                             : match === 'len' ? String(endNum === 0 ? 1 : endNum)
-                            : match === 'high' ? String((relMax ?? 0) / scaleForVol)
-							: match === 'low' ? String((relMin ?? 0) / scaleForVol)
                             : match === 'avg' ? String((relAvg ?? 0) / scaleForVol)
                             : match === 'maxrange' ? String(data.affect === 'vol' ? maxVolume : pitchLimit)
                             : match === 'minrange' ? String(data.affect === 'vol' ? minVolume : 0)
@@ -424,24 +420,18 @@ export class ChangeStepAcross extends ChangeSequence {
                             : match === 'pitchesmax' ? String(info.allLowPitch?.max ?? 0)
                             : match === 'pitchesmin' ? String(info.allLowPitch?.min ?? 0)
                             : match === 'pitchavg' ? String(info.notePitch?.avg ?? 0)
-                            : match === 'pitchmax' ? String(info.notePitch?.max ?? 0)
-                            : match === 'pitchmin' ? String(info.notePitch?.min ?? 0)
-                            : match === 'pitchprev' ? String(info.notePitch?.prev ?? 0) // only for "pitch"
-                            : match === 'pitch' ? String(info.notePitch?.curr ?? 0) // only for "pitch"
+                            : match === 'pitchprev' ? String(info.notePitch?.prev ?? 0)
+                            : match === 'pitch' ? String(info.notePitch?.curr ?? 0)
                             : match === 'bendsavg' ? String(info.allPinInterval?.avg ?? 0)
                             : match === 'bendsmax' ? String(info.allPinInterval?.max ?? 0)
                             : match === 'bendsmin' ? String(info.allPinInterval?.min ?? 0)
                             : match === 'bendavg' ? String(info.notePinInterval?.avg ?? 0)
-                            : match === 'bendmax' ? String(info.notePinInterval?.max ?? 0)
-                            : match === 'bendmin' ? String(info.notePinInterval?.min ?? 0)
                             : match === 'bendprev' ? String(info.notePinInterval?.prev ?? 0) // only for "vol" or "bends"
                             : match === 'bend' ? String(info.notePinInterval?.curr ?? 0) // only for "vol" or "bends"
                             : match === 'volsavg' ? String((info.allPinSize?.avg ?? 0) / volRange)
                             : match === 'volsmax' ? String((info.allPinSize?.max ?? 0) / volRange)
                             : match === 'volsmin' ? String((info.allPinSize?.min ?? 0) / volRange)
                             : match === 'volavg' ? String((info.notePinSize?.avg ?? 0) / volRange)
-                            : match === 'volmax' ? String((info.notePinSize?.max ?? 0) / volRange)
-                            : match === 'volmin' ? String((info.notePinSize?.min ?? 0) / volRange)
                             : match === 'volprev' ? String((info.notePinSize?.prev ?? 0) / volRange) // only for "vol" or "bends"
                             : match === 'vol' ? String((info.notePinSize?.curr ?? 0) / volRange) // only for "vol" or "bends"
                             : ''});
@@ -524,20 +514,20 @@ export class ChangeStepAcross extends ChangeSequence {
         if (firstIndex === -1) { return; } // No notes due to filtering i.e. mod channel w/o notes matching pitchIndex.
 
         type noteData = {
-            notePinSize: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            notePinSize: { avg?: number, prev?: number, curr?: number },
             allPinSize: { min?: number, max?: number, avg?: number },
-            notePinInterval: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            notePinInterval: { avg?: number, prev?: number, curr?: number },
             allPinInterval: { min?: number, max?: number, avg?: number }
-            notePitch: { min?: number, max?: number, avg?: number, prev?: number, curr?: number },
+            notePitch: { avg?: number, prev?: number, curr?: number },
             allLowPitch: { min?: number, max?: number, avg?: number }
         }
 
         // Collects cross-note measurements to pass to the algorithm.
         const init = { min: Number.MAX_SAFE_INTEGER, max: Number.MIN_SAFE_INTEGER, avg: 0 }
         const noteData: noteData = {
-            allPinSize: { ...init }, notePinSize: { ...init },
-            allLowPitch: { ...init }, notePitch: { ...init },
-            allPinInterval: { ...init }, notePinInterval: { ...init }
+            allPinSize: { ...init }, notePinSize: { avg: 0 },
+            allLowPitch: { ...init }, notePitch: { avg: 0 },
+            allPinInterval: { ...init }, notePinInterval: { avg: 0 }
         };
 
         let noteCount = 0;
@@ -607,22 +597,16 @@ export class ChangeStepAcross extends ChangeSequence {
             let avgInterval = 0;
             note.pins.forEach(pin => {
                 avgSize += pin.size;
-                noteData.notePinSize.min = Math.min(noteData.notePinSize.min!, pin.size);
-                noteData.notePinSize.max = Math.max(noteData.notePinSize.max!, pin.size);
                 noteData.notePinSize.avg = noteData.notePinSize.avg! + pin.size;
                 avgInterval += pin.interval;
-                noteData.notePinInterval.min = Math.min(noteData.notePinInterval.min!, pin.interval);
-                noteData.notePinInterval.max = Math.max(noteData.notePinInterval.max!, pin.interval);
                 noteData.notePinInterval.avg = noteData.notePinInterval.avg! + pin.interval;
             });
             noteData.notePinSize.avg = noteData.notePinSize.avg! / note.pins.length;
             noteData.notePinInterval.avg = noteData.notePinInterval.avg! / note.pins.length;
-            noteData.notePitch.min = pitchToPositionInScale(doc, Math.min(...note.pitches));
-            noteData.notePitch.max = pitchToPositionInScale(doc, Math.max(...note.pitches));
             noteData.notePitch.avg = pitchToPositionInScale(doc, note.pitches.reduce((prev, curr) => prev + curr) / note.pitches.length);
-            noteData.notePitch.curr = noteData.notePitch.min;
+            noteData.notePitch.curr = pitchToPositionInScale(doc, Math.min(...note.pitches));
             noteData.notePitch.prev = prevLowPitch;
-            prevLowPitch = noteData.notePitch.min;
+            prevLowPitch = noteData.notePitch.curr;
 
             noteRatio = noteEndNum === 0 ? 1 : (i - firstIndex) / noteEndNum;
 
