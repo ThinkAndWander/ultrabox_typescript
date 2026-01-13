@@ -157,16 +157,16 @@ export function snapPitchToScale(doc: SongDocument, pitch: number, force?: boole
         return Math.round(pitch); // already on scale
     }
 
-    let distanceUp = 0;
-    let distanceDown = 0;
+    let distanceUp = Config.maxPitch;
+    let distanceDown = Config.maxPitch;
 
-    for (let i = pitch + 1; i <= Config.maxPitch; i++) {
+    for (let i = pitch + 1; i <= Config.maxPitch + 0.5; i++) {
         if (scale[mod(Math.round(i), 12)]) {
             distanceUp = i - pitch;
             break;
         }
     }
-    for (let i = pitch - 1; i >= 0; i--) {
+    for (let i = pitch - 1; i > -0.5; i--) {
         if (scale[mod(Math.round(i), 12)]) {
             distanceDown = pitch - i;
             break;
