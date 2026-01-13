@@ -51,7 +51,7 @@ const funcPitchPresets: { [key: string]: IStepData } = {
     'Staircase down': { affect: 'pitch', per: 'note', add: ['-num'] },
     'Shift notes': { affect: 'pitch', per: 'time', add: ['random()'] },
     'Align center': { affect: 'pitch', add: ['pitchesavg - pitch'] },
-    'Align invert': { affect: 'pitch', add: ['2 * (pitchesavg - pitch)'] },
+    'Flip around center': { affect: 'pitch', add: ['2 * (pitchesavg - pitch)'] },
     'Fade to top': { affect: 'pitch', add: ['(pitchesmax - pitch) * (num/len)'] },
     'Fade to center': { affect: 'pitch', add: ['(pitchesavg - pitch) * (num/len)'] },
     'Fade to center + bend': { affect: 'bends', per: 'time', add: ['(pitchesavg - pitch) * (num/len)'], onlyExistingPins: true },

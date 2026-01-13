@@ -134,6 +134,108 @@ export function generateScaleMap(oldScaleFlags: ReadonlyArray<boolean>, newScale
     return fullPitchMap;
 }
 
+/**
+ * Snaps to the active octave scale if snapping is on (or forced). This doesn't snap based on min/max range.
+ * @param pitch The note's lowest pitch, or pitch + pin interval. Do not pass in just an interval because the note's
+ * starting position isn't usually aligned to the start of an octave, i.e. it will not scale correctly without adding
+ * the offset == pitch mod 12. To get the snapping position for just the interval, subtract the note's
+ * lowest pitch from the result of the function.
+ * @param force When true, treats "notes outside scale" as false to force alignment.
+ */
+export function snapPitchToScale(doc: SongDocument, pitch: number, force?: boolean) {
+    if (doc.song.getChannelIsNoise(doc.channel) ||
+        doc.song.getChannelIsMod(doc.channel) ||
+        (!force && doc.prefs.notesOutsideScale)) {
+        return Math.round(pitch); // skip
+    }
+
+    let scale = doc.song.scale == Config.scales.dictionary["Custom"].index
+        ? doc.song.scaleCustom
+        : Config.scales[doc.song.scale].flags;
+
+    if (scale[mod(Math.round(pitch), 12)]) {
+        return Math.round(pitch); // already on scale
+    }
+
+    let distanceUp = 0;
+    let distanceDown = 0;
+
+    for (let i = pitch + 1; i <= Config.maxPitch; i++) {
+        if (scale[mod(Math.round(i), 12)]) {
+            distanceUp = i - pitch;
+            break;
+        }
+    }
+    for (let i = pitch - 1; i >= 0; i--) {
+        if (scale[mod(Math.round(i), 12)]) {
+            distanceDown = pitch - i;
+            break;
+        }
+    }
+
+    return distanceUp < distanceDown
+        ? Math.round(pitch + distanceUp)
+        : Math.round(pitch - distanceDown);
+}
+
+/**
+ * Snaps a whole note to the active octave scale if snapping is on (or forced).
+ * @param force When true, treats "notes outside scale" as false to force alignment.
+*/
+export function snapNoteToScale(doc: SongDocument, note: Note, force?: boolean) {
+    if (doc.song.getChannelIsNoise(doc.channel) ||
+        doc.song.getChannelIsMod(doc.channel) ||
+        (!force && doc.prefs.notesOutsideScale)) {
+        return; // skip
+    }
+
+    note.pitches = note.pitches.map((pitch) => snapPitchToScale(doc, pitch, force));
+    const minPitch = Math.min(...note.pitches);
+    note.pins = note.pins.map((pin) => makeNotePin(snapPitchToScale(doc, minPitch + pin.interval, force) - minPitch, pin.time, pin.size));
+}
+
+/**
+ * For pitch channels only, this reads the current scale and snaps a given positive integer pitch to its nearest
+ * position in the scale (if needed), then returns that position. The returned index may be positive or negative.
+ * This is used to perform scale-accurate pitch arithmetic before converting back with positionInScaleToPitch.
+*/
+export function pitchToPositionInScale(doc: SongDocument, pitch: number, force?: number): number {
+    if (doc.song.getChannelIsNoise(doc.channel) ||
+        doc.song.getChannelIsMod(doc.channel) ||
+        (!force && doc.prefs.notesOutsideScale)) {
+        return pitch; // skip. Assumes free scale (all semitones)
+    }
+
+    const scale = doc.song.scale == Config.scales.dictionary["Custom"].index
+        ? doc.song.scaleCustom
+        : Config.scales[doc.song.scale].flags;
+
+    const pitchOnScale = !scale[pitch % 12] ? snapPitchToScale(doc, pitch) : pitch;
+    const semitonesOnScale = scale.map((value, index) => value ? index : -1).filter(index => index !== -1);
+
+    return Math.trunc(pitchOnScale / 12) * semitonesOnScale.length + semitonesOnScale.indexOf(pitchOnScale % 12);
+}
+
+/**
+ * For pitch channels only, this reads the current scale and returns the pitch from an index representing only on-scale
+ * semitones. The index can be any number. It will be rounded and clamped to the allowed range that fits in the song.
+*/
+export function positionInScaleToPitch(doc: SongDocument, indexInScale: number, force?: number): number {
+    if (doc.song.getChannelIsNoise(doc.channel) ||
+        doc.song.getChannelIsMod(doc.channel) ||
+        (!force && doc.prefs.notesOutsideScale)) {
+        return indexInScale; // skip. Assumes free scale (all semitones)
+    }
+
+    const scale = doc.song.scale == Config.scales.dictionary["Custom"].index
+        ? doc.song.scaleCustom
+        : Config.scales[doc.song.scale].flags;
+
+    const semitonesOnScale = scale.map((value, index) => value ? index : -1).filter(index => index !== -1);
+    indexInScale = Math.min(Math.max(Math.round(indexInScale), 0), Config.pitchOctaves * semitonesOnScale.length)
+    return 12 * Math.trunc(indexInScale / semitonesOnScale.length) + semitonesOnScale[indexInScale % semitonesOnScale.length];
+}
+
 export function removeRedundantPins(pins: NotePin[]): void {
     for (let i: number = 1; i < pins.length - 1;) {
         if (pins[i - 1].interval == pins[i].interval &&
@@ -4292,7 +4394,7 @@ export class ChangeNoteTruncate extends ChangeSequence {
 }
 
 export class ChangeSplitNotesAtPoint extends ChangeSequence {
-    constructor(pattern: Pattern, cutPoint: number, pitchIndex?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, cutPoint: number, pitchIndex?: number) {
         super();
 
         let splitNote: Note;
@@ -4335,10 +4437,11 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                         : 0;
 
                     // We know enough to create a pin with the exact interval and size we want, though we need to
-                    // round those values to make them legal. The time is relative to left note. For the right note
-                    // it would be zero.
+                    // round those values to make them legal. The interpolated pitch rounds specially in case the user
+                    // needs it snapped to an active scale.
+					const cutPitch = leftPin.interval + percentBetweenPins * (rightPin.interval - leftPin.interval);
                     const cutPin = makeNotePin(
-                        Math.round(leftPin.interval + percentBetweenPins * (rightPin.interval - leftPin.interval)),
+                        snapPitchToScale(doc, note.pitches[0] + cutPitch) - note.pitches[0],
                         cutRelativeToNote,
                         Math.round(leftPin.size + percentBetweenPins * (rightPin.size - leftPin.size)),
                     );
@@ -4351,6 +4454,8 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                     // insert the cut pin as needed to the end of left note and start of right note.
                     if (leftPin.time != cutRelativeToNote) {
                         note.pins.push(cutPin);
+                    } else {
+                        note.pins[note.pins.length - 1].interval = cutPin.interval; // adjust for scale snapping.
                     }
                     if (rightPin.time > 0) {
                         splitNote.pins.unshift(makeNotePin(0, 0, cutPin.size))
@@ -4365,31 +4470,12 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
     }
 }
 
-export class ChangeSplitNotesAtSelection extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern) {
-        super();
-        let i: number = 0;
-        while (i < pattern.notes.length) {
-            const note: Note = pattern.notes[i];
-            if (note.start < doc.selection.patternSelectionStart && doc.selection.patternSelectionStart < note.end) {
-                const copy: Note = note.clone();
-                this.append(new ChangeNoteLength(doc, note, note.start, doc.selection.patternSelectionStart));
-                i++;
-                this.append(new ChangeNoteAdded(doc, pattern, copy, i, false));
-                this.append(new ChangeNoteLength(doc, copy, doc.selection.patternSelectionStart, copy.end));
-                // i++; // The second note might be split again at the end of the selection. Check it again.
-            } else if (note.start < doc.selection.patternSelectionEnd && doc.selection.patternSelectionEnd < note.end) {
-                const copy: Note = note.clone();
-                this.append(new ChangeNoteLength(doc, note, note.start, doc.selection.patternSelectionEnd));
-                i++;
-                this.append(new ChangeNoteAdded(doc, pattern, copy, i, false));
-                this.append(new ChangeNoteLength(doc, copy, doc.selection.patternSelectionEnd, copy.end));
-                i++;
-            } else {
-                i++;
-            }
-        }
-    }
+class ChangeSplitNotesAtSelection extends ChangeSequence {
+	constructor(doc: SongDocument, pattern: Pattern) {
+		super();
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionStart));
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionEnd));
+	}
 }
 
 class ChangeTransposeNote extends UndoableChange {
@@ -4602,8 +4688,7 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
         const oldEnd: number = doc.selection.patternSelectionEnd;
 
         if (doc.selection.patternSelectionActive) {
-            this.append(new ChangeSplitNotesAtPoint(pattern, oldStart));
-            this.append(new ChangeSplitNotesAtPoint(pattern, oldEnd));
+            this.append(new ChangeSplitNotesAtSelection(doc, pattern));
         }
         
         const newStart: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldStart + parts));
