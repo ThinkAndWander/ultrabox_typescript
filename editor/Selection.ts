@@ -1006,16 +1006,16 @@ export class Selection {
                     const note = pattern.notes[i];
                     if (note.end > x1 && note.start < x2) {
                         if (vol) {
-                            if (isNoise) {
+                            if (isNoise) { // Volume max -> Fade out
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
-                                    { affect: 'vol', per: 'note', add: [1, 0], onlyExistingPins: true },
-                                    undefined, undefined, pitchIfMod
-                                ))
+                                    { affect: 'vol', per: 'pin', add: ['maxrange - minrange'], onlyExistingPins: true }));
+                                this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
+                                    { affect: 'vol', per: 'pin', mult: [ '1 - num / len'], onlyExistingPins: true }));
                             } else {
                                 this._changeFlatten.append(new ChangeStepAcross(this._doc, channelIndex, pattern,
                                     { affect: 'vol', per: 'note', add: ['maxrange - minrange'], onlyExistingPins: true },
                                     undefined, undefined, pitchIfMod
-                                ))
+                                ));
                             }
                         } else if (!isMod) {
                             this._changeFlatten.append(new ChangeStretchVerticalRelative(

@@ -444,12 +444,6 @@ export class EditorTabSelection {
                     const multArr: string[] = row.rowMultiplyBy.value === '' ? ['1']
                         : row.rowMultiplyBy.value.split(',').map(str => withDefault(str, '1'));
 
-                    // The last element in a step array occurs at/after the end. Bug? I don't know.
-                    if (behavior === 'step') {
-                        addArr.push('0'),
-                        multArr.push('1')
-                    }
-
                     stepData.per = (type === 'vpn' || type === 'ppn' || type === 'bpn') ? "note"
                         : type === 'vpp' || type === 'bpp' ? "pin"
                         : "time";

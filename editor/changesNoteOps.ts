@@ -470,7 +470,9 @@ export class ChangeStepAcross extends ChangeSequence {
                         resolve(stepArray[Math.floor(ratios[slot] * (stepArray.length - 1))], val, current, lengths[slot], info),
                         resolve(stepArray[Math.ceil(ratios[slot] * (stepArray.length - 1))], val, current, lengths[slot], info)];
                     let fraction = ratios[slot] * (stepArray.length - 1) - Math.floor(ratios[slot] * (stepArray.length - 1))
-                    return data.type === 'step' ? numbersLR[0] : numbersLR[0] + fraction * (numbersLR[1] - numbersLR[0])
+                    return data.type === 'step'
+                        ? fraction <= 0.5 ? numbersLR[0] : numbersLR[1]
+                        : numbersLR[0] + fraction * (numbersLR[1] - numbersLR[0])
                 }
                 
                 return resolve(stepArray[index % stepArray.length], val, current, lengths[slot], info);
@@ -1162,7 +1164,9 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
-        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        const notesArray = pitchIndex === undefined
+            ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+
         if (notesArray.length === 0) { return; }
 
         if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
@@ -1209,7 +1213,16 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
                 ? a.start - b.start
                 : 0);
 
-        // Restore last pattern continuation if the mirrored note starts at x=0 and has same pitches.
+        // Normalize notes that don't start at interval zero.
+        notesArray.forEach((entry) => {
+            if (entry.pins[0].interval !== 0) {
+                entry.pitches = entry.pitches.map(pitch => pitch + entry.pins[0].interval);
+                entry.pins = entry.pins.map(pin => ({ ...pin, interval: pin.interval - entry.pins[0].interval }));
+                // We restrict pitch + interval from exceeding bounds, so no need to clamp or ensure unique pitches.
+            }
+        })
+
+        // Restore last pattern continuation if the mirrored note starts at x=0 and starts where the last note ends.
         if (pitchIndex === undefined && !inPlace && firstNote.start === 0
             && notesArray[0].start === 0
             && notesArray[0].pitches.every((pitch, index) => pitch === firstNote.pitches[index])) {
