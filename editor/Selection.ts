@@ -965,8 +965,17 @@ export class Selection {
 
                     for (const note of notesCopy) {
                         const adjustedX1 = Math.max(x1 as number, note.start);
-                        const adjustedX2 = Math.min(x2 as number, note.end);
-                        const adjustedCuts = absolute ? Math.max(Math.floor((adjustedX2 - adjustedX1) / cuts) - 1, 1) : cuts;
+                        let adjustedX2 = Math.min(x2 as number, note.end);
+                        let adjustedCuts: number;
+
+                        if (absolute) {
+                            const width = adjustedX2 - adjustedX1;
+                            if (width <= cuts) { continue; }
+                            adjustedX2 = adjustedX1 + Math.ceil(width / cuts) * cuts;
+                            adjustedCuts = Math.max(Math.ceil(width / cuts) - 1, 1);
+                        } else {
+                            adjustedCuts = cuts;
+                        }
 
                         this._changeNoteOperations.append(new ChangeSplitAcross(this._doc, pattern, adjustedCuts, adjustedX1, adjustedX2, pitchIfMod));
                     }

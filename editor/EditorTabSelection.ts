@@ -339,9 +339,9 @@ export class EditorTabSelection {
 		} else if (event.target === this._volFadeIn) {
 			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [0, 1], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '(x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : 0) + ((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '1 / (maxrange - minrange)'], mult: [1, 2], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['(x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : 0) + ((((x / high * (1 - high)) * (maxrange - minrange))) / (maxrange - minrange))', 0], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['1 / (maxrange - minrange)', 0], mult: [2, 1], onlyExistingPins: true }, modTrackIndex);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
 			this._doc.selection.noteStepAcross(isModChannel
