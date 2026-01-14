@@ -4401,6 +4401,7 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, cutPoint: number, pitchIndex?: number) {
         super();
 
+        let leftNote: Note;
         let splitNote: Note;
         for (let i = pattern.notes.length - 1; i >= 0; i--) {
             const note: Note = pattern.notes[i];
@@ -4417,10 +4418,11 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                 const cutRelativeToNote = cutPoint - note.start
                 const cutIndex = note.pins.findIndex((pin) => pin.time > cutRelativeToNote)
                 if (cutIndex != -1) {
+                    leftNote = note.clone();
                     splitNote = note.clone();
 
-                    note.end = cutPoint;
-                    note.pins = [...note.pins.slice(0, cutIndex)];
+                    leftNote.end = cutPoint;
+                    leftNote.pins = [...leftNote.pins.slice(0, cutIndex)];
 
                     splitNote.continuesLastPattern = false;
                     splitNote.start = cutPoint;
@@ -4432,7 +4434,7 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                     // This note used to continuously go from its left pin values to its right pin values, by
                     // linear interpolation (lerp). So if we consider their distance to the cutpoint, we can find
                     // its exact pitch and volume, which is a lerp between those pins.
-                    const leftPin = note.pins[note.pins.length - 1];
+                    const leftPin = leftNote.pins[leftNote.pins.length - 1];
                     const rightPin = splitNote.pins[0];
                     const spaceToLeftPin = cutRelativeToNote - leftPin.time;
                     const spaceBetweenPins = spaceToLeftPin + rightPin.time;
@@ -4445,7 +4447,7 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                     // needs it snapped to an active scale.
 					const cutPitch = leftPin.interval + percentBetweenPins * (rightPin.interval - leftPin.interval);
                     const cutPin = makeNotePin(
-                        snapPitchToScale(doc, note.pitches[0] + cutPitch) - note.pitches[0],
+                        snapPitchToScale(doc, leftNote.pitches[0] + cutPitch) - leftNote.pitches[0],
                         cutRelativeToNote,
                         Math.round(leftPin.size + percentBetweenPins * (rightPin.size - leftPin.size)),
                     );
@@ -4457,15 +4459,15 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
                     // Notes need pins at their exact start/end. We cut the pins left and right earlier, but now
                     // insert the cut pin as needed to the end of left note and start of right note.
                     if (leftPin.time != cutRelativeToNote) {
-                        note.pins.push(cutPin);
+                        leftNote.pins.push(cutPin);
                     } else {
-                        note.pins[note.pins.length - 1].interval = cutPin.interval; // adjust for scale snapping.
+                        leftNote.pins[leftNote.pins.length - 1].interval = cutPin.interval; // adjust for scale snapping.
                     }
                     if (rightPin.time > 0) {
                         splitNote.pins.unshift(makeNotePin(0, 0, cutPin.size))
                     }
 
-                    pattern.notes.splice(i + 1, 0, splitNote);
+                    this.append(new ChangeNotesAdded(doc, pattern, [note], [leftNote, splitNote]));
                 }
 
                 break;

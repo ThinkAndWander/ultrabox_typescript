@@ -2166,6 +2166,8 @@ export class PatternEditor {
 
         const continuousState: boolean = this._doc.lastChangeWas(this._dragChange);
         if (this._mouseDown && continuousState && this._dragChange != null) {
+            this._selectionOriginalCoords.start = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0;
+            this._selectionOriginalCoords.end = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : 0;
 
             if (this._draggingSelectionContents) {
                 this._doc.record(this._dragChange);
@@ -2175,10 +2177,6 @@ export class PatternEditor {
 
             } else if (this._draggingStartOfSelection || this._draggingEndOfSelection || this._shiftHeld) {
                 this._setPatternSelection(this._dragChange);
-                if (!this._draggingStartOfSelection && !this._draggingEndOfSelection) {
-                    this._selectionOriginalCoords.start = this._doc.selection.patternSelectionStart;
-                    this._selectionOriginalCoords.end = this._doc.selection.patternSelectionEnd;
-                }
                 this._dragChange = null;
             } else if (this._mouseDragging || this._cursor.curNote == null || !this._dragChange.isNoop() || this._draggingStartOfSelection || this._draggingEndOfSelection || this._draggingSelectionContents || this._shiftHeld) {
                 this._doc.record(this._dragChange);

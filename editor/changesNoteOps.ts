@@ -1207,10 +1207,14 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
         })
 
         // Restore last pattern continuation if the mirrored note starts at x=0 and starts where the last note ends.
-        if (pitchIndex === undefined && !inPlace && firstNote.start === 0
-            && notesArray[0].start === 0
-            && notesArray[0].pitches.every((pitch, index) => pitch === firstNote.pitches[index])) {
-            notesArray[0].continuesLastPattern = firstNote.continuesLastPattern;
+        if (pitchIndex === undefined && !inPlace && firstNote.start === 0 && notesArray[0].start === 0) {
+            const sorted = notesArray[0].pitches.toSorted((a, b) => a - b);
+            const sortedFirst = firstNote.pitches.toSorted((a, b) => a - b);
+
+            if (sorted.length === sortedFirst.length &&
+                sorted.every((pitch, index) => pitch === sortedFirst[index])) {
+                notesArray[0].continuesLastPattern = firstNote.continuesLastPattern;
+            }
         }
 
         doc.notifier.changed();
@@ -1218,110 +1222,112 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
     }
 }
 
-/** Stretch/shrink notes by position proportionate to the selected range containing them, and transpose to a new range. Notes will
- * automatically get mirrored if x2 < x1.
- * 
+/**
+ * Stretch/shrink notes by position proportionate to the selected range containing them, and transpose to a new range.
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
- * 
  * x1b, x2b define the location of the new range.
+ * 
  * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
  * Must be a value under Config.modCount. Value is not checked to see if in range.
 */
 export class ChangeStretchHorizontal extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, x1b: number, x2b: number, x1?: number, x2?: number, pitchIndex?: number) {
+    constructor(doc: SongDocument, pattern: Pattern, x1new: number, x2new: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x2b = Math.min(x2b, doc.song.partsPerPattern);
+        x2new = Math.min(x2new, doc.song.partsPerPattern);
         x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern
-            || x1b < 0 || x2b < 0 || x1b == x2b || x1b > doc.song.partsPerPattern || x2b > doc.song.partsPerPattern
-            || (x1 === x1b && x2 == x2b)) {
+            || x1new < 0 || x2new < 0 || x1new == x2new || x1new > doc.song.partsPerPattern || x2new > doc.song.partsPerPattern
+            || (x1 === x1new && x2 == x2new)) {
+            return;
+        }
+
+        if (x2new <= x1new) {
             return;
         }
 
         if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
         if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
 
-        if (x2b < x1b) {
-            this.append(new ChangeMirrorHorizontal(doc, pattern, true, x1, x2, pitchIndex));
-            [x1b, x2b] = [x2b, x1b] //swap
-        }
+        // Cut notes at the new range bound ends so they chop off nicely.
+        if (x1new !== 0 && (x1new < x1 || x1new > x2)) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1new, pitchIndex)); }
+        if (x2new !== doc.song.partsPerPattern && (x2new < x1 || x2new > x2)) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2new, pitchIndex)); }
 
+        const oldNotes: Note[] = [];
         const newNotes: Note[] = [];
-        const scaleFactor = (x2b - x1b) / (x2 - x1);
-        const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        const scaleFactor = (x2new - x1new) / (x2 - x1);
+        const notesArray = pitchIndex === undefined
+            ? pattern.notes
+            : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
 
         // Construct stretched notes
         let note: Note;
         let prevNote: Note | null = null;
         let newNote: Note;
-        let oldRangeStart = -1, oldRangeEnd = -1;
-        let newRangeStart = -1, newRangeEnd = -1;
         let minCompressedSize = 0;
         for (let i = 0; i < notesArray.length; i++) {
             note = notesArray[i];
 
-            // Track which notes are in the deletion ranges. All notes to be stretched will be in the old range.
-            if (note.start >= x2 && note.start >= x2b) { break; }
-            if (note.end > x1b && note.start < x2b) {
-                if (newRangeStart === -1) { newRangeStart = i; }
+            if (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
+                continue; // For mod channels, skip off-pitch notes
             }
-            if (note.end > x1 && note.start < x2) {
-                if (oldRangeStart === -1) { oldRangeStart = i; }
+            if ((note.start >= x1 && note.end <= x2) ||
+                (note.start >= x1new && note.end <= x2new)) {
+                oldNotes.push(note); // Delete old and new range
+            }
+            if (note.start >= x2 || note.end <= x1) {
+                continue; // Don't stretch unless in old range
+            }
 
-                // The new range must be at least this big to avoid loss.
-                minCompressedSize += note.pins.length;
+            // The new range must be at least this big to avoid loss.
+            minCompressedSize += note.pins.length;
 
-                // transpose the note, then stretch it to hold at minimum its pins.
-                newNote = note.clone();
-                newNote.start = Math.round(newNote.start + x1b - x1);
-                newNote.end += x1b - x1;
+            // transpose the note, then stretch it to hold at minimum its pins.
+            newNote = note.clone();
+            newNote.start += x1new - x1;
+            newNote.end += x1new - x1;
+            removeRedundantPins(newNote.pins); // to maximize compressability, just in case.
 
-                let prevPin: NotePin | null = null;
-                for (const pin of newNote.pins) {
-                    // Stretch the pins, but don't allow them to overlap. Assumes they're sorted by time.
-                    pin.time = Math.round(pin.time * scaleFactor);
-                    if (prevPin && pin.time === prevPin.time) {
-                        pin.time += 1;
-                    }
-
-                    prevPin = pin;
-                }
-                newNote.end = Math.round(Math.max(
-                    newNote.start + newNote.pins[newNote.pins.length - 1].time,
-                    newNote.start + newNote.pins.length - 1));
-
-                // Move notes so they don't overlap.
-                if (prevNote && newNote.start < prevNote.end) {
-                    newNote.end += prevNote.end - newNote.start;
-                    newNote.start = prevNote.end;
+            let prevPin: NotePin | null = null;
+            for (const pin of newNote.pins) {
+                // Stretch the pins, but don't allow them to overlap. Assumes they're sorted by time.
+                pin.time = Math.trunc(pin.time * scaleFactor);
+                if (prevPin && pin.time <= prevPin.time) {
+                    pin.time = prevPin.time + 1;
                 }
 
-                newNotes.push(newNote);
-                prevNote = newNote;
+                prevPin = pin;
             }
-            
-            if (note.start >= x2 && oldRangeEnd === -1) { oldRangeEnd = i; }
-            if (note.start >= x2b && newRangeEnd === -1) { newRangeEnd = i; }
+
+            // Scale note position. Size to fit pins.
+            newNote.start = Math.trunc(x1new + (newNote.start - x1new) * scaleFactor);
+            newNote.end = Math.max(
+                newNote.start + newNote.pins[newNote.pins.length - 1].time,
+                newNote.start + newNote.pins.length - 1);
+
+            // Move notes so they don't overlap.
+            if (prevNote && newNote.start < prevNote.end) {
+                newNote.end += prevNote.end - newNote.start;
+                newNote.start = prevNote.end;
+            }
+
+            if (newNote.continuesLastPattern && newNote.start !== 0) {
+                newNote.continuesLastPattern = false;
+            }
+
+            newNotes.push(newNote);
+            prevNote = newNote;
         }
 
-        // Do nothing if overly shrunk or out of bounds.
-        if (x2b - x1b < minCompressedSize ||
-            newNotes.length === 0 ||
-            newNotes[newNotes.length - 1].end > x2b) {
+        // Do nothing if out of bounds.
+        if (newNotes.length === 0 ||
+            newNotes[newNotes.length - 1].end > x2new) {
             return;
         }
 
-        // When there are no notes to the right of the range(s).
-        if (oldRangeEnd === -1) { oldRangeEnd = notesArray.length; }
-        if (newRangeEnd === -1) { newRangeEnd = notesArray.length; }
+        this.append(new ChangeNotesAdded(doc, pattern, oldNotes, newNotes));
 
-        // Delete the notes in the old range, then replace the notes in the new range.
-        const oldRangeToDelete = notesArray.slice(oldRangeStart, oldRangeEnd);
-        const newRangeToDelete = notesArray.slice(newRangeStart, newRangeEnd).filter((note) => !oldRangeToDelete.includes(note));
-        this.append(new ChangeNotesAdded(doc, pattern, oldRangeToDelete, []));
-        this.append(new ChangeNotesAdded(doc, pattern, newRangeToDelete, newNotes));
         doc.notifier.changed();
         this._didSomething();
     }

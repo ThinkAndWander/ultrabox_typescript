@@ -167,7 +167,7 @@ export class EditorTabSelection {
         this._split = button({ class: "selectionOps-actionbutton noteOpSplit" });
         this._splitLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionSplit") }, "");
         this._splitDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
-		this._volLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionVolOps") }, "vol");
+		this._volLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionVolOps") }, "Volume");
 		this._volDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
 		this._volUp = button({ class: "selectionOps-actionbutton noteOpVolChange" });
 		this._volDown = button({ class: "selectionOps-actionbutton noteOpVolChange", style: 'transform: scaleY(-1);' });
