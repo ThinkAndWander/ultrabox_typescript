@@ -38,7 +38,6 @@ export class Selection {
 
     private _changeTranspose: ChangeGroup | null = null;
     private _changeNoteOperations: ChangeGroup | null = null;
-    private _ChangeStretchHorizontal: ChangeGroup | null = null;
     private _changeFlatten: ChangeGroup | null = null;
     private _changeTrack: ChangeGroup | null = null;
     private _changeInstrument: ChangeGroup | null = null;

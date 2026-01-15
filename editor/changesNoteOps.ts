@@ -1,7 +1,7 @@
 import { NotePin, Note, Pattern, Config } from "../synth/synth";
 import { ChangeSequence } from "./Change";
 import { SongDocument } from "./SongDocument";
-import { ChangeNotesAdded, ChangeSplitNotesAtPoint, pitchToPositionInScale, positionInScaleToPitch, removeRedundantPins, snapNoteToScale, snapPitchToScale } from "./changes";
+import { ChangeNotesAdded, ChangeSplitNotesAtPoint, mod, pitchToPositionInScale, positionInScaleToPitch, removeRedundantPins, snapNoteToScale, snapPitchToScale } from "./changes";
 
 /** Merges adjacent notes that share the same pitches in the given range.
  * 
@@ -37,7 +37,10 @@ export class ChangeMergeAcrossAdjacent extends ChangeSequence {
 
                 // sync again with for loop to pick up changes in main array and avoid recursive lock
                 // sync before the new change so that it lags behind by 1 the same as the regular array.
-                notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+                notesArray = pitchIndex === undefined
+                    ? pattern.notes
+                    : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+
                 this.append(new ChangeMergeAcross(doc, pattern, prevNote.start, note.end, pitchIndex));
                 prevNote = null;
                 i -= 1;
@@ -64,10 +67,7 @@ export class ChangeMergeAcross extends ChangeSequence {
         x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
-        const notesArray = pitchIndex === undefined
-            ? pattern.notes.concat()
-            : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
-        if (notesArray.length <= 1) { return; }
+        if (pattern.notes.length <= 1) { return; }
 
         let note: Note;
         let firstNote: Note | null = null;
@@ -75,11 +75,14 @@ export class ChangeMergeAcross extends ChangeSequence {
         let basePitch = 0, notePitch = 0;
         let notePinList: NotePin[] = [];
 
-        for (let i = 0; i < notesArray.length; i++) {
-            note = notesArray[i];
+        for (let i = 0; i < pattern.notes.length; i++) {
+            note = pattern.notes[i];
 
             if (note.end <= x1) { continue; }
             if (note.start >= x2) { break; }
+            if (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
+                continue;
+            }
 
             if (!firstNote) {
                 firstNote = note;
@@ -92,7 +95,7 @@ export class ChangeMergeAcross extends ChangeSequence {
             }
 
             if (note !== firstNote) {
-                notesArray.splice(i, 1);
+                pattern.notes.splice(i, 1);
                 i--;
 
                 notePitch = Math.min(...note.pitches);
@@ -139,7 +142,6 @@ export class ChangeMergeAcross extends ChangeSequence {
         // Span the first note through all pins, assuming its pitches across the full length.
         firstNote.end = lastNote.end;
         firstNote.pins = notePinList;
-        pattern.notes = notesArray;
 
         doc.notifier.changed();
         this._didSomething();
@@ -1434,6 +1436,68 @@ export class ChangeStretchVertical extends ChangeSequence {
             note.pitches = [...new Set(note.pitches)]; // Keep it unique.
             snapNoteToScale(doc, note);
         }
+
+        doc.notifier.changed();
+        this._didSomething();
+    }
+}
+
+/**
+ * Wraps around note data within the selection bounds by {amount} units of time (called "parts").
+ * 
+ * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
+ * @param amountInParts How far to wrap. Accepts any integer, positive (wrap right) or negative (left).
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
+ */
+export class ChangeWrapAcross extends ChangeSequence {
+    constructor(doc: SongDocument, pattern: Pattern, amountInParts: number, x1?: number, x2?: number, pitchIndex?: number) {
+        super();
+
+        x1 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionStart : 0);
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
+        if (pattern.notes.length === 0) { return; }
+
+        const width = x2 - x1;
+        amountInParts = mod(amountInParts, width);
+        const remainder = width - amountInParts;
+        if (amountInParts === 0) { return; } // Exact wrap needs no change.
+
+        if (x1 !== 0) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x1, pitchIndex)); }
+        if (x2 !== doc.song.partsPerPattern) { this.append(new ChangeSplitNotesAtPoint(doc, pattern, x2, pitchIndex)); }
+
+        // Cut at the wrap point.
+        const oldNotes: Note[] = [];
+        const newNotes: Note[] = [];
+        const cutPoint = x1 + amountInParts;
+        this.append(new ChangeSplitNotesAtPoint(doc, pattern, cutPoint, pitchIndex));
+
+        const notesArray = pitchIndex === undefined
+            ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
+        if (notesArray.length === 0) { return; }
+
+        for (let i = 0; i < notesArray.length; i++) {
+            const note = notesArray[i].clone();
+            note.continuesLastPattern = false;
+
+            if (note.end <= x1) { continue; }
+            if (note.start >= x2) { break; }
+
+            // Left side of cut is transposed to the end, right side wraps to the start
+            if (note.start < cutPoint) {
+                note.start += remainder;
+                note.end += remainder;
+            } else {
+                note.start -= amountInParts;
+                note.end -= amountInParts;
+            }
+
+            oldNotes.push(notesArray[i]);
+            newNotes.push(note);
+        }
+
+        this.append(new ChangeNotesAdded(doc, pattern, oldNotes, newNotes));
 
         doc.notifier.changed();
         this._didSomething();

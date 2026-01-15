@@ -3761,6 +3761,11 @@ export class SongEditor {
         this._ctrlHeld = event.ctrlKey;
         this._shiftHeld = event.shiftKey;
 
+        // Escape should break out of exclusive pointer access.
+        if (event.keyCode == 27 /* ESC key */ && document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+
         if (this.prompt) {
             if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
                 this.prompt.whenKeyPressed(event);

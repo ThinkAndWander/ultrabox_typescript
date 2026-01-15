@@ -1,7 +1,7 @@
 import { ColorConfig } from "./ColorConfig";
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Slider } from "./HTMLWrapper";
-import { PatternEditor, SelectionMode } from "./PatternEditor";
+import { PatternEditor, SelectionResizeMode } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
 import { IStepData } from "./changesNoteOps";
 import { Config } from "../synth/SynthConfig";
@@ -82,6 +82,7 @@ export class EditorTabSelection {
     private _patternEditor: PatternEditor;
     private _tipHandler: TipHandler;
     private _selectionModeMoveLabel: HTMLDivElement;
+    private _selectionModeWrapLabel : HTMLDivElement;
     private _selectionModeStretchLabel : HTMLDivElement;
     private _selectionModeLabel : HTMLDivElement;
     private _affectModChannelContainer: HTMLDivElement;
@@ -139,13 +140,16 @@ export class EditorTabSelection {
 
     private _constructHTML() {
         const _selectionOpsDescription = div({ style: `padding: 3px 0; max-width: 15em; text-align: center; color: ${ColorConfig.secondaryText};` }, "Selection");
-        this._selectionModeLabel = div({ style: `padding: 3px 0; color: ${ColorConfig.secondaryText};` }, "Move mode");
+        this._selectionModeLabel = div({ style: `padding: 3px 0; color: ${ColorConfig.secondaryText};` }, "Resizing selection is normal");
         const _selectionModeBtnMove = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
         this._selectionModeMoveLabel = div({ class: "tab-settings-radio selected-tab" }, "↤");
+        const _selectionModeBtnWrap = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
+        this._selectionModeWrapLabel = div({ class: "tab-settings-radio" }, "⟺");
         const _selectionModeBtnStretch = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
         this._selectionModeStretchLabel = div({ class: "tab-settings-radio" }, "↔");
         const  _selectionModeButtonsGroup: HTMLDivElement = div({ class: "tab-settings-buttons-group", style: "margin-bottom: 0.4rem;" },
             div({ class: "tab-settings-radiodiv" }, _selectionModeBtnMove, this._selectionModeMoveLabel),
+            div({ class: "tab-settings-radiodiv" }, _selectionModeBtnWrap, this._selectionModeWrapLabel),
             div({ class: "tab-settings-radiodiv" }, _selectionModeBtnStretch, this._selectionModeStretchLabel))
         this._affectModChannelNum = input({ type: "number", step: "1", min: 1, max: Config.modCount, value: "1" });
         this._affectModChannelContainer = div({ class: "selectionOps-action" },
@@ -268,8 +272,9 @@ export class EditorTabSelection {
             this._functionParameterGroup
         ];
 
-        _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Move));
-        _selectionModeBtnStretch.addEventListener("change", () => this._whenSelectionModeChanged(SelectionMode.Stretch));
+        _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.Move));
+        _selectionModeBtnWrap.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.WrapAround));
+        _selectionModeBtnStretch.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.Stretch));
         this._splitDropdown.addEventListener("click", () => {
             this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none");
         });
@@ -296,10 +301,11 @@ export class EditorTabSelection {
             ..._selectionOps);
     }
 
-    private _whenSelectionModeChanged = (type: SelectionMode): void => {
+    private _whenSelectionModeChanged = (type: SelectionResizeMode): void => {
         [
-            {type: SelectionMode.Move, obj: this._selectionModeMoveLabel},
-            {type: SelectionMode.Stretch, obj: this._selectionModeStretchLabel}
+            {type: SelectionResizeMode.Move, obj: this._selectionModeMoveLabel},
+            {type: SelectionResizeMode.WrapAround, obj: this._selectionModeWrapLabel},
+            {type: SelectionResizeMode.Stretch, obj: this._selectionModeStretchLabel}
         ].forEach((entry) => {
             if (type == entry.type) {
                 if (!entry.obj.classList.contains('selected-tab')) { entry.obj.classList.add('selected-tab') }
@@ -309,7 +315,10 @@ export class EditorTabSelection {
         })
 
         this._patternEditor.switchEditingMode(type);
-        this._selectionModeLabel.innerText = (type === SelectionMode.Move) ? "Move mode" : "Stretch mode";
+        this._selectionModeLabel.innerText =
+            (type === SelectionResizeMode.Move) ? "Resizing selection is normal" :
+            (type === SelectionResizeMode.WrapAround) ? "Resizing selection wraps around" :
+            "Resizing selection stretches";
     }
 
     private _whenSettingButtonClicked = (event: MouseEvent): void => {
@@ -364,10 +373,15 @@ export class EditorTabSelection {
         if (specialFunction !== undefined) {
             this._setSpecialFunction(specialFunction);
         } else {
-            this._getStepFunctionGUI(
-                funcVolPresets[this._functionSelect.value] ??
+            const preset = funcVolPresets[this._functionSelect.value] ??
                 funcPitchPresets[this._functionSelect.value] ??
-                funcBendsPresets[this._functionSelect.value]);
+                funcBendsPresets[this._functionSelect.value];
+
+            if (preset) {
+                this._getStepFunctionGUI(preset);
+            } else {
+                this._functionParameterGroup?.replaceChildren();
+            }
         }
         
         this._functionRun.removeEventListener("click", this._specialFunctionCurried);
@@ -376,7 +390,7 @@ export class EditorTabSelection {
     }
 
 	/** Creates an IStepData object and GUI from given options. Commas delimit entries in the array textboxes. */
-	private _getStepFunctionGUI(preset?: IStepData) {
+	private _getStepFunctionGUI(preset: IStepData) {
 		interface IRowData {
             rowAffect: HTMLSelectElement;
             rowBehavior: HTMLSelectElement;
@@ -408,20 +422,18 @@ export class EditorTabSelection {
         let fromAdd: string | undefined;
         let fromMultiply: string | undefined;
 
-        if (preset) {
-            fromAffects = 
-                (preset.affect === 'vol' && preset.per === 'note') ? 'vpn' :
-                (preset.affect === 'vol' && preset.per === 'pin') ? 'vpp' :
-                (preset.affect === 'vol' && preset.per === 'time') ? 'vbt' :
-                (preset.affect === 'pitch') ? 'ppn' :
-                (preset.affect === 'bends' && preset.per === 'note') ? 'bpn' :
-                (preset.affect === 'bends' && preset.per === 'pin') ? 'bpp' :
-                (preset.affect === 'bends' && preset.per === 'time') ? 'bbt' :
-                undefined;
+        fromAffects = 
+            (preset.affect === 'vol' && preset.per === 'note') ? 'vpn' :
+            (preset.affect === 'vol' && preset.per === 'pin') ? 'vpp' :
+            (preset.affect === 'vol' && preset.per === 'time') ? 'vbt' :
+            (preset.affect === 'pitch') ? 'ppn' :
+            (preset.affect === 'bends' && preset.per === 'note') ? 'bpn' :
+            (preset.affect === 'bends' && preset.per === 'pin') ? 'bpp' :
+            (preset.affect === 'bends' && preset.per === 'time') ? 'bbt' :
+            undefined;
 
-            if (preset.add) { fromAdd = preset.add.join(','); }
-            if (preset.mult) { fromMultiply = preset.mult.join(','); }
-        }
+        if (preset.add) { fromAdd = preset.add.join(','); }
+        if (preset.mult) { fromMultiply = preset.mult.join(','); }
 
         /** Reads control values to update the action when user runs the function. */
         const updatePerform = () => {
@@ -472,13 +484,13 @@ export class EditorTabSelection {
             affect.value = isFirstRow && fromAffects
                 ? fromAffects satisfies keyof typeof affects
                 : 'vpn';
-            behavior.value = isFirstRow && preset?.type
+            behavior.value = isFirstRow && preset.type
                 ? preset.type
                 : behaviors.cycle
 
             if (fromAdd) { add.value = isFirstRow ? fromAdd : ''; }
             if (fromMultiply) { multiplyBy.value = isFirstRow ? fromMultiply : ''; }
-            onlyExistingPins.checked = isFirstRow ? (preset?.onlyExistingPins ?? false) : false
+            onlyExistingPins.checked = isFirstRow ? (preset.onlyExistingPins ?? false) : false
 
             // Clicking remove on a row finds itself in the rows and removes itself that way.
             if (!isFirstRow) {
