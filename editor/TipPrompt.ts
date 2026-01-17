@@ -26,6 +26,20 @@ export class TipPrompt implements Prompt {
 					p("The most common scales are major and minor. Assuming your song uses all pitches in the scale and especially \"tonic\" pitches (the purple rows in the pattern editor) then major scales tend to sound more playful or optimistic, whereas minor scales sound more serious or sad."),
 				)];
 			} break;
+			case "selectionResizeMode": {
+				this.messages = [div(
+					h2("Selection resize behavior"),
+					p("After making a selection on the pattern sheet, you can grab the edges of the selection to resize it. Normally, it just resizes the selection. In stretch mode, it also stretches or compresses everything as the bounds change. In wrap-around mode, instead of resizing, it wraps notes to the other side of the selection, even parts of notes.")
+				)];
+				break;
+			}
+			case "selectionResizeSnapping": {
+				this.messages = [div(
+					h2("Selection resize snapping"),
+					p("Normally grabbing the edges of a selection to extend it will snap to the grid based on the song rhythm, but you can also hold shift before you drag the edge for an alternate snapping mode. You can snap to the ends of notes, or all features (notes and gaps around them). Exclusive snapping changes BOTH of the selection bounds, try it out!")
+				)];
+				break;
+			}
 			case "selectionMerge": {
 				this.messages = [div(
 					h2("Merge"),
@@ -152,7 +166,7 @@ export class TipPrompt implements Prompt {
 			} break;
 			case "selectionModTarget": {
 				this.messages = [div(
-					h2("Modulation track to affect"),
+					h2("Modulation track #"),
 					p("Which modulation channel to affect, #1 is the top track, #2 is the track below it, and so on.")
 				)]
 			} break;

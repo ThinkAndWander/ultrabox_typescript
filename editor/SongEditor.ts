@@ -854,9 +854,9 @@ export class SongEditor {
     private readonly _algorithmSelectRow: HTMLDivElement = div({ class: "selectRow" }, span({ class: "tip", onclick: () => this._openPrompt("algorithm") }, "Algorithm: "), div({ class: "selectContainer" }, this._algorithmSelect));
 
     private readonly _tabButtonInstrument: HTMLInputElement = input({ type: "radio", name: 'tab-settings-radio-group', class: "tab-settings-radio" });
-    private readonly _tabBtnInstrLabel: HTMLDivElement = div({ class: "tab-settings-radio selected-tab" }, TabControls[TabSettingType.EditInstrument].icon);
+    private readonly _tabBtnInstrLabel: HTMLDivElement = div({ class: "tab-settings-radio selected-tab" }, TabControls[TabSettingType.ChannelSettings].icon);
     private readonly _tabButtonSelection: HTMLInputElement = input({ type: "radio", name: 'tab-settings-radio-group', class: "tab-settings-radio" });
-    private readonly _tabBtnSelLabel: HTMLDivElement = div({ class: "tab-settings-radio" }, TabControls[TabSettingType.EditSelection].icon);
+    private readonly _tabBtnSelLabel: HTMLDivElement = div({ class: "tab-settings-radio" }, TabControls[TabSettingType.PatternControls].icon);
     private readonly _tabSettingsButtonsGroup: HTMLDivElement = div({ class: "tab-settings-buttons-group" },
         div({ class: "tab-settings-radiodiv" }, this._tabButtonInstrument, this._tabBtnInstrLabel),
         div({ class: "tab-settings-radiodiv" }, this._tabButtonSelection, this._tabBtnSelLabel));
@@ -1594,8 +1594,8 @@ export class SongEditor {
         //this._pitchedPresetSelect.addEventListener("change", this._whenSetPitchedPreset);
         //this._drumPresetSelect.addEventListener("change", this._whenSetDrumPreset);
         this._algorithmSelect.addEventListener("change", this._whenSetAlgorithm);
-        this._tabButtonInstrument.addEventListener("change", () => this._whenSelectTab(TabSettingType.EditInstrument));
-        this._tabButtonSelection.addEventListener("change", () => this._whenSelectTab(TabSettingType.EditSelection));
+        this._tabButtonInstrument.addEventListener("change", () => this._whenSelectTab(TabSettingType.ChannelSettings));
+        this._tabButtonSelection.addEventListener("change", () => this._whenSelectTab(TabSettingType.PatternControls));
         this._instrumentsButtonBar.addEventListener("click", this._whenSelectInstrument);
         //this._customizeInstrumentButton.addEventListener("click", this._whenCustomizePressed);
         this._feedbackTypeSelect.addEventListener("change", this._whenSetFeedbackType);
@@ -2210,8 +2210,8 @@ export class SongEditor {
         this._sampleLoadingStatusContainer.style.display = this._doc.prefs.showSampleLoadingStatus ? "" : "none";
         this._instrumentCopyGroup.style.display = this._doc.prefs.instrumentCopyPaste ? "" : "none";
         this._instrumentExportGroup.style.display = this._doc.prefs.instrumentImportExport ? "" : "none";
-        this._instrumentAndModulatorSettings.style.display = this._doc.viewedTab == TabControls[TabSettingType.EditInstrument] ? "" : "none";
-        this._editorTabSelection.htmlEntryPoint.style.display = this._doc.viewedTab === TabControls[TabSettingType.EditSelection] ? "" : "none";
+        this._instrumentAndModulatorSettings.style.display = this._doc.viewedTab == TabControls[TabSettingType.ChannelSettings] ? "" : "none";
+        this._editorTabSelection.htmlEntryPoint.style.display = this._doc.viewedTab === TabControls[TabSettingType.PatternControls] ? "" : "none";
         this._instrumentAndModulatorSettings.style.scrollbarWidth = this._doc.prefs.showInstrumentScrollbars ? "" : "none";
         if (document.getElementById('text-content'))
             document.getElementById('text-content')!.style.display = this._doc.prefs.showDescription ? "" : "none";
@@ -3491,7 +3491,7 @@ export class SongEditor {
     }
 
     private _renderInstrumentBar(channel: Channel, instrumentIndex: number, colors: ChannelColors) {
-        if (this._doc.viewedTab !== TabControls[TabSettingType.EditInstrument]) {
+        if (this._doc.viewedTab !== TabControls[TabSettingType.ChannelSettings]) {
             return;
         }
 
@@ -4021,7 +4021,7 @@ export class SongEditor {
                 if (event.shiftKey) {
                     this._doc.selection.selectChannel();
                 } else {
-                    this._doc.selection.selectAll();
+                    this._doc.selection.selectAllPatterns();
                 }
                 event.preventDefault();
                 break;
@@ -4812,8 +4812,8 @@ export class SongEditor {
 
     private _whenSelectTab = (type: TabSettingType): void => {
         [
-            {type: TabSettingType.EditInstrument, obj: this._tabBtnInstrLabel},
-            {type: TabSettingType.EditSelection, obj: this._tabBtnSelLabel}
+            {type: TabSettingType.ChannelSettings, obj: this._tabBtnInstrLabel},
+            {type: TabSettingType.PatternControls, obj: this._tabBtnSelLabel}
         ].forEach((entry) => {
             if (type == entry.type) {
                 if (!entry.obj.classList.contains('selected-tab')) { entry.obj.classList.add('selected-tab') }
@@ -5101,7 +5101,7 @@ export class SongEditor {
                 this._doc.selection.transpose(false, false);
                 break;
             case "selectAll":
-                this._doc.selection.selectAll();
+                this._doc.selection.selectAllPatterns();
                 break;
             case "selectChannel":
                 this._doc.selection.selectChannel();

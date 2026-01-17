@@ -1,7 +1,7 @@
 import { ColorConfig } from "./ColorConfig";
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Slider } from "./HTMLWrapper";
-import { PatternEditor, SelectionResizeMode } from "./PatternEditor";
+import { PatternEditor, SelectionResizeMode, SelectionResizeSnapping } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
 import { IStepData } from "./changesNoteOps";
 import { Config } from "../synth/SynthConfig";
@@ -81,10 +81,8 @@ export class EditorTabSelection {
     private _doc: SongDocument;
     private _patternEditor: PatternEditor;
     private _tipHandler: TipHandler;
-    private _selectionModeMoveLabel: HTMLDivElement;
-    private _selectionModeWrapLabel : HTMLDivElement;
-    private _selectionModeStretchLabel : HTMLDivElement;
-    private _selectionModeLabel : HTMLDivElement;
+    private _resizeModeDropdown: HTMLSelectElement;
+    private _snappingModeDropdown: HTMLSelectElement;
     private _affectModChannelContainer: HTMLDivElement;
     private _affectModChannelNum : HTMLInputElement;
     private _merge : HTMLButtonElement;
@@ -139,22 +137,30 @@ export class EditorTabSelection {
     }
 
     private _constructHTML() {
-        const _selectionOpsDescription = div({ style: `padding: 3px 0; max-width: 15em; text-align: center; color: ${ColorConfig.secondaryText};` }, "Selection");
-        this._selectionModeLabel = div({ style: `padding: 3px 0; color: ${ColorConfig.secondaryText};` }, "Resizing selection is normal");
-        const _selectionModeBtnMove = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
-        this._selectionModeMoveLabel = div({ class: "tab-settings-radio selected-tab" }, "↤");
-        const _selectionModeBtnWrap = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
-        this._selectionModeWrapLabel = div({ class: "tab-settings-radio" }, "⟺");
-        const _selectionModeBtnStretch = input({ type: "radio", name: "selection-mode-radio-group", class: "tab-settings-radio" });
-        this._selectionModeStretchLabel = div({ class: "tab-settings-radio" }, "↔");
-        const  _selectionModeButtonsGroup: HTMLDivElement = div({ class: "tab-settings-buttons-group", style: "margin-bottom: 0.4rem;" },
-            div({ class: "tab-settings-radiodiv" }, _selectionModeBtnMove, this._selectionModeMoveLabel),
-            div({ class: "tab-settings-radiodiv" }, _selectionModeBtnWrap, this._selectionModeWrapLabel),
-            div({ class: "tab-settings-radiodiv" }, _selectionModeBtnStretch, this._selectionModeStretchLabel))
+        const selectionOpsDescription = div({ style: `padding: 3px 0; max-width: 15em; text-align: center; color: ${ColorConfig.secondaryText};` }, "Pattern Controls");
+
+        this._resizeModeDropdown = select();
+        [
+            { lbl: 'Move', val: SelectionResizeMode.Move, x: true },
+            { lbl: 'Stretch', val: SelectionResizeMode.Stretch },
+            { lbl: 'Wrap around', val: SelectionResizeMode.WrapAround }
+        ].forEach(o => this._resizeModeDropdown.appendChild(option({ value: o.val, selected: o.x}, o.lbl)));
+        this._resizeModeDropdown.addEventListener('change', this._setResizeMode);
+
+        this._snappingModeDropdown = select();
+        [
+            { lbl: 'Rhythm', val: SelectionResizeSnapping.Rhythm },
+            { lbl: 'Features', val: SelectionResizeSnapping.SnapFeaturesUnion, x: true },
+            { lbl: 'Notes', val: SelectionResizeSnapping.SnapNotesUnion },
+            { lbl: 'Notes (exclusive)', val: SelectionResizeSnapping.SnapNotesIntersect },
+            { lbl: 'Features (exclusive)', val: SelectionResizeSnapping.SnapFeaturesIntersect }
+        ].forEach(o => this._snappingModeDropdown.appendChild(option({ value: o.val, selected: o.x }, o.lbl)));
+        this._snappingModeDropdown.addEventListener('change', this._setSnapMode);
+
         this._affectModChannelNum = input({ type: "number", step: "1", min: 1, max: Config.modCount, value: "1" });
         this._affectModChannelContainer = div({ class: "selectionOps-action" },
             this._affectModChannelNum,
-            div({ class: "tip", onclick: () => this._tipHandler("selectionModTarget") }, "Mod Track #"))
+            div({ class: "tip", onclick: () => this._tipHandler("selectionModTarget") }, "Modulation track #"))
         this._merge = button({ class: "selectionOps-actionbutton noteOpMerge" });
         this._mergeAll = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._bridge = button({ class: "selectionOps-actionbutton noteOpBridge" });
@@ -226,7 +232,14 @@ export class EditorTabSelection {
 
         this._functionParameterGroup = div();
 
-        const _selectionOps = [
+        const patternControls = [
+            selectionOpsDescription,
+            div({ class: "selectionOps-action"},
+                div({ class: "tip", onclick: () => this._tipHandler("selectionResizeMode") }, "Selection resize"),
+                div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._resizeModeDropdown)),
+            div({ class: "selectionOps-action"},
+                div({ class: "tip", onclick: () => this._tipHandler("selectionResizeSnapping") }, "Selection snap"),
+                div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._snappingModeDropdown)),
             this._affectModChannelContainer,
             div({ class: "selectionOps-action"},
                 this._merge,
@@ -272,9 +285,6 @@ export class EditorTabSelection {
             this._functionParameterGroup
         ];
 
-        _selectionModeBtnMove.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.Move));
-        _selectionModeBtnWrap.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.WrapAround));
-        _selectionModeBtnStretch.addEventListener("change", () => this._whenSelectionModeChanged(SelectionResizeMode.Stretch));
         this._splitDropdown.addEventListener("click", () => {
             this._splitDropdownGroup.style.display = (this._splitDropdownGroup.style.display === "none" ? "" : "none");
         });
@@ -294,31 +304,15 @@ export class EditorTabSelection {
         this._splitAbsolute.addEventListener("change", this._updateSplitSliderParts(this._splitSlider.input));
         this._updateSplitSliderParts(this._splitSliderInputBox)(); // Set defaults.
 
-        this.htmlEntryPoint = div({},
-            _selectionOpsDescription,
-            this._selectionModeLabel,
-            _selectionModeButtonsGroup,
-            ..._selectionOps);
+        this.htmlEntryPoint = div({}, ...patternControls);
     }
 
-    private _whenSelectionModeChanged = (type: SelectionResizeMode): void => {
-        [
-            {type: SelectionResizeMode.Move, obj: this._selectionModeMoveLabel},
-            {type: SelectionResizeMode.WrapAround, obj: this._selectionModeWrapLabel},
-            {type: SelectionResizeMode.Stretch, obj: this._selectionModeStretchLabel}
-        ].forEach((entry) => {
-            if (type == entry.type) {
-                if (!entry.obj.classList.contains('selected-tab')) { entry.obj.classList.add('selected-tab') }
-            } else {
-                entry.obj.classList.remove('selected-tab')
-            }
-        })
+    private _setResizeMode = (): void => {
+        this._patternEditor.setSelectionResizeMode(Number(this._resizeModeDropdown.value));
+    }
 
-        this._patternEditor.switchEditingMode(type);
-        this._selectionModeLabel.innerText =
-            (type === SelectionResizeMode.Move) ? "Resizing selection is normal" :
-            (type === SelectionResizeMode.WrapAround) ? "Resizing selection wraps around" :
-            "Resizing selection stretches";
+    private _setSnapMode = (): void => {
+        this._patternEditor.setSelectionResizeSnapping(Number(this._snappingModeDropdown.value));
     }
 
     private _whenSettingButtonClicked = (event: MouseEvent): void => {

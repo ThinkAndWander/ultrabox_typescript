@@ -38,7 +38,7 @@ export class SongDocument {
 	public bar: number = 0;
 	public recalcChannelNames: boolean;
 	public recentPatternInstruments: number[][] = [];
-	public viewedTab: TabControl = TabControls[TabSettingType.EditInstrument];
+	public viewedTab: TabControl = TabControls[TabSettingType.ChannelSettings];
 	public viewedInstrument: number[] = [];
 	public recordingModulators: boolean = false;
 	public continuingModRecordingChange: ChangeHoldingModRecording | null = null;

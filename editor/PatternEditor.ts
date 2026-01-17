@@ -10,7 +10,7 @@ import { HTML, SVG } from "imperative-html/dist/esm/elements-strict";
 import { ChangeSequence, UndoableChange } from "./Change";
 import { ChangeVolume, FilterMoveData, ChangeTempo, ChangePan, ChangeReverb, ChangeDistortion, ChangeOperatorAmplitude, ChangeFeedbackAmplitude, ChangePulseWidth, ChangeDetune, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangePanDelay, ChangeChorus, ChangeEQFilterSimplePeak, ChangeNoteFilterSimplePeak, ChangeStringSustain, ChangeEnvelopeSpeed, ChangeSupersawDynamism, ChangeSupersawShape, ChangeSupersawSpread, ChangePitchShift, ChangeChannelBar, ChangeDragSelectedNotes, ChangeEnsurePatternExists, ChangeNoteTruncate, ChangeNoteAdded, ChangePatternSelection, ChangePinTime, ChangeSizeBend, ChangePitchBend, ChangePitchAdded, ChangeArpeggioSpeed, ChangeBitcrusherQuantization, ChangeBitcrusherFreq, ChangeEchoSustain, ChangeEQFilterSimpleCut, ChangeNoteFilterSimpleCut, ChangeFilterMovePoint, ChangeDuplicateSelectedReusedPatterns, ChangeHoldingModRecording, ChangeDecimalOffset, ChangeMoveNotesSideways } from "./changes";
 import { prettyNumber } from "./EditorConfig";
-import { ChangeStretchHorizontal, ChangeWrapAcross } from "./changesNoteOps";
+import { ChangeStretchHorizontal, ChangeWrapAcross, search } from "./changesNoteOps";
 
 function makeEmptyReplacementElement<T extends Node>(node: T): T {
     const clone: T = <T>node.cloneNode(false);
@@ -25,6 +25,19 @@ export enum SelectionResizeMode {
     WrapAround,
     /** Resizing the selection stretches all notes and note pins proportionally to the new size. */
     Stretch
+}
+
+export enum SelectionResizeSnapping {
+    /** Resizing snaps to the rhythm (e.g. 1/4 bars) */
+    Rhythm,
+    /** Snaps to the nearest ends of a note or gap. Replaces selection (intersection) */
+    SnapFeaturesIntersect,
+    /** Snaps to the nearest ends of a note or gap, unioning with existing selection. */
+    SnapFeaturesUnion,
+    /** Snaps to the ends of only notes. Replaces selection (intersection) */
+    SnapNotesIntersect,
+    /** Snaps to the nearest ends of a note or gap, unioning with existing selection. */
+    SnapNotesUnion
 }
 
 class PatternCursor {
@@ -110,7 +123,8 @@ export class PatternEditor {
     private _draggingStartOfSelection: boolean = false;
     private _draggingEndOfSelection: boolean = false;
     private _draggingSelectionContents: boolean = false;
-    private _resizeSelectionMode = SelectionResizeMode.Move;
+    private _selectionResizing = SelectionResizeMode.Move;
+    private _selectionSnapping = SelectionResizeSnapping.SnapFeaturesUnion;
     private _unresizedSelection = { start: 0, end: 0 };
     private _dragTime: number = 0;
     private _dragPitch: number = 0;
@@ -1661,7 +1675,7 @@ export class PatternEditor {
             this._lastChangeWasPatternSelection = this._doc.lastChangeWas(this._changePatternSelection);
             this._doc.setProspectiveChange(this._dragChange);
 
-            if (this._resizeSelectionMode === SelectionResizeMode.WrapAround &&
+            if (this._selectionResizing === SelectionResizeMode.WrapAround &&
                 (this._cursorAtStartOfSelection() || this._cursorAtEndOfSelection())) {
                 this.container.requestPointerLock();
                 this._mouseDragging = true;
@@ -1780,15 +1794,37 @@ export class PatternEditor {
 
             if (this._draggingStartOfSelection || this._draggingEndOfSelection) {
                 const pattern: Pattern | null = this._doc.getCurrentPattern(this._barOffset)
-                const newStart = this._draggingStartOfSelection
-                    ? Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart))
-                    : this._doc.selection.patternSelectionStart;
-                const newEnd = this._draggingEndOfSelection
-                    ? Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart))
-                    : this._doc.selection.patternSelectionEnd;
 
-                // In wrap-around mode, dragging selection ends shifts the wrap amount instead of adjusting selection bounds.
-                if (this._resizeSelectionMode === SelectionResizeMode.WrapAround) {
+                // Normally, dragging the selection bounds follows its snapping behavior.
+                let newStart = this._doc.selection.patternSelectionStart;
+                let newEnd = this._doc.selection.patternSelectionEnd;
+                if (!this._shiftHeld /*|| this._selectionSnapping === SelectionResizeSnapping.Rhythm*/) {
+                    if (this._draggingStartOfSelection) {
+                        newStart = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
+                    } else {
+                        newEnd = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
+                    }
+                } else if (pattern !== null) { // When shift is held *while* dragging bounds, snap to notes only
+                    const snapAll =
+                        this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
+                        this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesUnion;
+
+                    const result = search(this._doc, pattern, false, currentPart, true, snapAll, snapAll);
+
+                    if (result) { // Perform interesect, else union.
+                        if (this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
+                            this._selectionSnapping === SelectionResizeSnapping.SnapNotesIntersect) {
+                            newStart = this._draggingStartOfSelection ? result.x1 : currentPart > newStart ? result.x1 : Math.min(newStart, result.x1);
+                            newEnd = this._draggingEndOfSelection ? result.x2 : currentPart > newEnd ? result.x2 : Math.min(newEnd, result.x2);
+                        } else {
+                            newStart = this._draggingStartOfSelection ? result.x1 : Math.min(newStart, result.x1);
+                            newEnd = this._draggingEndOfSelection ? result.x2 : Math.max(newEnd, result.x2);
+                        }
+                    }
+                }
+
+                // In wrap-around mode, dragging selection ends shifts the wrap amount instead of adjusting bounds.
+                if (this._selectionResizing === SelectionResizeMode.WrapAround) {
                         this._mouseLockXShift +=
                             (newStart - this._doc.selection.patternSelectionStart) +
                             (newEnd - this._doc.selection.patternSelectionEnd);
@@ -1797,7 +1833,7 @@ export class PatternEditor {
                 }
 
                 // Prospectively perform side effects based on selection mode when adjusting selection.
-                if (this._resizeSelectionMode === SelectionResizeMode.WrapAround) {
+                if (this._selectionResizing === SelectionResizeMode.WrapAround) {
                     if (pattern) {
                         const coordsWidth = this._doc.selection.patternSelectionEnd - this._doc.selection.patternSelectionStart;
                         const origCoordsWidth = this._unresizedSelection.end - this._unresizedSelection.start;
@@ -1805,7 +1841,7 @@ export class PatternEditor {
                             this._unresizedSelection.start, this._unresizedSelection.end);
                         sequence.append(wrap);
                     }
-                } else if (this._resizeSelectionMode === SelectionResizeMode.Stretch) {
+                } else if (this._selectionResizing === SelectionResizeMode.Stretch) {
                     if (pattern) {
                         const stretch = new ChangeStretchHorizontal(this._doc, pattern,
                             this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd,
@@ -2199,7 +2235,7 @@ export class PatternEditor {
             // Pointer lock usually avoids pattern selection movements, but isn't guaranteed to be allowed / isn't on mobile
             // We still respect selection bounds changes in wrap around to accommodate those scenarios, and so we need to also
             // undo those deviations on releasing the mouse/touch event.
-            if (this._resizeSelectionMode === SelectionResizeMode.WrapAround) {
+            if (this._selectionResizing === SelectionResizeMode.WrapAround) {
                 this._doc.selection.patternSelectionStart = this._unresizedSelection.start;
                 this._doc.selection.patternSelectionEnd = this._unresizedSelection.end;
             }
@@ -2357,7 +2393,7 @@ export class PatternEditor {
         }
 
         // Update the color of the fill to indicate the selection mode.
-        if (this._resizeSelectionMode === SelectionResizeMode.Move) {
+        if (this._selectionResizing === SelectionResizeMode.Move) {
             this._selectionRect.setAttribute("fill", ColorConfig.boxSelectionFill);
         } else {
             this._selectionRect.setAttribute("fill", ColorConfig.fifthNote);
@@ -2711,13 +2747,19 @@ export class PatternEditor {
         return this._pitchHeight * (this._pitchCount - (pitch) - 0.5);
     }
 
-    public switchEditingMode(mode: SelectionResizeMode): void {
-        if (this._resizeSelectionMode !== mode) {
-            this._resizeSelectionMode = mode;
+    public setSelectionResizeMode(mode: SelectionResizeMode): void {
+        if (this._selectionResizing !== mode) {
+            this._selectionResizing = mode;
             this._unresizedSelection.start = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0;
             this._unresizedSelection.end = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : 0;
         }
 
         this._updateSelection();
+    }
+
+    public setSelectionResizeSnapping(mode: SelectionResizeSnapping): void {
+        if (this._selectionSnapping !== mode) {
+            this._selectionSnapping = mode;
+        }
     }
 }

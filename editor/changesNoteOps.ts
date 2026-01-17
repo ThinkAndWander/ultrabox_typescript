@@ -1443,7 +1443,7 @@ export class ChangeStretchVertical extends ChangeSequence {
 }
 
 /**
- * Wraps around note data within the selection bounds by {amount} units of time (called "parts").
+ * Wraps around note data within the selection bounds by an integer amount of time.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
  * @param amountInParts How far to wrap. Accepts any integer, positive (wrap right) or negative (left).
@@ -1563,4 +1563,70 @@ export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x
     }
 
     return indices;
+}
+
+/**
+ * Searches a pattern in one direction from a starting point and returns the bounds of the found feature, else null. If
+ * no starting position is provided, defaults to selection bounds. If not provided, assumes whole pattern is selected.
+ * Stops searching at the ends, returning null if no element found. Note, the coordinates are always returned with the
+ * smallest one as x1, even in backwards mode.
+ * @param backwards Whether to search backwards (left on the pattern) instead of forwards (default false)
+ * @param seekFrom The x-position to start searching from. If not provided and a selection is active, starts from
+ * selection end (or start if backwards is true). If not provided and no selection is active, defaults to 0.
+ * @param notes Whether to seek for notes (default false)
+ * @param gaps Whether to seek for gaps between notes (default false)
+ * @param edges Whether to seek for the gaps at the start/end of a pattern (default false)
+ * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * Must be a value under Config.modCount. Value is not checked to see if in range.
+ */
+export function search(doc: SongDocument, pattern: Pattern, backwards: boolean, seekFrom?: number,
+    notes?: boolean, gaps?: boolean, edges?: boolean, pitchIndex?: number): ({x1: number, x2: number} | null)
+{
+    let seek = seekFrom !== undefined ? seekFrom : doc.selection.patternSelectionActive
+        ? backwards ? doc.selection.patternSelectionStart : doc.selection.patternSelectionEnd
+        : 0;
+
+    let prev: Note | undefined;
+    let note: Note;
+
+    // For empty patterns, match if edges is true
+    if (pattern.notes.length === 0 && edges) {
+        return { x1: 0, x2: doc.song.partsPerPattern };
+    }
+
+    if (backwards) {
+        for (let i = pattern.notes.length - 1; i >= 0; i--) {
+            note = pattern.notes[i];
+
+            if (note.start >= seek || (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex))) { continue; }
+            prev = i < pattern.notes.length - 1 ? pattern.notes[i + 1] : undefined;
+
+            // Match pattern edge start-gap, else this gap, else this note
+            if (edges && !prev && note.end < seek) { return { x1: note.end, x2: doc.song.partsPerPattern } }
+            if (gaps && prev && prev.start >= seek && note.end < seek) { return { x1: note.start, x2: prev.end } }
+            if (notes) { return { x1: note.start, x2: note.end }; }
+            seek = note.start;
+        }
+    } else {
+        for (let i = 0; i < pattern.notes.length; i++) {
+            note = pattern.notes[i];
+
+            if (note.end <= seek || (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex))) { continue; }
+            prev = i > 0 ? pattern.notes[i - 1] : undefined;
+
+            // Match pattern edge start-gap, else this gap, else this note
+            if (edges && !prev && note.start > seek) { return { x1: 0, x2: note.start } }
+            if (gaps && prev && prev.end <= seek && note.start > seek) { return { x1: prev.end, x2: note.start } }
+            if (notes) { return { x1: note.start, x2: note.end }; }
+            seek = note.end;
+        }
+    }
+
+    // Match pattern edge end-gap
+    if (edges) {
+        if (backwards) { return { x1: pattern.notes[0].start, x2: 0 } }
+        return { x1: pattern.notes[pattern.notes.length - 1].end, x2: doc.song.partsPerPattern }
+    }
+
+    return null;
 }
