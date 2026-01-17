@@ -39,6 +39,13 @@ function save(blob: Blob, name: string): void {
     }
 }
 
+const enum StepStatus {
+    Disabled,
+    Ready,
+    InProgress,
+    Done
+}
+
 export class ExportPrompt implements Prompt {
     private synth: Synth;
     private thenExportTo: string;
@@ -48,6 +55,8 @@ export class ExportPrompt implements Prompt {
     private totalChunks: number;
     private currentChunk: number;
     private outputStarted: boolean = false;
+    private stepStatusAutoAmp = StepStatus.Disabled;
+    private stepStatusSynth = StepStatus.Ready;
     private readonly _fileName: HTMLInputElement = input({ type: "text", style: "width: 10em;", value: Config.jsonFormat + "-Song", maxlength: 250, "autofocus": "autofocus" });
     private readonly _computedSamplesLabel: HTMLDivElement = div({ style: "width: 10em;" }, new Text("0:00"));
     private readonly _enableIntro: HTMLInputElement = input({ type: "checkbox" });
@@ -66,6 +75,7 @@ export class ExportPrompt implements Prompt {
     "Remove Whitespace: ", this._removeWhitespace);
     private readonly _cancelButton: HTMLButtonElement = button({ class: "cancelButton" });
     private readonly _exportButton: HTMLButtonElement = button({ class: "exportButton", style: "width:45%;" }, "Export");
+    private readonly _autoAmplify: HTMLInputElement = input({ style: `margin-right: 1rem;`, type: "checkbox" });
     private readonly _outputProgressBar: HTMLDivElement = div({ style: `width: 0%; background: ${ColorConfig.loopAccent}; height: 100%; position: absolute; z-index: 2;` });
     private readonly _outputProgressLabel: HTMLDivElement = div({ style: `position: relative; top: -1px; z-index: 3;` }, "0%");
     private readonly _outputProgressContainer: HTMLDivElement = div({ style: `height: 12px; background: ${ColorConfig.uiWidgetBackground}; display: block; position: relative; z-index: 1;` },
@@ -107,6 +117,7 @@ export class ExportPrompt implements Prompt {
             ),
         ),
         div({ class: "selectContainer", style: "width: 100%;" }, this._formatSelect),
+        div({}, this._autoAmplify, "Maximize volume"),
         this._removeWhitespaceDiv,
         div({ style: "text-align: left;" }, "Exporting can be slow. Reloading the page or clicking the X will cancel it. Please be patient."),
         this._outputProgressContainer,
@@ -144,6 +155,11 @@ export class ExportPrompt implements Prompt {
             this._removeWhitespace.checked = lastExportWhitespace;
         }
 
+        const lastExportAutoAmplify = window.localStorage.getItem("exportAutoAmplify") !== "0";
+        if (lastExportAutoAmplify !== null) {
+            this._autoAmplify.checked = lastExportAutoAmplify;
+        }
+
         if (this._formatSelect.value == "json") {
             this._removeWhitespaceDiv.style.display = "block";
         } else {
@@ -161,6 +177,7 @@ export class ExportPrompt implements Prompt {
         this._enableIntro.addEventListener("click", () => { (this._computedSamplesLabel.firstChild as Text).textContent = this.samplesToTime(this._doc.synth.getTotalSamples(this._enableIntro.checked, this._enableOutro.checked, +this._loopDropDown.value - 1)); });
         this._loopDropDown.addEventListener("change", () => { (this._computedSamplesLabel.firstChild as Text).textContent = this.samplesToTime(this._doc.synth.getTotalSamples(this._enableIntro.checked, this._enableOutro.checked, +this._loopDropDown.value - 1)); });
         this._formatSelect.addEventListener("change", () => { if (this._formatSelect.value == "json") { this._removeWhitespaceDiv.style.display = "block"; } else {  this._removeWhitespaceDiv.style.display = "none"; } });
+        this._autoAmplify.addEventListener("click", () => { if (!this.outputStarted) { this.stepStatusAutoAmp = this._autoAmplify.checked ? StepStatus.Ready : StepStatus.Disabled }});
         this.container.addEventListener("keydown", this._whenKeyPressed);
 
         this._fileName.value = _doc.song.title;
@@ -181,6 +198,8 @@ export class ExportPrompt implements Prompt {
         if (this.synth != null)
             this.synth.renderingSong = false;
         this.outputStarted = false;
+        this.stepStatusSynth = StepStatus.Ready;
+        if (this.stepStatusAutoAmp !== StepStatus.Disabled) { this.stepStatusAutoAmp = StepStatus.Ready; }
         this._doc.undo();
     }
 
@@ -232,6 +251,7 @@ export class ExportPrompt implements Prompt {
             return;
         window.localStorage.setItem("exportFormat", this._formatSelect.value);
         window.localStorage.setItem("exportWhitespace", this._removeWhitespace.value);
+        window.localStorage.setItem("exportAutoAmplify", this._autoAmplify.checked ? "1" : "0");
         switch (this._formatSelect.value) {
             case "wav":
                 this.outputStarted = true;
@@ -258,38 +278,74 @@ export class ExportPrompt implements Prompt {
     }
 
     private _synthesize(): void {
-        //const timer: number = performance.now();
-
         // If output was stopped e.g. user clicked the close button, abort.
         if (this.outputStarted == false) {
             return;
         }
 
-        // Update progress bar UI once per 5 sec of exported data
-        const samplesPerChunk: number = this.synth.samplesPerSecond * 5; //e.g. 44100 * 5
-        const currentFrame: number = this.currentChunk * samplesPerChunk;
+        // Transition to next steps.
+        if (this.stepStatusSynth === StepStatus.Ready) {
+            this.stepStatusSynth = StepStatus.InProgress;
+        }
+        if (this.stepStatusSynth === StepStatus.Done && this.stepStatusAutoAmp === StepStatus.Ready) {
+            this.stepStatusAutoAmp = StepStatus.InProgress;
+        }
 
-        const samplesInChunk: number = Math.min(samplesPerChunk, this.sampleFrames - currentFrame);
-        const tempSamplesL = new Float32Array(samplesInChunk);
-        const tempSamplesR = new Float32Array(samplesInChunk);
+        // Synth step.
+        if (this.stepStatusSynth === StepStatus.InProgress) {
+            // Update progress bar UI once per 5 sec of exported data
+            const samplesPerChunk: number = this.synth.samplesPerSecond * 5; //e.g. 44100 * 5
+            const currentFrame: number = this.currentChunk * samplesPerChunk;
 
-        this.synth.renderingSong = true;
-        this.synth.synthesize(tempSamplesL, tempSamplesR, samplesInChunk);
+            const samplesInChunk: number = Math.min(samplesPerChunk, this.sampleFrames - currentFrame);
+            const tempSamplesL = new Float32Array(samplesInChunk);
+            const tempSamplesR = new Float32Array(samplesInChunk);
 
-        // Concatenate chunk data into final array
-        this.recordedSamplesL.set(tempSamplesL, currentFrame);
-        this.recordedSamplesR.set(tempSamplesR, currentFrame);
+            this.synth.renderingSong = true;
+            this.synth.synthesize(tempSamplesL, tempSamplesR, samplesInChunk);
 
-        // Update UI
-        this._outputProgressBar.style.setProperty("width", Math.round((this.currentChunk + 1) / this.totalChunks * 100.0) + "%");
-        this._outputProgressLabel.innerText = Math.round((this.currentChunk + 1) / this.totalChunks * 100.0) + "%";
+            // Concatenate chunk data into final array
+            this.recordedSamplesL.set(tempSamplesL, currentFrame);
+            this.recordedSamplesR.set(tempSamplesR, currentFrame);
 
-        // Next call, synthesize the next chunk.
-        this.currentChunk++;
+            // Update UI
+            this._outputProgressBar.style.setProperty("width", Math.round((this.currentChunk + 1) / this.totalChunks * 100.0) + "%");
+            this._outputProgressLabel.innerText = Math.round((this.currentChunk + 1) / this.totalChunks * 100.0) + "%";
 
-        if (this.currentChunk >= this.totalChunks) {
-            // Done, call final function
+            // Next call, synthesize the next chunk.
+            this.currentChunk++;
+
+            if (this.currentChunk >= this.totalChunks) {
+                this.stepStatusSynth = StepStatus.Done;
+                if (this.stepStatusAutoAmp !== StepStatus.Disabled) {
+                    this.stepStatusAutoAmp = StepStatus.InProgress;
+                }
+            }
+        }
+
+        // Max amplify step.
+        else if (this.stepStatusAutoAmp = StepStatus.InProgress) {
+            this._outputProgressLabel.innerText = "Amplifying...";
+            let max = 0;
+
+            for (let i = 0; i < this.recordedSamplesL.length; i++) { if (this.recordedSamplesL[i] > max) { max = this.recordedSamplesL[i]; } }
+            for (let i = 0; i < this.recordedSamplesR.length; i++) { if (this.recordedSamplesR[i] > max) { max = this.recordedSamplesR[i]; } }
+
+            // clamp max to [-1, 1] as it shouldn't, but is often, above range. Then 1/x it, abs value as we want dist from center (0)
+            const factor = Math.abs(1 / (max > 1 ? 1 : max < -1 ? -1 : max));
+            for (let i = 0; i < this.recordedSamplesL.length; i++) { this.recordedSamplesL[i] *= factor; }
+            for (let i = 0; i < this.recordedSamplesR.length; i++) { this.recordedSamplesR[i] *= factor; }
+
+            this.stepStatusAutoAmp = StepStatus.Done;
+        }
+
+        // Finalize.
+        if (this.stepStatusSynth === StepStatus.Done &&
+            (this.stepStatusAutoAmp === StepStatus.Disabled || this.stepStatusAutoAmp === StepStatus.Done))
+        {
             this.synth.renderingSong = false;
+            this.stepStatusSynth = StepStatus.Ready;
+            if (this.stepStatusAutoAmp !== StepStatus.Disabled) { this.stepStatusAutoAmp = StepStatus.Ready; }
             this._outputProgressLabel.innerText = "Encoding...";
             if (this.thenExportTo == "wav") {
                 this._exportToWavFinish();
@@ -300,13 +356,9 @@ export class ExportPrompt implements Prompt {
             else {
                 throw new Error("Unrecognized file export type chosen!");
             }
-        }
-        else {
-            // Continue batch export
+        } else { // Continue processing steps.
             setTimeout(() => { this._synthesize(); });
         }
-
-        //console.log("export timer", (performance.now() - timer) / 1000.0);
     }
 
     private _exportTo(type: string): void {

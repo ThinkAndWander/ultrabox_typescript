@@ -1798,13 +1798,13 @@ export class PatternEditor {
                 // Normally, dragging the selection bounds follows its snapping behavior.
                 let newStart = this._doc.selection.patternSelectionStart;
                 let newEnd = this._doc.selection.patternSelectionEnd;
-                if (!this._shiftHeld /*|| this._selectionSnapping === SelectionResizeSnapping.Rhythm*/) {
+                if (!this._shiftHeld || this._selectionSnapping === SelectionResizeSnapping.Rhythm) {
                     if (this._draggingStartOfSelection) {
                         newStart = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
                     } else {
                         newEnd = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
                     }
-                } else if (pattern !== null) { // When shift is held *while* dragging bounds, snap to notes only
+                } else if (this._shiftHeld && pattern !== null) { // Shift+drag for special snapping.
                     const snapAll =
                         this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
                         this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesUnion;
@@ -2564,7 +2564,8 @@ export class PatternEditor {
                     const pattern2: Pattern | null = this._doc.song.getPattern(channel, this._doc.bar + this._barOffset);
                     if (pattern2 == null) continue;
 
-                    const octaveOffset: number = this._doc.getBaseVisibleOctave(channel) * Config.pitchesPerOctave;
+                    const channelShown = this._doc.prefs.pitchSyncScrollBar ? this._doc.channel : channel;
+                    const octaveOffset: number = this._doc.getBaseVisibleOctave(channelShown) * Config.pitchesPerOctave;
                     for (const note of pattern2.notes) {
                         for (const pitch of note.pitches) {
                             let notePath: SVGPathElement = SVG.path();

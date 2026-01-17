@@ -17,6 +17,7 @@ export class Preferences {
 	public showLetters: boolean;
 	public showChannels: boolean;
 	public showScrollBar: boolean;
+	public pitchSyncScrollBar: boolean;
 	public alwaysFineNoteVol: boolean;
 	public displayVolumeBar: boolean;
 	public instrumentCopyPaste: boolean;
@@ -41,7 +42,7 @@ export class Preferences {
 	public showOscilloscope: boolean;
 	public showSampleLoadingStatus: boolean;
 	public showDescription: boolean;
-	public showInstrumentScrollbars: boolean;
+	public showSettingsScrollbars: boolean;
 	public closePromptByClickoff: boolean;
 	public frostedGlassBackground: boolean;
 	
@@ -58,6 +59,7 @@ export class Preferences {
 		this.showLetters = window.localStorage.getItem("showLetters") == "true";
 		this.showChannels = window.localStorage.getItem("showChannels") == "true";
 		this.showScrollBar = window.localStorage.getItem("showScrollBar") != "false";
+		this.pitchSyncScrollBar = window.localStorage.getItem("pitchSyncScrollBar") === "true";
 		this.alwaysFineNoteVol = window.localStorage.getItem("alwaysFineNoteVol") == "true";
 		this.displayVolumeBar = window.localStorage.getItem("displayVolumeBar") != "false";
 		this.instrumentCopyPaste = window.localStorage.getItem("instrumentCopyPaste") != "false";
@@ -76,7 +78,7 @@ export class Preferences {
 		this.showOscilloscope = window.localStorage.getItem("showOscilloscope") == "true";
 		this.showSampleLoadingStatus = window.localStorage.getItem("showSampleLoadingStatus") != "false";
 		this.showDescription = window.localStorage.getItem("showDescription") != "false";
-		this.showInstrumentScrollbars = window.localStorage.getItem("showInstrumentScrollbars") == "true";
+		this.showSettingsScrollbars = window.localStorage.getItem("showInstrumentScrollbars") == "true";
 		this.closePromptByClickoff = window.localStorage.getItem("closePromptByClickoff") == "true";
 		this.frostedGlassBackground = window.localStorage.getItem("frostedGlassBackground") == "true";
 		this.keyboardLayout = window.localStorage.getItem("keyboardLayout") || "pianoTransposingC";
@@ -86,7 +88,7 @@ export class Preferences {
 		this.customTheme = window.localStorage.getItem("customTheme");
         this.customTheme2 = window.localStorage.getItem("customTheme2");
 		this.visibleOctaves = ((<any>window.localStorage.getItem("visibleOctaves")) >>> 0) || Preferences.defaultVisibleOctaves;
-		
+
 		const defaultScale: Scale | undefined = Config.scales.dictionary[window.localStorage.getItem("defaultScale")!];
 		this.defaultScale = (defaultScale != undefined) ? defaultScale.index : 0;
 		
@@ -98,7 +100,6 @@ export class Preferences {
 			if (window.localStorage.getItem("fullScreen") == "true") this.layout = "long";
 			window.localStorage.removeItem("fullScreen");
 		}
-		
 	}
 	
 	public save(): void {
@@ -111,6 +112,7 @@ export class Preferences {
 		window.localStorage.setItem("showLetters", this.showLetters ? "true" : "false");
 		window.localStorage.setItem("showChannels", this.showChannels ? "true" : "false");
 		window.localStorage.setItem("showScrollBar", this.showScrollBar ? "true" : "false");
+		window.localStorage.setItem("pitchSyncScrollBar", this.pitchSyncScrollBar ? "true" : "false");
 		window.localStorage.setItem("alwaysFineNoteVol", this.alwaysFineNoteVol ? "true" : "false");
 		window.localStorage.setItem("displayVolumeBar", this.displayVolumeBar ? "true" : "false");
 		window.localStorage.setItem("enableChannelMuting", this.enableChannelMuting ? "true" : "false");
@@ -129,7 +131,7 @@ export class Preferences {
 		window.localStorage.setItem("showOscilloscope", this.showOscilloscope ? "true" : "false");
 		window.localStorage.setItem("showSampleLoadingStatus", this.showSampleLoadingStatus ? "true" : "false");
 		window.localStorage.setItem("showDescription", this.showDescription ? "true" : "false");
-		window.localStorage.setItem("showInstrumentScrollbars", this.showInstrumentScrollbars ? "true" : "false");
+		window.localStorage.setItem("showInstrumentScrollbars", this.showSettingsScrollbars ? "true" : "false");
 		window.localStorage.setItem("closePromptByClickoff", this.closePromptByClickoff ? "true" : "false");
 		window.localStorage.setItem("frostedGlassBackground", this.frostedGlassBackground ? "true" : "false");
 		window.localStorage.setItem("keyboardLayout", this.keyboardLayout);
