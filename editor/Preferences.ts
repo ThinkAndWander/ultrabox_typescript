@@ -1,7 +1,8 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
-import {Scale, Config} from "../synth/SynthConfig";
-import {ColorConfig} from "../editor/ColorConfig";
+import { Scale, Config } from "../synth/SynthConfig";
+import { ColorConfig } from "../editor/ColorConfig";
+import { Command } from "./Commands";
 
 export class Preferences {
 	public static readonly defaultVisibleOctaves: number = 3;
@@ -31,6 +32,8 @@ export class Preferences {
 	public visibleOctaves: number = Preferences.defaultVisibleOctaves;
 	public pressControlForShortcuts: boolean;
 	public keyboardLayout: string;
+	public builtInCommandDisabledIDs: number[];
+	public customCommands: Command[];
 	public bassOffset: number;
 	public enableMidi: boolean;
 	public showRecordButton: boolean;
@@ -82,6 +85,8 @@ export class Preferences {
 		this.closePromptByClickoff = window.localStorage.getItem("closePromptByClickoff") == "true";
 		this.frostedGlassBackground = window.localStorage.getItem("frostedGlassBackground") == "true";
 		this.keyboardLayout = window.localStorage.getItem("keyboardLayout") || "pianoTransposingC";
+		this.builtInCommandDisabledIDs = JSON.parse(window.localStorage.getItem("builtInCommandDisabledIDs") ?? '[]')
+		this.customCommands = Command.FromJSON(window.localStorage.getItem("customCommands") ?? '[]');
 		this.bassOffset = (+(<any>window.localStorage.getItem("bassOffset"))) || 0;
 		this.layout = window.localStorage.getItem("layout") || "small";
 		this.colorTheme = window.localStorage.getItem("colorTheme") || ColorConfig.defaultTheme;
@@ -135,6 +140,8 @@ export class Preferences {
 		window.localStorage.setItem("closePromptByClickoff", this.closePromptByClickoff ? "true" : "false");
 		window.localStorage.setItem("frostedGlassBackground", this.frostedGlassBackground ? "true" : "false");
 		window.localStorage.setItem("keyboardLayout", this.keyboardLayout);
+		window.localStorage.setItem("builtInCommandDisabledIDs", JSON.stringify([...this.builtInCommandDisabledIDs]));
+		window.localStorage.setItem("customCommands", JSON.stringify(this.customCommands));
 		window.localStorage.setItem("bassOffset", String(this.bassOffset));
 		window.localStorage.setItem("layout", this.layout);
 		window.localStorage.setItem("colorTheme", this.colorTheme);
@@ -142,6 +149,5 @@ export class Preferences {
 		window.localStorage.setItem("customTheme2", this.customTheme2!);
 		window.localStorage.setItem("volume", String(this.volume));
 		window.localStorage.setItem("visibleOctaves", String(this.visibleOctaves));
-		
 	}
 }

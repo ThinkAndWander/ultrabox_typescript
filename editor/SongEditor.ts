@@ -56,6 +56,7 @@ import { SampleLoadingStatusPrompt } from "./SampleLoadingStatusPrompt";
 import { AddSamplesPrompt } from "./AddSamplesPrompt";
 import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
+import { builtInCommands, Command, CommandContext, CursorButtons, IShortcut, ShortcutHandler } from "./Commands";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -730,6 +731,7 @@ export class SongEditor {
     public prompt: Prompt | null = null;
 
     private readonly _keyboardLayout: KeyboardLayout = new KeyboardLayout(this._doc);
+    private readonly _shortcutHandler: ShortcutHandler;
     private readonly _patternEditorPrev: PatternEditor = new PatternEditor(this._doc, false, -1);
     private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0);
     private readonly _patternEditorNext: PatternEditor = new PatternEditor(this._doc, false, 1);
@@ -1434,6 +1436,7 @@ export class SongEditor {
         window.addEventListener("resize", this.whenUpdated);
         window.requestAnimationFrame(this.updatePlayButton);
         window.requestAnimationFrame(this._animate);
+        this._shortcutHandler = new ShortcutHandler(this._doc.prefs.builtInCommandDisabledIDs, this._doc.prefs.customCommands, this._handleCommand);
 
         if (!("share" in navigator)) {
             this._fileMenu.removeChild(this._fileMenu.querySelector("[value='shareUrl']")!);
@@ -1685,6 +1688,9 @@ export class SongEditor {
         this._trackArea.addEventListener("contextmenu", this._disableCtrlContextMenu);
         this.mainLayer.addEventListener("keydown", this._whenKeyPressed);
         this.mainLayer.addEventListener("keyup", this._whenKeyReleased);
+        this.mainLayer.addEventListener("mousedown", this._shortcutHandler.handleCursorDown);
+        this.mainLayer.addEventListener("mouseup", this._shortcutHandler.handleCursorUp);
+        this.mainLayer.addEventListener("wheel", this._shortcutHandler.handleWheel);
         this.mainLayer.addEventListener("focusin", this._onFocusIn);
         this._instrumentCopyButton.addEventListener("click", this._copyInstrument.bind(this));
         this._instrumentPasteButton.addEventListener("click", this._pasteInstrument.bind(this));
@@ -3763,11 +3769,13 @@ export class SongEditor {
         this._ctrlHeld = event.ctrlKey;
         this._shiftHeld = event.shiftKey;
 
-        // Escape should break out of exclusive pointer access.
+        // Browsers designate a key to break pointer lock but it's unstandardized, see
+        // https://www.w3.org/TR/pointerlock-2/#requirements. Escape will be an explicit standard in Beepbox.
         if (event.keyCode == 27 /* ESC key */ && document.pointerLockElement) {
             document.exitPointerLock();
         }
 
+        // Defer to modal dialogs.
         if (this.prompt) {
             if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
                 this.prompt.whenKeyPressed(event);
@@ -3846,6 +3854,7 @@ export class SongEditor {
         const needControlForShortcuts: boolean = (this._doc.prefs.pressControlForShortcuts != event.getModifierState("CapsLock"));
         const canPlayNotes: boolean = (!event.ctrlKey && !event.metaKey && needControlForShortcuts);
         if (canPlayNotes) this._keyboardLayout.handleKeyEvent(event, true);
+        this._shortcutHandler.handleKeyPressed(event);
 
         //this._trackEditor.onKeyPressed(event);
         switch (event.keyCode) {
@@ -4484,8 +4493,8 @@ export class SongEditor {
         }
     }
 
-
     private _whenKeyReleased = (event: KeyboardEvent): void => {
+        this._shortcutHandler.handleKeyReleased(event);
         this._muteEditor.onKeyUp(event);
         if (!event.ctrlKey) { // Ctrl
             this._patternEditor.controlMode = false;
@@ -4499,6 +4508,11 @@ export class SongEditor {
         // Release live pitches regardless of control or caps lock so that any pitches played before will get released even if the modifier keys changed.
         this._keyboardLayout.handleKeyEvent(event, false);
     }
+
+    /** Handles command invocation for the given command. */
+	private _handleCommand(command: Command, actionData?: string): void {
+		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData : "") + "."); // TODO: fill out.
+	}
 
     private _copyTextToClipboard(text: string): void {
         // Set as any to allow compilation without clipboard types (since, uh, I didn't write this bit and don't know the proper types library) -jummbus

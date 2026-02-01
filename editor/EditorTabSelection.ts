@@ -582,6 +582,7 @@ export class EditorTabSelection {
                     // arrowkeys to get "stuck" because of this.
                     if (document.activeElement === el) { 
                         document.querySelector<HTMLButtonElement>('button.noteOpMerge')?.focus();
+                        //mainlayer to focus
                     }
 
                     el.setAttribute("disabled", "true")
