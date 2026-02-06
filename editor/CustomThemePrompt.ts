@@ -221,9 +221,7 @@ export class CustomThemePrompt implements Prompt {
 			let base64 = <string>reader.result;
 			window.localStorage.setItem("customTheme", base64);
 			const value = `url("${window.localStorage.getItem('customTheme')}")`
-			console.log('setting', value)
 			this._pattern._svg.style.backgroundImage = value;
-			console.log('done')
 		});
 		reader.readAsDataURL(file);
 	}

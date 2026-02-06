@@ -56,7 +56,7 @@ import { SampleLoadingStatusPrompt } from "./SampleLoadingStatusPrompt";
 import { AddSamplesPrompt } from "./AddSamplesPrompt";
 import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
-import { builtInCommands, Command, CommandContext, CursorButtons, IShortcut, ShortcutHandler } from "./Commands";
+import { Command, CommandArgument, CommandContext, FreeformEventType, ShortcutHandler } from "./Commands";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -733,12 +733,18 @@ export class SongEditor {
     private readonly _keyboardLayout: KeyboardLayout = new KeyboardLayout(this._doc);
     private readonly _shortcutHandler: ShortcutHandler;
     private readonly _patternEditorPrev: PatternEditor = new PatternEditor(this._doc, false, -1);
-    private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0);
+    private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0,
+        () => this._updateContextsForFocus(CommandContext.OnPatternEditor)
+    );
     private readonly _patternEditorNext: PatternEditor = new PatternEditor(this._doc, false, 1);
     private readonly _editorTabSelection = new EditorTabSelection(this._doc, this._patternEditor, this._openPrompt.bind(this));
-    private readonly _trackEditor: TrackEditor = new TrackEditor(this._doc, this);
+    private readonly _trackEditor: TrackEditor = new TrackEditor(this._doc, this,
+        () => this._updateContextsForFocus(CommandContext.OnChannelEditor)
+    );
     private readonly _muteEditor: MuteEditor = new MuteEditor(this._doc, this);
-    private readonly _loopEditor: LoopEditor = new LoopEditor(this._doc, this._trackEditor);
+    private readonly _loopEditor: LoopEditor = new LoopEditor(this._doc, this._trackEditor,
+        () => this._updateContextsForFocus(CommandContext.OnLoopEditor)
+    );
     private readonly _piano: Piano = new Piano(this._doc);
     private readonly _octaveScrollBar: OctaveScrollBar = new OctaveScrollBar(this._doc, this._piano);
     private readonly _playButton: HTMLButtonElement = button({ class: "playButton", type: "button", title: "Play (Space)" }, span("Play"));
@@ -1437,6 +1443,10 @@ export class SongEditor {
         window.requestAnimationFrame(this.updatePlayButton);
         window.requestAnimationFrame(this._animate);
         this._shortcutHandler = new ShortcutHandler(this._doc.prefs.builtInCommandDisabledIDs, this._doc.prefs.customCommands, this._handleCommand);
+        this._shortcutHandler.onFreeform = (ev, cmd, args) => { // TODO THIS IS A TEST REMOVE IT
+            console.log("event: " + (ev === FreeformEventType.Canceled ? "Canceled" : ev === FreeformEventType.NextArg ? "NextArg" : ev === FreeformEventType.NextArgBlocked ? "NextArgBlocked" : ev === FreeformEventType.Preview ? "Preview" : ev === FreeformEventType.Started ? "Started" : ev === FreeformEventType.Submit ? "Submit" : "SubmitBlocked")
+                + ", command: " + cmd.Name + ", args: [" + args.join(",") + "]"); // TODO REMOVE THIS
+        }
 
         if (!("share" in navigator)) {
             this._fileMenu.removeChild(this._fileMenu.querySelector("[value='shareUrl']")!);
@@ -1725,9 +1735,7 @@ export class SongEditor {
             }
         });
 
-        // Sorry, bypassing typescript type safety on this function because I want to use the new "passive" option.
-		//this._trackAndMuteContainer.addEventListener("scroll", this._onTrackAreaScroll, {capture: false, passive: true});
-		(<Function>this._trackAndMuteContainer.addEventListener)("scroll", this._onTrackAreaScroll, {capture: false, passive: true});
+		this._trackAndMuteContainer.addEventListener("scroll", this._onTrackAreaScroll, {capture: false, passive: true});
 
         if (isMobile) {
             const autoPlayOption: HTMLOptionElement = <HTMLOptionElement>this._optionsMenu.querySelector("[value=autoPlay]");
@@ -2038,10 +2046,12 @@ export class SongEditor {
     private _setPrompt(promptName: string | null): void {
         if (this._currentPromptName == promptName) return;
         this._currentPromptName = promptName;
+        this._shortcutHandler.setContext(CommandContext.ModalShown, promptName !== null);
 
         if (this.prompt) {
             if (this._wasPlaying && !(this.prompt instanceof TipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomChipPrompt || this.prompt instanceof CustomFilterPrompt || this.prompt instanceof VisualLoopControlsPrompt || this.prompt instanceof SustainPrompt || this.prompt instanceof HarmonicsEditorPrompt || this.prompt instanceof SpectrumEditorPrompt)) {
                 this._doc.performance.play();
+                this._shortcutHandler.setContext(CommandContext.LivePlayback, false);
             }
             this._wasPlaying = false;
             this._promptContainerBG.style.display = "none";
@@ -2144,6 +2154,7 @@ export class SongEditor {
                 if (!(this.prompt instanceof TipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomChipPrompt || this.prompt instanceof CustomFilterPrompt || this.prompt instanceof VisualLoopControlsPrompt || this.prompt instanceof SustainPrompt || this.prompt instanceof HarmonicsEditorPrompt || this.prompt instanceof SpectrumEditorPrompt)) {
                     this._wasPlaying = this._doc.synth.playing;
                     this._doc.performance.pause();
+                    this._shortcutHandler.setContext(CommandContext.LivePlayback, false);
                 }
                 this._promptContainer.style.display = "";
                 if (this._doc.prefs.frostedGlassBackground == true) {
@@ -2186,6 +2197,10 @@ export class SongEditor {
     }
 
     public whenUpdated = (): void => {
+        this._shortcutHandler.setContext(CommandContext.PatternSelection, this._doc.selection.patternSelectionActive);
+        this._shortcutHandler.setContext(CommandContext.ChannelSelection, this._doc.selection.boxSelectionActive);
+        this._shortcutHandler.setContext(CommandContext.ModulationChannelActive, this._doc.song.getChannelIsMod(this._doc.channel));
+
         const prefs: Preferences = this._doc.prefs;
         this._muteEditor.container.style.display = prefs.enableChannelMuting ? "" : "none";
         const trackBounds: DOMRect = this._trackVisibleArea.getBoundingClientRect();
@@ -3476,9 +3491,9 @@ export class SongEditor {
          // Writeback to mods if control key is held while moving a slider.
          this.handleModRecording();
 
-        }
+    }
     
-        public handleModRecording(): void {
+    public handleModRecording(): void {
             window.clearTimeout(this._modRecTimeout);
             const lastChange: Change | null = this._doc.checkLastChange();
             if ((this._ctrlHeld || this._shiftHeld) && lastChange != null && this._doc.synth.playing) {
@@ -3876,7 +3891,10 @@ export class SongEditor {
                 } else if (event.shiftKey) {
                     // Jump to mouse
                     if (this._trackEditor.movePlayheadToMouse() || this._patternEditor.movePlayheadToMouse()) {
-                        if (!this._doc.synth.playing) this._doc.performance.play();
+                        if (!this._doc.synth.playing) {
+                            this._doc.performance.play();
+                            this._shortcutHandler.setContext(CommandContext.LivePlayback, true);
+                        }
                     }
                     if (Math.floor(this._doc.synth.playhead) < this._doc.synth.loopBarStart || Math.floor(this._doc.synth.playhead) > this._doc.synth.loopBarEnd) {
                         this._doc.synth.loopBarStart = -1;
@@ -3959,6 +3977,7 @@ export class SongEditor {
                             if (!this._doc.synth.playing) {
                                 this._doc.synth.snapToBar();
                                 this._doc.performance.play();
+                                this._shortcutHandler.setContext(CommandContext.LivePlayback, true);
                             }
                         }
                         else {
@@ -4510,9 +4529,15 @@ export class SongEditor {
     }
 
     /** Handles command invocation for the given command. */
-	private _handleCommand(command: Command, actionData?: string): void {
-		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData : "") + "."); // TODO: fill out.
+	private _handleCommand(command: Command, actionData?: CommandArgument[]): void {
+		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData.join(";") : "") + "."); // TODO: fill out.
 	}
+
+    private _updateContextsForFocus(contextToKeep: CommandContext | undefined) {
+        this._shortcutHandler.setContext(CommandContext.OnPatternEditor, contextToKeep === CommandContext.OnPatternEditor);
+        this._shortcutHandler.setContext(CommandContext.OnChannelEditor, contextToKeep === CommandContext.OnChannelEditor);
+        this._shortcutHandler.setContext(CommandContext.OnLoopEditor, contextToKeep === CommandContext.OnLoopEditor);
+    }
 
     private _copyTextToClipboard(text: string): void {
         // Set as any to allow compilation without clipboard types (since, uh, I didn't write this bit and don't know the proper types library) -jummbus
@@ -4559,17 +4584,23 @@ export class SongEditor {
         if (this._doc.synth.playing) {
             this._doc.performance.pause();
             this.outVolumeHistoricCap = 0;
+            this._shortcutHandler.setContext(CommandContext.LivePlayback, false);
+            this._shortcutHandler.setContext(CommandContext.Recording, false);
         } else {
             this._doc.synth.snapToBar();
             this._doc.performance.play();
+            this._shortcutHandler.setContext(CommandContext.LivePlayback, true);
         }
     }
 
     private _toggleRecord = (): void => {
         if (this._doc.synth.playing) {
             this._doc.performance.pause();
+            this._shortcutHandler.setContext(CommandContext.LivePlayback, false);
+            this._shortcutHandler.setContext(CommandContext.Recording, false);
         } else {
             this._doc.performance.record();
+            this._shortcutHandler.setContext(CommandContext.Recording, true);
         }
     }
 

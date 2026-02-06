@@ -55,7 +55,8 @@ export class LoopEditor {
 	private _renderedBarLoopStart: number = -1;
 	private _renderedBarLoopEnd: number = -1;
 		
-	constructor(private _doc: SongDocument, private _trackEditor: TrackEditor) {
+	constructor(private _doc: SongDocument, private _trackEditor: TrackEditor,
+		private _mouseOverCallback?: Function, private _mouseOutCallback?: Function) {
 		this._updateCursorStatus();
 		this._render();
 		this._doc.notifier.watch(this._documentChanged);
@@ -107,12 +108,14 @@ export class LoopEditor {
 	private _whenMouseOver = (event: MouseEvent): void => {
 		if (this._mouseOver) return;
 		this._mouseOver = true;
+		this._mouseOverCallback?.();
 		this._updatePreview();
 	}
 		
 	private _whenMouseOut = (event: MouseEvent): void => {
 		if (!this._mouseOver) return;
 		this._mouseOver = false;
+		this._mouseOutCallback?.();
 		this._updatePreview();
 	}
 		

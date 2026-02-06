@@ -392,8 +392,8 @@ export class ChangeStepAcross extends ChangeSequence {
 
         // Runs guaranteed-safe eval on expressions in the array with variable substitutions.
         // whitelist is 0-9A-Za-z space and .!&|+-*/%=<>?:,() except the function sequences () and =>.
-        const matchVariables = /(?<!\w)([a-zA-Z]+)\w*/g
-        const matchNotWhitelist = /[^0-9A-Za-z. !&|+\-*\/%=<>?:,()]|=\s*>/g
+        const matchVariables = /(?<!\w)([a-zA-Z]+)\w*/
+        const matchNotWhitelist = /[^0-9A-Za-z. !&|+\-*\/%=<>?:,()]|=\s*>/
 
         /** Given one expression or number, injects all variables and resolves everything to a number, or 0 on failure. */
         function resolve(entry: string | number, curr: number, stepInLength: number, endNum: number, info: noteData) {

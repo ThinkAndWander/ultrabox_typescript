@@ -70,7 +70,6 @@ export class InstrumentImportPrompt implements Prompt {
 			reader.onload = (e) => {
 			try {
 					const fileParsed: any = JSON.parse(String(e.target?.result));
-					console.log("Processing file:", fileParsed)
 					if (fileParsed.constructor.name == "Array") {
 						if ((this._doc.song.patternInstruments||this._doc.song.layeredInstruments)==false) {
 							alert("Instrument file contains multiple instruments! Please turn on either Simultaneous instruments per channel or Different instruments per pattern!");
