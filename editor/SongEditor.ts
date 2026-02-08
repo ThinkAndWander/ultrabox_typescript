@@ -1445,7 +1445,7 @@ export class SongEditor {
         this._shortcutHandler = new ShortcutHandler(this._doc.prefs.builtInCommandDisabledIDs, this._doc.prefs.customCommands, this._handleCommand);
         this._shortcutHandler.onFreeform = (ev, cmd, args) => { // TODO THIS IS A TEST REMOVE IT
             console.log("event: " + (ev === FreeformEventType.Canceled ? "Canceled" : ev === FreeformEventType.NextArg ? "NextArg" : ev === FreeformEventType.NextArgBlocked ? "NextArgBlocked" : ev === FreeformEventType.Preview ? "Preview" : ev === FreeformEventType.Started ? "Started" : ev === FreeformEventType.Submit ? "Submit" : "SubmitBlocked")
-                + ", command: " + cmd.Name + ", args: [" + args.join(",") + "]"); // TODO REMOVE THIS
+                + ", command: " + cmd.Name + ", args: [" + args.map(o => o.value + (o.metadata ? "|" + o.metadata : "")).join(",") + "]"); // TODO REMOVE THIS
         }
 
         if (!("share" in navigator)) {
@@ -3786,92 +3786,97 @@ export class SongEditor {
 
         // Browsers designate a key to break pointer lock but it's unstandardized, see
         // https://www.w3.org/TR/pointerlock-2/#requirements. Escape will be an explicit standard in Beepbox.
-        if (event.keyCode == 27 /* ESC key */ && document.pointerLockElement) {
+        if (event.key === "Escape" && document.pointerLockElement) {
             document.exitPointerLock();
         }
 
-        // Defer to modal dialogs.
+        // Defer to modal dialogs. Escape closes via undoing the open action (assuming no new history).
+        // TODO: this feels like a dangerous assumption. Is there a clean way to close it instead?
         if (this.prompt) {
-            if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
+            if (event.key === "Escape") {
+                this._doc.undo();
+            } else if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
                 this.prompt.whenKeyPressed(event);
             }
-            if (event.keyCode == 27) { // ESC key
-                // close prompt.
-                this._doc.undo();
-            }
+
             return;
         }
 
-		// Defer to any active input element.
-		if (document.activeElement?.tagName === "INPUT" && document.activeElement?.attributes.getNamedItem("type")?.value === "text") {
-			// Enter/esc returns focus to form
-            if (event.keyCode == 13 || event.keyCode == 27) {
+		// Defer to an active text field.
+        // Hardcoded shortcuts: {Enter} and {Escape} to return focus; escape discards changes.
+		if (document.activeElement?.tagName === "INPUT" && document.activeElement.attributes.getNamedItem("type")?.value === "text") {
+            if (event.key === "Enter" || event.key === "Escape") {
                 this.mainLayer.focus();
-                this._patternEditor.stopEditingModLabel(event.keyCode == 27);
+                this._patternEditor.stopEditingModLabel(event.key === "Escape");
             }
 
 			return;
 		}
 
-        // Defer to actively editing song title, channel name, or mod label
-        if (document.activeElement == this._songTitleInputBox.input || this._patternEditor.editingModLabel || document.activeElement == this._muteEditor._channelNameInput.input) {
-            // Enter/esc returns focus to form
-            if (event.keyCode == 13 || event.keyCode == 27) {
+        // Defer to actively editing song title, channel name, or mod label.
+        // Hardcoded shortcuts: {Enter} and {Escape} to return focus; escape discards changes.
+        if (document.activeElement === this._songTitleInputBox.input
+            || this._patternEditor.editingModLabel
+            || document.activeElement === this._muteEditor._channelNameInput.input)
+        {
+            if (event.key === "Enter" || event.key === "Escape") {
                 this.mainLayer.focus();
-                this._patternEditor.stopEditingModLabel(event.keyCode == 27);
+                this._patternEditor.stopEditingModLabel(event.key === "Escape");
             }
 
             return;
         }
 
-        // Defer to actively editing volume/pan rows
+        // Defer to actively editing volume/pan rows.
+        // Hardcoded shortcuts: {Enter} and {Escape} to return focus.
+        // TODO: this and above should be unified under a general way to identify inputs.
         if (
-                   document.activeElement == this._panSliderInputBox
-                    || document.activeElement == this._pwmSliderInputBox
-                    || document.activeElement == this._detuneSliderInputBox
-                    || document.activeElement == this._instrumentVolumeSliderInputBox
-                    || document.activeElement == this._chipWaveLoopStartStepper
-                    || document.activeElement == this._chipWaveLoopEndStepper
-                    || document.activeElement == this._chipWaveStartOffsetStepper
-                    || document.activeElement == this._octaveStepper
-                    || document.activeElement == this._unisonVoicesInputBox
-                    || document.activeElement == this._unisonSpreadInputBox
-                    || document.activeElement == this._unisonOffsetInputBox
-                    || document.activeElement == this._unisonExpressionInputBox
-                    || document.activeElement == this._unisonSignInputBox
-
-		) {
-            // Enter/esc returns focus to form
-            if (event.keyCode == 13 || event.keyCode == 27) {
+            document.activeElement == this._panSliderInputBox
+            || document.activeElement == this._pwmSliderInputBox
+            || document.activeElement == this._detuneSliderInputBox
+            || document.activeElement == this._instrumentVolumeSliderInputBox
+            || document.activeElement == this._chipWaveLoopStartStepper
+            || document.activeElement == this._chipWaveLoopEndStepper
+            || document.activeElement == this._chipWaveStartOffsetStepper
+            || document.activeElement == this._octaveStepper
+            || document.activeElement == this._unisonVoicesInputBox
+            || document.activeElement == this._unisonSpreadInputBox
+            || document.activeElement == this._unisonOffsetInputBox
+            || document.activeElement == this._unisonExpressionInputBox
+            || document.activeElement == this._unisonSignInputBox) {
+            if (event.key === "Enter" || event.key === "Escape") {
                 this.mainLayer.focus();
             }
 
             return;
         }
 
+        // In recording mode, defer to keyboard piano performance.
+        // Hardcoded shortcuts: {Space} or {Ctrl + P} or {Meta + P} to stop recording.
         if (this._doc.synth.recording) {
-            // The only valid keyboard interactions when recording are playing notes or pressing space OR P to stop.
-            if (!event.ctrlKey && !event.metaKey) {
-                this._keyboardLayout.handleKeyEvent(event, true);
-            }
-            if (event.keyCode == 32) { // space
+            if (event.key === " "
+                || ((event.ctrlKey || event.metaKey) && event.code === 'KeyP')) {
                 this._toggleRecord();
                 event.preventDefault();
                 this.refocusStage();
-            } else if (event.keyCode == 80 && (event.ctrlKey || event.metaKey)) { // p
-                this._toggleRecord();
-                event.preventDefault();
-                this.refocusStage();
+            } else if (!event.ctrlKey && !event.metaKey) {
+                this._keyboardLayout.handleKeyEvent(event, true); // performs a piano key.
+            } else {
+                this._shortcutHandler.handleKeyPressed(event);
             }
+
             return;
         }
 
-        const needControlForShortcuts: boolean = (this._doc.prefs.pressControlForShortcuts != event.getModifierState("CapsLock"));
+        const needControlForShortcuts: boolean = (this._doc.prefs.pressControlForShortcuts !== event.getModifierState("CapsLock"));
         const canPlayNotes: boolean = (!event.ctrlKey && !event.metaKey && needControlForShortcuts);
-        if (canPlayNotes) this._keyboardLayout.handleKeyEvent(event, true);
-        this._shortcutHandler.handleKeyPressed(event);
+        if (canPlayNotes) {
+            this._keyboardLayout.handleKeyEvent(event, true);
+        }
+        if (this._doc.synth.recording && (event.ctrlKey || event.metaKey)) {
+            this._shortcutHandler.handleKeyPressed(event);
+        }
 
-        //this._trackEditor.onKeyPressed(event);
         switch (event.keyCode) {
             case 27: // ESC key
                 if (!event.ctrlKey && !event.metaKey) {
@@ -4530,7 +4535,11 @@ export class SongEditor {
 
     /** Handles command invocation for the given command. */
 	private _handleCommand(command: Command, actionData?: CommandArgument[]): void {
-		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData.join(";") : "") + "."); // TODO: fill out.
+		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData.map(o => o.value + (o.metadata ? "|" + o.metadata : "")).join(";") : "") + "."); // TODO: fill out.
+
+        switch (command.Target) {
+            // TODO
+        }
 	}
 
     private _updateContextsForFocus(contextToKeep: CommandContext | undefined) {

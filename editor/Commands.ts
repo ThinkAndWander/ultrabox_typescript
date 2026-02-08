@@ -121,8 +121,7 @@ export enum CommandTargetName {
     TransposeOctaveDown = 63,
     TransposeOctaveUp = 64,
     TransposeUp = 65,
-    Undo = 66,
-    TEST = -344 // TODO DELETE THIS TEST AND REMOVE
+    Undo = 66
 }
 
 /**
@@ -420,15 +419,15 @@ export class CommandParameter
     }
 }
 
-/** Where argument data is required, it's treated as a string. For some types (e.g. numbers), it has metadata. */
+/** Where argument data is required, it's treated as a string. Some types (e.g. numbers), may have metadata. */
 export type CommandArgument = { value: string; metadata?: string; }
 
 /** A serialized format; don't rename keys. It'll break import. */
 interface CommandJSON {
     N: Command['Name']
     T: Command['Target']
-    C: Command['Context'],
-    S: Command['Shortcuts'],
+    C: Command['Context']
+    S: Command['Shortcuts']
     D: Command['ArgumentData']
     V: Command['Version']
 }
@@ -611,7 +610,6 @@ export class Command
 
 /** The metadata of all possible targets. Names here are for actions, but argument-less commands often reuse them. */
 export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
-    [CommandTargetName.TEST]: { name: 'TEST', parameters: [new CommandParameter(CommandActionDataType.Number, { isInt: true, min: 0, max: 100 })] }, // TODO TEST REMOVE DELETE THIS DO NOT COMMIT
     [CommandTargetName.None]: { name: '', parameters: [] },
     [CommandTargetName.CopyInstrument]: { name: 'Copy instrument', parameters: [] },
     [CommandTargetName.CopyPattern]: { name: 'Copy pattern', parameters: [] },
@@ -678,7 +676,7 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.TransposeOctaveDown]: { name: 'Move notes down an octave', parameters: [] },
     [CommandTargetName.TransposeOctaveUp]: { name: 'Move notes up an octave', parameters: [] },
     [CommandTargetName.TransposeUp]: { name: 'Move notes up a step', parameters: [] },
-    [CommandTargetName.Undo]: { name: 'Undo', parameters: [] },
+    [CommandTargetName.Undo]: { name: 'Undo', parameters: [] }
 };
 
 // Just to keep below neat
@@ -703,7 +701,6 @@ const fromTarget = (target: CommandTargetName, keysPassed: string[], cursorPasse
  * manager prevents binding a modifier key by itself. And the firing mechanism also ignores that, for speed.
 */
 export const builtInCommands: Command[] = [
-    new Command("TEST", CommandTargetName.TEST, "", [{ keys: [' '], cursor: [], freeformEntry: true }], [ { value: "0" } ]), // TODO TEST DELETE
     fromTarget(CommandTargetName.PlayOrPause, [' ']),
     fromTarget(CommandTargetName.PlayAtCursor, ['SHIFT', ' ']),
     new Command(targets[CommandTargetName.ToggleRecording].name, CommandTargetName.ToggleRecording,
@@ -821,6 +818,7 @@ export class ShortcutHandler {
     private _commandHasFired = false; // If a command fires in early invocation, this prevents it from firing again in late invocation (input release).
     private _commandContexts: CommandContext[] = []; // List of active contexts, set by SongEditor.
     private _freeform: { cmd: Command, defaultData: CommandArgument[], argInputs: CommandArgument[], numericType?: string } | undefined; // Tracks all relevant data in freeform input mode.
+    private _pianoRecordMode = false; // When true, ignores requirements to hit Meta, Control, or CapsLock when firing, for keyboard piano performance.
     private _onInvoke: (command: Command, actionData: CommandArgument[] | undefined) => void;
 
     /** Loads the shortcut handler, assembling the available commands list from the built-ins that aren't disabled and a custom list. */
@@ -904,14 +902,16 @@ export class ShortcutHandler {
             // On enter or space (for non-string data), move to next argument or submit.
             // If submitted empty, tries to use any default data that exists.
             else if (event.key === "Enter" || (event.key === " " && argInfo.valueType !== CommandActionDataType.String)) {
-                const inputOrDefault = arg.value === ""
-                    ? this._freeform.defaultData[args.length - 1].value
-                    : arg.value;
-
+                const withDefaults = {
+                    value: arg.value === "" ? this._freeform.defaultData[args.length - 1].value : arg.value,
+                    metadata: arg.metadata ?? this._freeform.defaultData[args.length - 1].metadata
+                        ?? ((argInfo.valueType === CommandActionDataType.Number) ? "set" : undefined)
+                };
                 // Next argument
                 if (args.length !== targets[this._freeform.cmd.Target].parameters.length) {
-                    if (argInfo.IsArgumentValid({ value: inputOrDefault, metadata: arg.metadata })) {
-                        arg.value = inputOrDefault;
+                    if (argInfo.IsArgumentValid(withDefaults)) {
+                        arg.value = withDefaults.value;
+                        arg.metadata = withDefaults.metadata;
                         this.onFreeform?.(FreeformEventType.NextArg, this._freeform.cmd, args);
                         args.push({ value: "" });
                     } else {
@@ -920,10 +920,9 @@ export class ShortcutHandler {
                     }
                 }
                 // Submission
-                else if (argInfo.IsArgumentValid({ value: inputOrDefault, metadata: arg.metadata }) &&
-                    Command.ValidContext(this._freeform.cmd, this._commandContexts))
-                {
-                    arg.value = inputOrDefault;
+                else if (argInfo.IsArgumentValid(withDefaults) && Command.ValidContext(this._freeform.cmd, this._commandContexts)) {
+                    arg.value = withDefaults.value;
+                    arg.metadata = withDefaults.metadata;
                     this.onFreeform?.(FreeformEventType.Submit, this._freeform.cmd, args);
                     this._onInvoke(this._freeform.cmd, args);
                     this._freeform = undefined;
@@ -960,14 +959,14 @@ export class ShortcutHandler {
 
                 if (numericNewType) {
                     arg.metadata ??= "set";
-                    arg.metadata = arg.metadata.replace(/\|(add|set|mul|div)$/, numericNewType)
-                        .replace(/\|random-list-(add|set|mul|div)$/, numericNewType)
-                        .replace(/\|random-(add|set|mul|div)$/, numericNewType);
+                    arg.metadata = arg.metadata.replace(/(add|set|mul|div)$/, numericNewType)
+                        .replace(/random-list-(add|set|mul|div)$/, numericNewType)
+                        .replace(/random-(add|set|mul|div)$/, numericNewType);
 
                     if (numericNewType === "add") {
-                        arg.metadata = arg.metadata.replace(/\|cycle$/, "cycle-add").replace(/\|cycle\-stop$/, "cycle-add-stop");
+                        arg.metadata = arg.metadata.replace(/cycle$/, "cycle-add").replace(/cycle\-stop$/, "cycle-add-stop");
                     } else if (numericNewType === "set") {
-                        arg.metadata = arg.metadata.replace(/\|cycle\-add$/, "cycle").replace(/\|cycle\-add\-stop$/, "cycle-stop");
+                        arg.metadata = arg.metadata.replace(/cycle\-add$/, "cycle").replace(/cycle\-add\-stop$/, "cycle-stop");
                     }
                 }
                 this.onFreeform?.(FreeformEventType.Preview, this._freeform.cmd, args);
@@ -1057,10 +1056,15 @@ export class ShortcutHandler {
         const narrowedList: Command[] = [];
         const candidates: { cmd: Command, from: IShortcut }[] = [];
         let exitEarlyInvocation = false;
+
+        const inputKeys = this._pianoRecordMode
+            ? this._recordedInputs.keys.filter((o => o !== "Control" && o !== "Meta" && o !== "CapsLock"))
+            : this._recordedInputs.keys;
+
         for (const command of commands) {
             for (let i = 0; i < command.Shortcuts.length; i++) {
                 // If all current inputs are part of this shortcut,
-                if (this._recordedInputs.keys.every(o => command.Shortcuts[i].keys.includes(o)) &&
+                if (inputKeys.every(o => command.Shortcuts[i].keys.includes(o)) &&
                     this._recordedInputs.cursor.every(o => command.Shortcuts[i].cursor.includes(o)))
                 {
                     // If the shortcut requires even more inputs than held, it's a superset. It can't be fired.
