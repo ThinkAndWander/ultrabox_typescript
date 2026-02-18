@@ -3,7 +3,7 @@
 import {Config} from "../synth/SynthConfig";
 import {SongDocument} from "./SongDocument";
 
-export class KeyboardLayout {
+export class KeyToPianoKey {
 	private static _pianoAtC: ReadonlyArray<ReadonlyArray<number | null>> = [
 		[   0,   2,   4,   5,   7,   9,  11,  12,  14,  16,  17],
 		[null,   1,   3,null,   6,   8,  10,null,  13,  15,null,  18],
@@ -30,18 +30,18 @@ export class KeyboardLayout {
 				pitchOffset = (y - 1 + Math.floor(x / scaleIndices.length)) * Config.pitchesPerOctave + scaleIndices[(x + scaleIndices.length) % scaleIndices.length];
 				break;
 			case "pianoAtC":
-				pitchOffset = KeyboardLayout._pianoAtC[y][x];
+				pitchOffset = KeyToPianoKey._pianoAtC[y][x];
 				forcedKey = Config.keys.dictionary["C"].basePitch;
 				break;
 			case "pianoAtA":
-				pitchOffset = KeyboardLayout._pianoAtA[y][x];
+				pitchOffset = KeyToPianoKey._pianoAtA[y][x];
 				forcedKey = Config.keys.dictionary["A"].basePitch;
 				break;
 			case "pianoTransposingC":
-				pitchOffset = KeyboardLayout._pianoAtC[y][x];
+				pitchOffset = KeyToPianoKey._pianoAtC[y][x];
 				break;
 			case "pianoTransposingA":
-				pitchOffset = KeyboardLayout._pianoAtA[y][x];
+				pitchOffset = KeyToPianoKey._pianoAtA[y][x];
 				break;
 		}
 		
@@ -75,7 +75,7 @@ export class KeyboardLayout {
 		}
 	}
 	
-	public handleKeyEvent(event: KeyboardEvent, pressed: boolean): void {
+	public performPianoKey(event: KeyboardEvent, pressed: boolean): void {
 		// See: https://www.w3.org/TR/uievents-code/#key-alphanumeric-writing-system
 		switch (event.code) {
 			case "Backquote": this.handleKey(-1, 3, pressed); break;
@@ -163,7 +163,7 @@ export class KeyboardLayout {
 			return;
 		}
 		
-		const pitch: number | null = KeyboardLayout.keyPosToPitch(this._doc, x, y, this._doc.prefs.keyboardLayout);
+		const pitch: number | null = KeyToPianoKey.keyPosToPitch(this._doc, x, y, this._doc.prefs.keyboardLayout);
 		
 		if (pitch != null) {
 			if (pressed) {

@@ -6,15 +6,20 @@ import {SongDocument} from "./SongDocument";
 import {Prompt} from "./Prompt";
 import {HTML} from "imperative-html/dist/esm/elements-strict";
 import {ColorConfig} from "./ColorConfig";
-import {KeyboardLayout} from "./KeyboardLayout";
+import {KeyToPianoKey} from "./KeyToPianoKey";
 import {Piano} from "./Piano";
+import { Command, ShortcutHandler } from "./Commands";
 
 const {button, label, div, p, a, h2, input, select, option} = HTML;
 
 export class RecordingSetupPrompt implements Prompt {
 	private readonly _keyboardMode: HTMLSelectElement = select({style: "width: 100%;"},
-		option({value: "useCapsLockForNotes"}, "simple shortcuts, use caps lock to play notes"),
-		option({value: "pressControlForShortcuts"}, "simple notes, press " + EditorConfig.ctrlName + " for shortcuts"),
+		option({value: "preferShortcuts"}, "simple shortcuts, use "
+			+ (this._doc.prefs.easyPianoPerformKey.length > 0 ? this._doc.prefs.easyPianoPerformKey : ShortcutHandler.defaultEasyPianoPerform).join("/")
+			+ " to play notes"),
+		option({value: "preferNotes"}, "simple notes, press "
+			+ (this._doc.prefs.easyPianoEscapeKey.length > 0 ? this._doc.prefs.easyPianoEscapeKey : ShortcutHandler.defaultEasyPianoEscapes).join("/")
+			+ " for shortcuts"),
 	);
 	private readonly _keyboardLayout: HTMLSelectElement = select({style: "width: 100%;"},
 		option({value: "wickiHayden"}, "Wicki-Hayden"),
@@ -39,6 +44,7 @@ export class RecordingSetupPrompt implements Prompt {
 	
 	private readonly _okayButton: HTMLButtonElement = button({class: "okayButton", style: "width:45%;"}, "Okay");
 	private readonly _cancelButton: HTMLButtonElement = button({class: "cancelButton"});
+
 	public readonly container: HTMLDivElement = div({class: "prompt noSelection recordingSetupPrompt", style: "width: 600px; text-align: right; max-height: 90%;"},
 		h2({style: "align-self: center;"}, "Note Recording Setup"),
 		div({style: "display: grid; overflow-y: auto; overflow-x: hidden; flex-shrink: 1;"},
@@ -96,7 +102,7 @@ export class RecordingSetupPrompt implements Prompt {
 	);
 	
 	constructor(private _doc: SongDocument) {
-		this._keyboardMode.value = this._doc.prefs.pressControlForShortcuts ? "pressControlForShortcuts" : "useCapsLockForNotes";
+		this._keyboardMode.value = this._doc.prefs.preferEasyPianoOverShortcuts ? "preferNotes" : "preferShortcuts";
 		this._keyboardLayout.value = this._doc.prefs.keyboardLayout;
 		this._bassOffset.value = String(this._doc.prefs.bassOffset);
 		this._enableMidi.checked = this._doc.prefs.enableMidi;
@@ -134,7 +140,7 @@ export class RecordingSetupPrompt implements Prompt {
 	}
 	
 	private _confirm = (): void => { 
-		this._doc.prefs.pressControlForShortcuts = (this._keyboardMode.value == "pressControlForShortcuts");
+		this._doc.prefs.preferEasyPianoOverShortcuts = (this._keyboardMode.value == "preferNotes");
 		this._doc.prefs.keyboardLayout = this._keyboardLayout.value;
 		this._doc.prefs.bassOffset = Number(this._bassOffset.value);
 		this._doc.prefs.enableMidi = this._enableMidi.checked;
@@ -161,7 +167,7 @@ export class RecordingSetupPrompt implements Prompt {
 			for (let colIndex: number = 0; colIndex < rowLengths[rowIndex]; colIndex++) {
 				const key: HTMLDivElement = div({style: `width: 20px; height: 20px; margin: 0 2px; box-sizing: border-box; flex-shrink: 0; display: flex; justify-content: center; align-items: center;`});
 				row.appendChild(key);
-				const pitch: number | null = KeyboardLayout.keyPosToPitch(this._doc, colIndex, 3 - rowIndex, this._keyboardLayout.value);
+				const pitch: number | null = KeyToPianoKey.keyPosToPitch(this._doc, colIndex, 3 - rowIndex, this._keyboardLayout.value);
 				if (pitch != null) {
 					const scalePitch: number = pitch % 12;
 					if (scale[scalePitch]) {

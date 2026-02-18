@@ -65,8 +65,7 @@ export class TrackEditor {
 	private _barDropDownBar: number = 0;
 	private _lastScrollTime: number = 0;
 		
-	constructor(private _doc: SongDocument, private _songEditor: SongEditor,
-		private _mouseOverCallback?: Function, private _mouseOutCallback?: Function) {
+	constructor(private _doc: SongDocument, private _songEditor: SongEditor) {
 		window.requestAnimationFrame(this._animatePlayhead);
 		this._svg.addEventListener("mousedown", this._whenMousePressed);
 		document.addEventListener("mousemove", this._whenMouseMoved);
@@ -215,13 +214,11 @@ export class TrackEditor {
 	private _whenMouseOver = (event: MouseEvent): void => {
 		if (this._mouseOver) return;
 		this._mouseOver = true;
-		this._mouseOverCallback?.();
 	}
 		
 	private _whenMouseOut = (event: MouseEvent): void => {
 		if (!this._mouseOver) return;
 		this._mouseOver = false;
-		this._mouseOutCallback?.();
 	}
 		
 	private _updateMousePos(event: MouseEvent): void {

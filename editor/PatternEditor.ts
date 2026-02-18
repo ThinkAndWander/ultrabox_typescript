@@ -151,8 +151,7 @@ export class PatternEditor {
     private _renderedModChannelCount: number = -1;
     private _followPlayheadBar: number = -1;
 
-    constructor(private _doc: SongDocument, private _interactive: boolean, private _barOffset: number,
-        private _mouseOverCallback?: Function, private _mouseOutCallback?: Function) {
+    constructor(private _doc: SongDocument, private _interactive: boolean, private _barOffset: number) {
         for (let i: number = 0; i < Config.pitchesPerOctave; i++) {
             const rectangle: SVGRectElement = SVG.rect();
             rectangle.setAttribute("x", "1");
@@ -705,13 +704,11 @@ export class PatternEditor {
         if (this._mouseOver) return;
         this._mouseOver = true;
         this._usingTouch = false;
-        this._mouseOverCallback?.();
     }
 
     private _whenMouseOut = (event: MouseEvent): void => {
         if (!this._mouseOver) return;
         this._mouseOver = false;
-        this._mouseOutCallback?.();
     }
 
     private _whenMousePressed = (event: MouseEvent): void => {
@@ -1680,7 +1677,7 @@ export class PatternEditor {
 
             if (this._selectionResizing === SelectionResizeMode.WrapAround &&
                 (this._cursorAtStartOfSelection() || this._cursorAtEndOfSelection())) {
-                this.container.requestPointerLock();
+                this.container.requestPointerLock(); // Browsers use a key, usually escape, to exit
                 this._mouseDragging = true;
             }
 

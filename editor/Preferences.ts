@@ -30,10 +30,12 @@ export class Preferences {
 	public displayBrowserUrl: boolean;
 	public volume: number = 75;
 	public visibleOctaves: number = Preferences.defaultVisibleOctaves;
-	public pressControlForShortcuts: boolean;
+	public preferEasyPianoOverShortcuts: boolean;
 	public keyboardLayout: string;
 	public builtInCommandDisabledIDs: number[];
 	public customCommands: Command[];
+	public easyPianoEscapeKey: string[];
+	public easyPianoPerformKey: string[];
 	public bassOffset: number;
 	public enableMidi: boolean;
 	public showRecordButton: boolean;
@@ -70,7 +72,7 @@ export class Preferences {
 		this.instrumentButtonsAtTop = window.localStorage.getItem("instrumentButtonsAtTop") == "true"
 		this.enableChannelMuting = window.localStorage.getItem("enableChannelMuting") != "false";
 		this.displayBrowserUrl = window.localStorage.getItem("displayBrowserUrl") != "false";
-		this.pressControlForShortcuts = window.localStorage.getItem("pressControlForShortcuts") == "true";
+		this.preferEasyPianoOverShortcuts = window.localStorage.getItem("pressControlForShortcuts") == "true";
 		this.enableMidi = window.localStorage.getItem("enableMidi") != "false";
 		this.showRecordButton = window.localStorage.getItem("showRecordButton") == "true";
 		this.snapRecordedNotesToRhythm = window.localStorage.getItem("snapRecordedNotesToRhythm") == "true";
@@ -87,6 +89,8 @@ export class Preferences {
 		this.keyboardLayout = window.localStorage.getItem("keyboardLayout") || "pianoTransposingC";
 		this.builtInCommandDisabledIDs = JSON.parse(window.localStorage.getItem("builtInCommandDisabledIDs") ?? '[]')
 		this.customCommands = Command.FromJSON(window.localStorage.getItem("customCommands") ?? '[]');
+		this.easyPianoEscapeKey = JSON.parse(window.localStorage.getItem("easyPianoEscapeKey") ?? '["escape"]');
+		this.easyPianoPerformKey = JSON.parse(window.localStorage.getItem("easyPianoPerformKey") ?? '["scrolllock"]');
 		this.bassOffset = (+(<any>window.localStorage.getItem("bassOffset"))) || 0;
 		this.layout = window.localStorage.getItem("layout") || "small";
 		this.colorTheme = window.localStorage.getItem("colorTheme") || ColorConfig.defaultTheme;
@@ -125,7 +129,7 @@ export class Preferences {
 		window.localStorage.setItem("instrumentImportExport", this.instrumentImportExport ? "true" : "false");
 		window.localStorage.setItem("instrumentButtonsAtTop", this.instrumentButtonsAtTop ? "true" : "false");
 		window.localStorage.setItem("displayBrowserUrl", this.displayBrowserUrl ? "true" : "false");
-		window.localStorage.setItem("pressControlForShortcuts", this.pressControlForShortcuts ? "true" : "false");
+		window.localStorage.setItem("pressControlForShortcuts", this.preferEasyPianoOverShortcuts ? "true" : "false");
 		window.localStorage.setItem("enableMidi", this.enableMidi ? "true" : "false");
 		window.localStorage.setItem("showRecordButton", this.showRecordButton ? "true" : "false");
 		window.localStorage.setItem("snapRecordedNotesToRhythm", this.snapRecordedNotesToRhythm ? "true" : "false");
@@ -142,6 +146,8 @@ export class Preferences {
 		window.localStorage.setItem("keyboardLayout", this.keyboardLayout);
 		window.localStorage.setItem("builtInCommandDisabledIDs", JSON.stringify([...this.builtInCommandDisabledIDs]));
 		window.localStorage.setItem("customCommands", JSON.stringify(this.customCommands));
+		window.localStorage.setItem("easyPianoEscapeKey", JSON.stringify(this.easyPianoEscapeKey));
+		window.localStorage.setItem("easyPianoPerformKey", JSON.stringify(this.easyPianoPerformKey));
 		window.localStorage.setItem("bassOffset", String(this.bassOffset));
 		window.localStorage.setItem("layout", this.layout);
 		window.localStorage.setItem("colorTheme", this.colorTheme);
