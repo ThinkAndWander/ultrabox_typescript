@@ -22,6 +22,7 @@ import { HarmonicsEditor, HarmonicsEditorPrompt } from "./HarmonicsEditor";
 import { InputBox, Slider } from "./HTMLWrapper";
 import { ImportPrompt } from "./ImportPrompt";
 import { ChannelRow } from "./ChannelRow";
+import { ShortcutsAndCommandsPrompt } from "./ShortcutsAndCommandsPrompt";
 import { LayoutPrompt } from "./LayoutPrompt";
 import { EnvelopeEditor } from "./EnvelopeEditor";
 import { FadeInOutEditor } from "./FadeInOutEditor";
@@ -56,7 +57,7 @@ import { SampleLoadingStatusPrompt } from "./SampleLoadingStatusPrompt";
 import { AddSamplesPrompt } from "./AddSamplesPrompt";
 import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
-import { Command, CommandArgument, CommandContext, CommandTargetName, FreeformEventType, ShortcutHandler } from "./Commands";
+import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands } from "./Commands";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -744,12 +745,12 @@ export class SongEditor {
     );
     private readonly _piano: Piano = new Piano(this._doc);
     private readonly _octaveScrollBar: OctaveScrollBar = new OctaveScrollBar(this._doc, this._piano);
-    private readonly _playButton: HTMLButtonElement = button({ class: "playButton", type: "button", title: "Play (Space)" }, span("Play"));
-    private readonly _pauseButton: HTMLButtonElement = button({ class: "pauseButton", style: "display: none;", type: "button", title: "Pause (Space)" }, "Pause");
-    private readonly _recordButton: HTMLButtonElement = button({ class: "recordButton", style: "display: none;", type: "button", title: "Record (Ctrl+Space)" }, span("Record"));
-    private readonly _stopButton: HTMLButtonElement = button({ class: "stopButton", style: "display: none;", type: "button", title: "Stop Recording (Space)" }, "Stop Recording");
-    private readonly _prevBarButton: HTMLButtonElement = button({ class: "prevBarButton", type: "button", title: "Previous Bar (left bracket)" });
-    private readonly _nextBarButton: HTMLButtonElement = button({ class: "nextBarButton", type: "button", title: "Next Bar (right bracket)" });
+    private readonly _playButton: HTMLButtonElement = button({ class: "playButton", type: "button", title: "Play " + Cut([CommandTargetName.PlayOrPause]) }, span("Play"));
+    private readonly _pauseButton: HTMLButtonElement = button({ class: "pauseButton", style: "display: none;", type: "button", title: "Pause " + Cut([CommandTargetName.PlayOrPause]) }, "Pause");
+    private readonly _recordButton: HTMLButtonElement = button({ class: "recordButton", style: "display: none;", type: "button", title: "Record " + Cut([CommandTargetName.ToggleRecording]) }, span("Record"));
+    private readonly _stopButton: HTMLButtonElement = button({ class: "stopButton", style: "display: none;", type: "button", title: "Stop Recording " + Cut([CommandTargetName.PlayOrPause]) }, "Stop Recording");
+    private readonly _prevBarButton: HTMLButtonElement = button({ class: "prevBarButton", type: "button", title: "Previous Bar " + Cut([CommandTargetName.PrevBar]) });
+    private readonly _nextBarButton: HTMLButtonElement = button({ class: "nextBarButton", type: "button", title: "Next Bar " + Cut([CommandTargetName.NextBar]) });
     private readonly _volumeSlider: Slider = new Slider(input({ title: "main volume", style: "width: 5em; flex-grow: 1; margin: 0;", type: "range", min: "0", max: "75", value: "50", step: "1" }), this._doc, null, false);
     private readonly _outVolumeBarBg: SVGRectElement = SVG.rect({ "pointer-events": "none", width: "90%", height: "50%", x: "5%", y: "25%", fill: ColorConfig.uiWidgetBackground });
     private readonly _outVolumeBar: SVGRectElement = SVG.rect({ "pointer-events": "none", height: "50%", width: "0%", x: "5%", y: "25%", fill: "url('#volumeGrad2')" });
@@ -770,40 +771,40 @@ export class SongEditor {
     );
     private readonly _fileMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "File"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
-        option({ value: "new" }, "+ New Blank Song (⇧`)"),
-        option({ value: "import" }, "↑ Import Song... (" + EditorConfig.ctrlSymbol + "O)"),
-        option({ value: "export" }, "↓ Export Song... (" + EditorConfig.ctrlSymbol + "S)"),
+        option({ value: "new" }, "+ New Blank Song " + Cut([CommandTargetName.NewSong], 'menu')),
+        option({ value: "import" }, "↑ Import Song... " + Cut([CommandTargetName.Import], 'menu')),
+        option({ value: "export" }, "↓ Export Song... " + Cut([CommandTargetName.Export], 'menu')),
         option({ value: "copyUrl" }, "⎘ Copy Song URL"),
         option({ value: "shareUrl" }, "⤳ Share Song URL"),
         option({ value: "configureShortener" }, "🛠 Customize Url Shortener..."),
         option({ value: "shortenUrl" }, "… Shorten Song URL"),
-        option({ value: "viewPlayer" }, "▶ View in Song Player (⇧P)"),
+        option({ value: "viewPlayer" }, "▶ View in Song Player " + Cut([CommandTargetName.OpenSongPlayer], 'menu')),
         option({ value: "copyEmbed" }, "⎘ Copy HTML Embed Code"),
-        option({ value: "songRecovery" }, "⚠ Recover Recent Song... (`)"),
+        option({ value: "songRecovery" }, "⚠ Recover Recent Song... " + Cut([CommandTargetName.SongRecovery], 'menu')),
     );
     private readonly _editMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "Edit"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
-        option({ value: "undo" }, "Undo (Z)"),
-        option({ value: "redo" }, "Redo (Y)"),
-        option({ value: "copy" }, "Copy Pattern (C)"),
-        option({ value: "pasteNotes" }, "Paste Pattern Notes (V)"),
-        option({ value: "pasteNumbers" }, "Paste Pattern Numbers (" + EditorConfig.ctrlSymbol + "⇧V)"),
-        option({ value: "insertBars" }, "Insert Bar (⏎)"),
-        option({ value: "deleteBars" }, "Delete Selected Bars (⌫)"),
-        option({ value: "insertChannel" }, "Insert Channel (" + EditorConfig.ctrlSymbol + "⏎)"),
-        option({ value: "deleteChannel" }, "Delete Selected Channels (" + EditorConfig.ctrlSymbol + "⌫)"),
-        option({ value: "selectChannel" }, "Select Channel (⇧A)"),
-        option({ value: "selectAll" }, "Select All (A)"),
-        option({ value: "duplicatePatterns" }, "Duplicate Reused Patterns (D)"),
-        option({ value: "transposeUp" }, "Move Notes Up (+ or ⇧+)"),
-        option({ value: "transposeDown" }, "Move Notes Down (- or ⇧-)"),
-        option({ value: "moveNotesSideways" }, "Move All Notes Sideways... (W)"),
-	    option({ value: "generateEuclideanRhythm" }, "Generate Euclidean Rhythm... (E)"),
-        option({ value: "beatsPerBar" }, "Change Beats Per Bar... (⇧B)"),
-        option({ value: "barCount" }, "Change Song Length... (L)"),
-        option({ value: "channelSettings" }, "Channel Settings... (Q)"),
-        option({ value: "limiterSettings" }, "Limiter Settings... (⇧L)"),
-	    option({ value: "addExternal" }, "Add Custom Samples... (⇧Q)"),
+        option({ value: "undo" }, "Undo " + Cut([CommandTargetName.Undo], 'menu')),
+        option({ value: "redo" }, "Redo " + Cut([CommandTargetName.Redo], 'menu')),
+        option({ value: "copy" }, "Copy Pattern " + Cut([CommandTargetName.CopyPattern], 'menu')),
+        option({ value: "pasteNotes" }, "Paste Pattern Notes " + Cut([CommandTargetName.PastePattern], 'menu')),
+        option({ value: "pasteNumbers" }, "Paste Pattern Numbers " + Cut([CommandTargetName.PastePatternNumbers], 'menu')),
+        option({ value: "insertBars" }, "Insert Bar " + Cut([CommandTargetName.InsertBarNext], 'menu')),
+        option({ value: "deleteBars" }, "Delete Selected Bars " + Cut([CommandTargetName.DeleteBar], 'menu')),
+        option({ value: "insertChannel" }, "Insert Channel " + Cut([CommandTargetName.InsertChannel], 'menu')),
+        option({ value: "deleteChannel" }, "Delete Selected Channels " + Cut([CommandTargetName.DeleteChannel], 'menu')),
+        option({ value: "selectChannel" }, "Select Channel " + Cut([CommandTargetName.SelectChannel], 'menu')),
+        option({ value: "selectAll" }, "Select All " + Cut([CommandTargetName.SelectAllPatterns], 'menu')),
+        option({ value: "duplicatePatterns" }, "Duplicate Reused Patterns " + Cut([CommandTargetName.DuplicatePattern], 'menu')),
+        option({ value: "transposeUp" }, "Move Notes Up " + Cut([CommandTargetName.TransposeUp, CommandTargetName.TransposeOctaveUp], 'menu')),
+        option({ value: "transposeDown" }, "Move Notes Down " + Cut([CommandTargetName.TransposeDown, CommandTargetName.TransposeOctaveDown], 'menu')),
+        option({ value: "moveNotesSideways" }, "Move All Notes Sideways... " + Cut([CommandTargetName.MoveNotesSideways], 'menu')),
+	    option({ value: "generateEuclideanRhythm" }, "Generate Euclidean Rhythm... " + Cut([CommandTargetName.GenerateEuclideanRhythm], 'menu')),
+        option({ value: "beatsPerBar" }, "Change Beats Per Bar... " + Cut([CommandTargetName.EditBeatsPerBar], 'menu')),
+        option({ value: "barCount" }, "Change Song Length... " + Cut([CommandTargetName.EditSongLength], 'menu')),
+        option({ value: "channelSettings" }, "Channel Settings... " + Cut([CommandTargetName.EditChannelSettings], 'menu')),
+        option({ value: "limiterSettings" }, "Limiter Settings... " + Cut([CommandTargetName.EditLimiter], 'menu')),
+	    option({ value: "addExternal" }, "Add Custom Samples... " + Cut([CommandTargetName.EditCustomSamples], 'menu')),
     );
     private readonly _optionsMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "Preferences"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
@@ -835,6 +836,7 @@ export class SongEditor {
         option({ value: "showOscilloscope" }, "Show Oscilloscope"),
         option({ value: "showSampleLoadingStatus" }, "Show Sample Loading Status"),
         option({ value: "showDescription" }, "Show Description"),
+        option({ value: "shortcutsAndCommands" }, "Shortcuts and Commands..."),
         option({ value: "layout" }, "Set Layout..."),
         option({ value: "colorTheme" }, "Set Theme..."),
 	    option({ value: "customTheme" }, "Custom Theme..."),
@@ -1439,7 +1441,7 @@ export class SongEditor {
         window.addEventListener("resize", this.whenUpdated);
         window.requestAnimationFrame(this.updatePlayButton);
         window.requestAnimationFrame(this._animate);
-        this._shortcutHandler = new ShortcutHandler(this._doc.prefs.builtInCommandDisabledIDs, this._doc.prefs.customCommands, this._handleCommand);
+        this._shortcutHandler = new ShortcutHandler(this._doc.prefs.builtInEditsByID, this._doc.prefs.customCommands, this._handleCommand);
 
         if (!("share" in navigator)) {
             this._fileMenu.removeChild(this._fileMenu.querySelector("[value='shareUrl']")!);
@@ -2099,6 +2101,9 @@ export class SongEditor {
                 case "theme":
                     this.prompt = new ThemePrompt(this._doc);
                     break;
+                case "shortcutsAndCommands":
+                    this.prompt = new ShortcutsAndCommandsPrompt(this._doc);
+                    break;
                 case "layout":
                     this.prompt = new LayoutPrompt(this._doc);
                     break;
@@ -2184,9 +2189,11 @@ export class SongEditor {
     }
 
     public whenUpdated = (): void => {
-        this._shortcutHandler.setContext(CommandContext.PatternSelection, this._doc.selection.patternSelectionActive);
-        this._shortcutHandler.setContext(CommandContext.ChannelSelection, this._doc.selection.boxSelectionActive);
-        this._shortcutHandler.setContext(CommandContext.ModulationChannelActive, this._doc.song.getChannelIsMod(this._doc.channel));
+        if (this._shortcutHandler) { // whenUpdated is called async so this can be undefined sometimes
+            this._shortcutHandler.setContext(CommandContext.PatternSelection, this._doc.selection.patternSelectionActive);
+            this._shortcutHandler.setContext(CommandContext.ChannelSelection, this._doc.selection.boxSelectionActive);
+            this._shortcutHandler.setContext(CommandContext.ModulationChannelActive, this._doc.song.getChannelIsMod(this._doc.channel));
+        }
 
         const prefs: Preferences = this._doc.prefs;
         this._muteEditor.container.style.display = prefs.enableChannelMuting ? "" : "none";
@@ -2301,6 +2308,7 @@ export class SongEditor {
             (prefs.showOscilloscope ? textOnIcon : textOffIcon) + "Show Oscilloscope",
             (prefs.showSampleLoadingStatus ? textOnIcon : textOffIcon) + "Show Sample Loading Status",
             (prefs.showDescription ? textOnIcon : textOffIcon) + "Show Description",
+            textSpacingIcon + "Shortcuts and Commands...",
             textSpacingIcon + "Set Layout...",
             textSpacingIcon + "Set Theme...",
 	        textSpacingIcon + "Custom Theme...",
@@ -3765,8 +3773,6 @@ export class SongEditor {
             } else if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
                 this.prompt.whenKeyPressed(event);
             }
-
-            event.preventDefault();
         }
         // If an input is active, let inputs bubble to it, and escape/enter returns focus /discards changes.
 		else if (document.activeElement?.tagName === "INPUT" && document.activeElement.attributes.getNamedItem("type")?.value === "text") {
@@ -3774,8 +3780,6 @@ export class SongEditor {
                 this.mainLayer.focus();
                 this._patternEditor.stopEditingModLabel(event.key === "Escape");
             }
-
-            event.preventDefault(); // The user expects no shortcuts to fire while typing in a text field.
 		}
         // If the song title, channel name, or mod label are active, escape/enter returns focus, shortcuts stop
         else if (document.activeElement === this._songTitleInputBox.input
@@ -3786,8 +3790,6 @@ export class SongEditor {
                 this.mainLayer.focus();
                 this._patternEditor.stopEditingModLabel(event.key === "Escape");
             }
-
-            event.preventDefault(); // The user expects no shortcuts to fire while typing in a text field.
         }
         // If an input is active, escape or enter returns focus, shortcuts stop
         // TODO: this and above should be unified under a general way to identify inputs.
@@ -3812,12 +3814,12 @@ export class SongEditor {
         // In recording mode, defer inputs to keyboard piano performance, space/ctrl+p stops recording
         else if (this._doc.synth.recording) {
             if (event.key === " " || (event.ctrlKey && event.code === 'KeyP')) {
-                this._handleCommand(new Command("", CommandTargetName.ToggleRecording, "", []))
+                this._handleCommand(builtInCommands[CommandTargetName.ToggleRecording])
                 event.preventDefault();
             }
             else if (this._doc.prefs.preferEasyPianoOverShortcuts) {
                 if (this._shortcutHandler.easyPianoEscape.includes(event.key.toLowerCase()) ||
-                    this._shortcutHandler.recordedInputs.keys.some(o => this._shortcutHandler.easyPianoEscape.includes(o)))
+                    this._shortcutHandler.heldInputs.keys.some(o => this._shortcutHandler.easyPianoEscape.includes(o)))
                 {
                     this._shortcutHandler.handleKeyPressed(event, this._doc.prefs.preferEasyPianoOverShortcuts);
                 } else {
@@ -3825,7 +3827,7 @@ export class SongEditor {
                 }
             } else {
                 if (this._shortcutHandler.easyPianoPerform.includes(event.key.toLowerCase()) ||
-                    this._shortcutHandler.recordedInputs.keys.some(o => this._shortcutHandler.easyPianoPerform.includes(o)))
+                    this._shortcutHandler.heldInputs.keys.some(o => this._shortcutHandler.easyPianoPerform.includes(o)))
                 {
                     this._keyToPianoKeyHandler.performPianoKey(event, true);
                 } else {
@@ -3870,10 +3872,9 @@ export class SongEditor {
 
     /** Handles command invocation for the given command. */
 	private _handleCommand = (command: Command, actionData?: CommandArgument[]) => {
-		console.log('invoked ' + command.Name + (actionData !== undefined ? " with data: " + actionData.map(o => o.value + (o.metadata ? "|" + o.metadata : "")).join(";") : "") + "."); // TODO: remove
-
-        if (this._shortcutHandler.isContextSet(CommandContext.Recording)
-            && command.Target !== CommandTargetName.ToggleRecording) {
+        if (this._shortcutHandler.isContextSet(CommandContext.Recording) && (
+            command.Target === CommandTargetName.Undo ||
+            command.Target === CommandTargetName.Redo)) {
             return;
         }
 
@@ -3883,8 +3884,6 @@ export class SongEditor {
                 return;
             case CommandTargetName.CopyPattern:
                 this._doc.selection.copy();
-                this._doc.selection.resetBoxSelection();
-                this._doc.selection.selectionUpdated();
                 return;
             case CommandTargetName.CutPattern:
                 this._doc.selection.cutNotes();
@@ -4873,67 +4872,67 @@ export class SongEditor {
     private _editMenuHandler = (event: Event): void => {
         switch (this._editMenu.value) {
             case "undo":
-                this._doc.undo();
+                this._handleCommand(builtInCommands[CommandTargetName.Undo]);
                 break;
             case "redo":
-                this._doc.redo();
+                this._handleCommand(builtInCommands[CommandTargetName.Redo]);
                 break;
             case "copy":
-                this._doc.selection.copy();
+                this._handleCommand(builtInCommands[CommandTargetName.CopyPattern]);
                 break;
             case "insertBars":
-                this._doc.selection.insertBars();
+                this._handleCommand(builtInCommands[CommandTargetName.InsertBarNext]);
                 break;
             case "deleteBars":
-                this._doc.selection.deleteBars();
+                this._handleCommand(builtInCommands[CommandTargetName.DeleteBar]);
                 break;
             case "insertChannel":
-                this._doc.selection.insertChannel();
+                this._handleCommand(builtInCommands[CommandTargetName.InsertChannel]);
                 break;
             case "deleteChannel":
-                this._doc.selection.deleteChannel();
+                this._handleCommand(builtInCommands[CommandTargetName.DeleteChannel]);
                 break;
             case "pasteNotes":
-                this._doc.selection.pasteNotes();
+                this._handleCommand(builtInCommands[CommandTargetName.PastePattern]);
                 break;
             case "pasteNumbers":
-                this._doc.selection.pasteNumbers();
+                this._handleCommand(builtInCommands[CommandTargetName.PastePatternNumbers]);
                 break;
             case "transposeUp":
-                this._doc.selection.transpose(true, false);
+                this._handleCommand(builtInCommands[CommandTargetName.TransposeUp]);
                 break;
             case "transposeDown":
-                this._doc.selection.transpose(false, false);
+                this._handleCommand(builtInCommands[CommandTargetName.TransposeDown]);
                 break;
             case "selectAll":
-                this._doc.selection.selectAllPatterns();
+                this._handleCommand(builtInCommands[CommandTargetName.SelectAllPatterns]);
                 break;
             case "selectChannel":
-                this._doc.selection.selectChannel();
+                this._handleCommand(builtInCommands[CommandTargetName.SelectChannel]);
                 break;
             case "duplicatePatterns":
-                this._doc.selection.duplicatePatterns();
+                this._handleCommand(builtInCommands[CommandTargetName.DuplicatePattern]);
                 break;
             case "barCount":
-                this._openPrompt("barCount");
+                this._handleCommand(builtInCommands[CommandTargetName.EditSongLength]);
                 break;
             case "beatsPerBar":
-                this._openPrompt("beatsPerBar");
+                this._handleCommand(builtInCommands[CommandTargetName.EditBeatsPerBar]);
                 break;
             case "moveNotesSideways":
-                this._openPrompt("moveNotesSideways");
+                this._handleCommand(builtInCommands[CommandTargetName.MoveNotesSideways]);
                 break;
             case "channelSettings":
-                this._openPrompt("channelSettings");
+                this._handleCommand(builtInCommands[CommandTargetName.EditChannelSettings]);
                 break;
             case "limiterSettings":
-                this._openPrompt("limiterSettings");
+                this._handleCommand(builtInCommands[CommandTargetName.EditLimiter]);
                 break;
             case "generateEuclideanRhythm":
-                this._openPrompt("generateEuclideanRhythm");
+                this._handleCommand(builtInCommands[CommandTargetName.GenerateEuclideanRhythm]);
                 break;
             case "addExternal":
-                this._openPrompt("addExternal");
+                this._handleCommand(builtInCommands[CommandTargetName.EditCustomSamples]);
                 break;
         }
         this._editMenu.selectedIndex = 0;
@@ -4986,6 +4985,9 @@ export class SongEditor {
                 break;
             case "notesFlashWhenPlayed":
                 this._doc.prefs.notesFlashWhenPlayed = !this._doc.prefs.notesFlashWhenPlayed;
+                break;
+            case "shortcutsAndCommands":
+                this._openPrompt("shortcutsAndCommands")
                 break;
             case "layout":
                 this._openPrompt("layout");

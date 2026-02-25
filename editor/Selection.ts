@@ -334,8 +334,11 @@ export class Selection {
             "channels": channels,
         };
         window.localStorage.setItem("selectionCopy", JSON.stringify(selectionCopy));
-        // Clear selection after copy
+
+        // Clear selections after copy
         new ChangePatternSelection(this._doc, 0, 0);
+        this.resetBoxSelection();
+        this.selectionUpdated();
     }
 
     private _remapToNoisePitches(oldPitches: number[]): number[] {

@@ -28,10 +28,6 @@ export class EditorConfig {
 
     public static readonly releaseNotesURL: string = "./patch_notes.html";
 
-    public static readonly isOnMac: boolean = /^Mac/i.test(navigator.platform) || /Mac OS X/i.test(navigator.userAgent) || /^(iPhone|iPad|iPod)/i.test(navigator.platform) || /(iPhone|iPad|iPod)/i.test(navigator.userAgent);
-    public static readonly ctrlSymbol: string = EditorConfig.isOnMac ? "⌘" : "Ctrl+";
-    public static readonly ctrlName: string = EditorConfig.isOnMac ? "command" : "control";
-
     public static customSamples: string[] | null;
 	
     public static readonly presetCategories: DictionaryArray<PresetCategory> = toNameMap([

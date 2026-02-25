@@ -1,3 +1,6 @@
+import {HTML} from "imperative-html/dist/esm/elements-strict";
+const { span, kbd } = HTML;
+
 /**
  * This is the complete command subsystem, which is self-contained except for the custom shortcut editor prompt and
  * command palette, the serialization of those commands in Preferences.ts and event hook bindings of ShortcutHandler in
@@ -36,14 +39,14 @@
  *     this might not be true on your keyboard. But unless users are exporting layouts or swapping their own keyboard
  *     layout, it will reliably be true for custom commands a user sets. Those scenarios are rare enough to leave it to
  *     users to adjust their own commands.
- * - you cannot specify commands based on up or down state or control deferred state, because it was decided that it's
+ * - you cannot specify commands based on up or down state (you can override this), because it was decided that it's
  *     better to abstract this out of the user's hands. Allowing it would complicate scenarios for no special reason.
- * - you cannot hold inputs to repeat-invoke a command that defers (late invocation).
+ * - you cannot hold inputs to repeat-invoke a command that defers (late invocation)
  * - default shortcuts should not rely on Alt or other keybinds that major browsers like to use. The end user can be
  * expected to avoid their own browser's shortcuts when they set custom ones, so this applies only to defaults. Usually
- * we don't use modifier keys, and we need to also avoid `~ because it's treated as an escape to access shortcuts
- * when in keyboard performance mode (using the keyboard like a piano). This used to be control, but then you can't use
- * control for shortcuts which is kind of silly.
+ * we don't use modifier keys, and we need to also be careful about default shortcuts that include the easyPianoKey
+ * keys because when held, shortcuts without that key also fire. (Note: easyPiano escape key used to be Control, but it
+ * was an annoying binding to work around due to how often shortcuts use Control.)
  */
 
 const commandSyntaxVersion = 1;
@@ -401,6 +404,11 @@ interface CommandJSON {
     V: number // version
 }
 
+// keyed by built-in ID, which == target index (serial safe). A built-in entry is disabled if null is found with its
+// same index, or edited if a command is found.
+export interface BuiltInLookup {[key: string]: Command | null}
+interface BuiltInLookupJSON {[key: string]: CommandJSON | null}
+
 /**
  * Commands are invocable actions with a target concept such as "undo" or "left selection position", and the parameters
  * of its target are defined by the targets object. A command is intended to provide action data as a semicolon-delimited
@@ -416,12 +424,6 @@ interface CommandJSON {
  */
 export class Command
 {
-    /**
-     * Only built-in commands can set this value. When set, this is a positive unique integer per-command. This is
-     * used to identify which built-in commands a user has disabled.
-     */
-    public BuiltInId: number | undefined
-
     /** Only built-in commands can set this value. When true, the command palette will omit this command. */
     public HideInPalette: boolean | undefined
 
@@ -458,8 +460,7 @@ export class Command
         context: string,
         shortcuts: IShortcut[],
         argumentData?: CommandArgument[],
-        version?: number,
-        builtInId?: number)
+        version?: number)
     {
         this.Name = name;
         this.Target = target;
@@ -467,7 +468,6 @@ export class Command
         this.Shortcuts = shortcuts;
         this.ArgumentData = argumentData;
         this.Version = version;
-        this.BuiltInId = builtInId;
     }
 
     /** Verifies that every shortcut provides valid values for expected parameters. */
@@ -495,46 +495,6 @@ export class Command
         return (allShortcutsHaveArgsOrFreeform || this.ArgumentData !== undefined);
     }
 
-    /** Returns a user-legible string like "Ctrl + A + Wheel up" describing the key sequence for a shortcut. */
-    public static DisplayShortcut(shortcut: IShortcut): string
-    {
-        const keysList: string[] = [];
-
-        // Start with modifier keys, then other keyboard keys, then mouse inputs.
-        ["meta", "control", "shift", "alt", "compose"].forEach(modifierKey => {
-            const index = shortcut.keys.indexOf(modifierKey);
-            if (index !== -1) {
-                keysList.push(modifierKey);
-                shortcut.keys.splice(index, 1);
-            }
-        });
-
-        for (const key of shortcut.keys) {
-            if (key === " ") { keysList.push("Space"); }
-            else if (key === "ArrowUp") { keysList.push("Up"); }
-            else if (key === "ArrowLeft") { keysList.push("Left"); }
-            else if (key === "ArrowDown") { keysList.push("Down"); }
-            else if (key === "ArrowRight") { keysList.push("Right"); }
-            else if (key.length === 1) { keysList.push(key.toUpperCase()); }
-            else if (key.length > 0) { keysList.push(key); }
-        }
-
-        for (const button of shortcut.cursor) {
-            switch (button) {
-                case CursorButtons.LeftButton: keysList.push("Left-click"); break;
-                case CursorButtons.RightButton: keysList.push("Right-click"); break;
-                case CursorButtons.MiddleButton: keysList.push("Middle-click"); break;
-                case CursorButtons.BrowserBack: keysList.push("Mouse 4"); break;
-                case CursorButtons.BrowserForward: keysList.push("Mouse 5"); break;
-                case CursorButtons.WheelDown: keysList.push("Wheel down"); break;
-                case CursorButtons.WheelUp: keysList.push("Wheel up"); break;
-                default: (button satisfies never)
-            }
-        }
-
-        return keysList.join(" ＋ ");
-    }
-
     /**
      * Returns true for empty contexts or if every number sequence in the command's context matches an enum value in
      * active contexts, or is absent if the number sequence starts with a ! symbol. Example: "4 !3 1 42 !5"
@@ -544,28 +504,49 @@ export class Command
             str => (str[0] === '!') !== activeContexts.includes(+str)) ?? false);
     }
 
-    public static ToJSON(cmd: Command): string {
-        return JSON.stringify({
+    private static ToJSONObj(cmd: Command): CommandJSON {
+        return {
             N: cmd.Name,
             T: cmd.Target,
             ...(cmd.Context !== "" && { C: cmd.Context }),
-            S: cmd.Shortcuts.map(o => ({ ...o, keys: o.keys.map(k => k.toLowerCase()) })),
+            S: cmd.Shortcuts,
             ...(cmd.ArgumentData && cmd.ArgumentData.length > 0 && { D: cmd.ArgumentData }),
             V: cmd.Version ?? commandSyntaxVersion // Version cleared during load.
-        } satisfies CommandJSON);
+        };
     }
 
-    public static FromJSON(json: string): Command[] {
-        const entries = (JSON.parse(json) as CommandJSON[]).map(entry => new Command(
-            entry.N ?? "",
-            entry.T ?? CommandTargetName.None,
-            entry.C ?? "",
-            entry.S ?? [],
-            entry.D ?? [],
-            entry.V))
-            .filter(o => o.ValidArguments()); // Don't rehydrate bad arguments
-        entries.forEach(o => /* Migrate old versions here */ o.Version = undefined);
-        return entries;
+    private static FromJSONObj(jsonObj: CommandJSON): Command | undefined {
+        const command = new Command(
+            jsonObj.N ?? "",
+            jsonObj.T ?? CommandTargetName.None,
+            jsonObj.C ?? "",
+            jsonObj.S.map(o => ({ ...o, keys: o.keys.map(k => k.toLowerCase()) })),
+            jsonObj.D ?? [],
+            jsonObj.V);
+
+        if (!command.ValidArguments()) { return undefined; } // Don't rehydrate bad arguments
+        /* Migrate old versions here */
+        command.Version = undefined;
+        return command;
+    }
+
+    public static ToJSON(cmd: Command): string { return JSON.stringify(Command.ToJSONObj(cmd)); }
+    public static ToJSONArray(commands: Command[]): string { return JSON.stringify(commands.map(o => Command.ToJSONObj(o))); }
+    public static FromJSON(commandJson: string): Command | undefined { return Command.FromJSONObj(JSON.parse(commandJson) as CommandJSON); }
+    public static FromJSONArray(commandArrayJson: string): Command[] { return (JSON.parse(commandArrayJson) as CommandJSON[]).map(entry => Command.FromJSONObj(entry)).filter(o => o !== undefined) as Command[]; }
+    public static FromJSONLookup(commandLookupJson: string): BuiltInLookup {
+        const lookup: BuiltInLookup = {};
+        const jsonObj = JSON.parse(commandLookupJson) as BuiltInLookupJSON;
+        Object.entries(jsonObj).forEach(o => {
+            if (o[1]) { const restored = Command.FromJSONObj(o[1]);  if (restored) { lookup[o[0]] = restored; } }
+            else { lookup[o[0]] = null; }
+        });
+        return lookup;
+    }
+    public static ToJSONLookup(lookup: BuiltInLookup): string {
+        const jsonObj: BuiltInLookupJSON = {};
+		Object.entries(lookup).forEach(o => jsonObj[o[0]] = o[1] === null ? null : Command.ToJSONObj(o[1]))
+        return JSON.stringify(jsonObj);
     }
 }
 
@@ -643,100 +624,117 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
 
 // Just to keep below neat
 const nums = ['0','1','2','3','4','5','6','7','8','9'];
-const one = (target: CommandTargetName, keys: string[]) => {
-    return new Command(targets[target].name, target, "", [{ keys, cursor: [] }], undefined, undefined, target);
+const simple = (target: CommandTargetName, keys: string[], repeat?: boolean) => {
+    return new Command(targets[target].name, target, "", [{ keys, repeat }]);
 }
-const many = (target: CommandTargetName, context: string, shortcuts: IShortcut[], args?: CommandArgument[]) => {
-    return new Command(targets[target].name, target, context, shortcuts, args, undefined, target);
+const entry = (target: CommandTargetName, shortcuts: IShortcut[]) => {
+    return new Command(targets[target].name, target, "", shortcuts);
 }
 
 /**
- * The built-in commands list, most borrow the display name of their target as most aren't parameterized, so this is
+ * The built-in commands list, indexed by command target (one entry each). Indexing into it 
+ * 
+ * Built-in commands. These are indexed by target so the GUI can find and display shortcuts, though fair warning, not
+ * all targets have an entry. Most borrow the display name of their target as most aren't parameterized, so this is
  * mainly for the default shortcuts. Note that Control is used by keyboard performance (playing it as a piano) which
  * uses either caps lock state or control to activate keys. Meaning no keybind should by default require Control. The
  * danger here is that two keybinds that only differ by whether Control is held or not will, when control is required
- * to activate, both be triggered by the same keybind which is surprising and unhelpful to users. However, it's familiar
- * to users as well. So ideally there should be a legacy default that does that and a brand new redesign of keyboard
- * functionality which is the actual default.
+ * to activate, both be triggered by the same keybind which is surprising and unhelpful to users. However, it's
+ * familiar to users as well. So ideally there should be a legacy default that does that and a brand new redesign of
+ * keyboard functionality which is the actual default.
  * 
- * Shift is the only modifier key recommended for bindings. Control is used in key piano mode and sometimes intercepted
- * by the browser, like meta/alt. The shortcut handler prevents binding modifiers by themself.
-*/
-export const builtInCommands: Command[] = [
-    one(CommandTargetName.PlayOrPause, [' ']),
-    one(CommandTargetName.PlayAtCursor, ['shift', ' ']),
-    many(CommandTargetName.ToggleRecording, "", [
-        { keys: ['control', ' '], cursor: [] },
-        { keys: ['control', 'p'], cursor: [] }]),
-    one(CommandTargetName.OpenSongPlayer, ['shift', 'p']),
-    one(CommandTargetName.NewSong, ['shift', '~']),
-    one(CommandTargetName.SongRecovery, ['shift', '~']), // Intentionally same as NewSong
-    many(CommandTargetName.Undo, "", [
-        { keys: ['z'], cursor: [] },
-        { keys: ['control', 'z'], cursor: [] }]),
-    many(CommandTargetName.Redo, "", [
-        { keys: ['y'], cursor: [] },
-        { keys: ['shift', 'z'], cursor: [] }]),
-    one(CommandTargetName.ResetBoxSelection, ['escape']),
-    one(CommandTargetName.CutPattern, ['x']),
-    one(CommandTargetName.EditBeatsPerBar, ['shift', 'b']),
-    one(CommandTargetName.LoopPattern, ['b']),
-    one(CommandTargetName.CopyInstrument, ['shift', 'c']),
-    one(CommandTargetName.CopyPattern, ['c']),
-    one(CommandTargetName.InsertBarNext, ['enter']),
-    one(CommandTargetName.InsertBarPrev, ['shift', 'enter']),
-    one(CommandTargetName.InsertChannel, ['control', 'enter']),
-    one(CommandTargetName.DeleteBar, ['backspace']),
-    one(CommandTargetName.DeleteChannel, ['control', 'backspace']),
-    one(CommandTargetName.SelectAllPatterns, ['a']),
-    one(CommandTargetName.SelectChannel, ['shift', 'a']),
-    one(CommandTargetName.DuplicatePattern, ['d']),
-    one(CommandTargetName.EditSongEQ, ['e']),
-    one(CommandTargetName.GenerateEuclideanRhythm, ['shift', 'e']),
-    one(CommandTargetName.SnapPlayheadToBeginning, ['f']),
-    one(CommandTargetName.SnapPlayheadToLoopStart, ['shift', 'f']),
-    one(CommandTargetName.SnapPlayheadToSelected, ['h']),
-    one(CommandTargetName.EditLimiter, ['shift', 'l']),
-    one(CommandTargetName.EditSongLength, ['l']),
-    one(CommandTargetName.MuteChannel, ['m']),
-    one(CommandTargetName.MuteAll, ['shift', 'm']),
-    one(CommandTargetName.NewPattern, ['n']),
-    one(CommandTargetName.EditNoteFilter, ['shift', 'n']),
-    one(CommandTargetName.NewPatternFromEmpty, ['control', 'n']),
-    one(CommandTargetName.EditChannelSettings, ['q']),
-    one(CommandTargetName.EditCustomSamples, ['shift', 'q']),
-    one(CommandTargetName.SoloChannel, ['s']),
-    one(CommandTargetName.Export, ['shift', 's']),
-    one(CommandTargetName.Import, ['shift', 'o']),
-    one(CommandTargetName.PastePattern, ['v']),
-    one(CommandTargetName.PasteInstrument, ['shift', 'v']),
-    one(CommandTargetName.MoveNotesSideways, ['w']),
-    one(CommandTargetName.ExportInstrument, ['shift', 'i']),
-    one(CommandTargetName.RandomInstrumentPreset, ['r']),
-    one(CommandTargetName.RandomInstrumentGenerated, ['shift', 'r']),
-    one(CommandTargetName.NextBar, [']']),
-    one(CommandTargetName.PrevBar, ['[']),
-    one(CommandTargetName.TransposeDown, ['-']),
-    one(CommandTargetName.TransposeUp, ['=']),
-    one(CommandTargetName.TransposeOctaveDown, ['shift', '_']),
-    one(CommandTargetName.TransposeOctaveUp, ['shift', '+']),
-    one(CommandTargetName.RemovePattern, ['delete']),
-    one(CommandTargetName.PatternUp, ['arrowup']),
-    one(CommandTargetName.SelectionUp, ['shift', 'arrowup']),
-    many(CommandTargetName.SetInstrument, "", [
-        ...nums.map(num => ({ keys: ['control', num], cursor: [], argumentData: [{ value: num }] })),
-        ...nums.map(num => ({ keys: ['shift', num], cursor: [], argumentData: [{ value: num }] })) ]),
-    many(CommandTargetName.SetChannel, "", nums.map(o => ({ keys: [o], cursor: [], argumentData: [{ value: o }] }))),
-    many(CommandTargetName.SetRhythm, "", nums.map(o => ({ keys: ['alt', o], cursor: [], argumentData: [{ value: o }] }))),
-    one(CommandTargetName.MoveChannelUp, ['control', 'arrowup']),
-    one(CommandTargetName.PatternDown, ['arrowdown']),
-    one(CommandTargetName.SelectionDown, ['shift', 'arrowdown']),
-    one(CommandTargetName.MoveChannelDown, ['control', 'arrowdown']),
-    one(CommandTargetName.MovePatternLeft, ['arrowleft']),
-    one(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft']),
-    one(CommandTargetName.MovePatternRight, ['arrowright']),
-    one(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'])
-];
+ * Avoid default keybinds that use Meta or Alt due to OS/browser interception when assigning defaults.
+ * Control also has some shortcuts in use among browsers. Try to avoid those.
+ */
+export const builtInCommands = {
+    [CommandTargetName.PlayOrPause]: simple(CommandTargetName.PlayOrPause, [' ']),
+    [CommandTargetName.PlayAtCursor]: simple(CommandTargetName.PlayAtCursor, ['shift', ' ']),
+    [CommandTargetName.ToggleRecording]: entry(CommandTargetName.ToggleRecording, [
+        { keys: ['control', ' '] },
+        { keys: ['control', 'p'] }]),
+    [CommandTargetName.OpenSongPlayer]: simple(CommandTargetName.OpenSongPlayer, ['shift', 'p']),
+    [CommandTargetName.NewSong]: simple(CommandTargetName.NewSong, ['shift', '~']),
+    [CommandTargetName.SongRecovery]: simple(CommandTargetName.SongRecovery, ['`']),
+    [CommandTargetName.Undo]: entry(CommandTargetName.Undo, [
+        { keys: ['z'] },
+        { keys: ['control', 'z'] }]),
+    [CommandTargetName.Redo]: entry(CommandTargetName.Redo, [
+        { keys: ['y'] },
+        { keys: ['control', 'y'] },
+        { keys: ['shift', 'z'] }]),
+    [CommandTargetName.ResetBoxSelection]: simple(CommandTargetName.ResetBoxSelection, ['escape']),
+    [CommandTargetName.CutPattern]: entry(CommandTargetName.CutPattern, [
+        { keys: ['x'] },
+        { keys: ['control', 'x'] }]),
+    [CommandTargetName.EditBeatsPerBar]: simple(CommandTargetName.EditBeatsPerBar, ['shift', 'b']),
+    [CommandTargetName.Jummbify]: simple(CommandTargetName.Jummbify, ['control', 'shift', 'alt', 'j']),
+    [CommandTargetName.LoopPattern]: simple(CommandTargetName.LoopPattern, ['b']),
+    [CommandTargetName.CopyInstrument]: entry(CommandTargetName.CopyInstrument, [
+        { keys: ['shift', 'c'] }]),
+    [CommandTargetName.CopyPattern]: entry(CommandTargetName.CopyPattern, [
+        { keys: ['c'] },
+        { keys: ['control', 'c'] }]),
+    [CommandTargetName.InsertBarNext]: simple(CommandTargetName.InsertBarNext, ['enter'], true),
+    [CommandTargetName.InsertBarPrev]: simple(CommandTargetName.InsertBarPrev, ['shift', 'enter'], true),
+    [CommandTargetName.InsertChannel]: simple(CommandTargetName.InsertChannel, ['control', 'enter'], true),
+    [CommandTargetName.DeleteBar]: simple(CommandTargetName.DeleteBar, ['backspace'], true),
+    [CommandTargetName.DeleteChannel]: simple(CommandTargetName.DeleteChannel, ['control', 'backspace'], true),
+    [CommandTargetName.SelectAllPatterns]: entry(CommandTargetName.SelectAllPatterns, [
+        { keys: ['a'] },
+        { keys: ['control', 'a'] }]),
+    [CommandTargetName.SelectChannel]: simple(CommandTargetName.SelectChannel, ['shift', 'a']),
+    [CommandTargetName.DuplicatePattern]: simple(CommandTargetName.DuplicatePattern, ['d']),
+    [CommandTargetName.EditSongEQ]: simple(CommandTargetName.EditSongEQ, ['shift', 'e']),
+    [CommandTargetName.GenerateEuclideanRhythm]: simple(CommandTargetName.GenerateEuclideanRhythm, ['e']),
+    [CommandTargetName.SnapPlayheadToBeginning]: simple(CommandTargetName.SnapPlayheadToBeginning, ['f']),
+    [CommandTargetName.SnapPlayheadToLoopStart]: simple(CommandTargetName.SnapPlayheadToLoopStart, ['shift', 'f']),
+    [CommandTargetName.SnapPlayheadToSelected]: simple(CommandTargetName.SnapPlayheadToSelected, ['h']),
+    [CommandTargetName.EditLimiter]: simple(CommandTargetName.EditLimiter, ['shift', 'l']),
+    [CommandTargetName.EditSongLength]: simple(CommandTargetName.EditSongLength, ['l']),
+    [CommandTargetName.MuteChannel]: simple(CommandTargetName.MuteChannel, ['m']),
+    [CommandTargetName.MuteAll]: simple(CommandTargetName.MuteAll, ['shift', 'm']),
+    [CommandTargetName.NewPattern]: simple(CommandTargetName.NewPattern, ['n']),
+    [CommandTargetName.EditNoteFilter]: simple(CommandTargetName.EditNoteFilter, ['shift', 'n']),
+    [CommandTargetName.NewPatternFromEmpty]: simple(CommandTargetName.NewPatternFromEmpty, ['control', 'n']),
+    [CommandTargetName.EditChannelSettings]: simple(CommandTargetName.EditChannelSettings, ['q']),
+    [CommandTargetName.EditCustomSamples]: simple(CommandTargetName.EditCustomSamples, ['shift', 'q']),
+    [CommandTargetName.SoloChannel]: simple(CommandTargetName.SoloChannel, ['s']),
+    [CommandTargetName.Export]: simple(CommandTargetName.Export, ['control', 's']),
+    [CommandTargetName.Import]: simple(CommandTargetName.Import, ['control', 'o']),
+    [CommandTargetName.PastePattern]: entry(CommandTargetName.PastePattern, [
+        { keys: ['v'] },
+        { keys: ['control', 'v'] }]),
+    [CommandTargetName.PastePatternNumbers]: simple(CommandTargetName.PastePatternNumbers, ['control', 'shift', 'v']),
+    [CommandTargetName.PasteInstrument]: simple(CommandTargetName.PasteInstrument, ['shift', 'v']),
+    [CommandTargetName.MoveNotesSideways]: simple(CommandTargetName.MoveNotesSideways, ['w']),
+    [CommandTargetName.ExportInstrument]: simple(CommandTargetName.ExportInstrument, ['shift', 'i']),
+    [CommandTargetName.RandomInstrumentPreset]: simple(CommandTargetName.RandomInstrumentPreset, ['r']),
+    [CommandTargetName.RandomInstrumentGenerated]: simple(CommandTargetName.RandomInstrumentGenerated, ['shift', 'r']),
+    [CommandTargetName.NextBar]: simple(CommandTargetName.NextBar, [']'], true),
+    [CommandTargetName.PrevBar]: simple(CommandTargetName.PrevBar, ['['], true),
+    [CommandTargetName.TransposeDown]: simple(CommandTargetName.TransposeDown, ['-'], true),
+    [CommandTargetName.TransposeUp]: simple(CommandTargetName.TransposeUp, ['='], true),
+    [CommandTargetName.TransposeOctaveDown]: simple(CommandTargetName.TransposeOctaveDown, ['shift', '_'], true),
+    [CommandTargetName.TransposeOctaveUp]: simple(CommandTargetName.TransposeOctaveUp, ['shift', '+'], true),
+    [CommandTargetName.RemovePattern]: simple(CommandTargetName.RemovePattern, ['delete']),
+    [CommandTargetName.PatternUp]: simple(CommandTargetName.PatternUp, ['arrowup'], true),
+    [CommandTargetName.SelectionUp]: simple(CommandTargetName.SelectionUp, ['shift', 'arrowup'], true),
+    [CommandTargetName.SetInstrument]: entry(CommandTargetName.SetInstrument, [
+        ...nums.map(num => ({ keys: ['control', num], argumentData: [{ value: num }] })),
+        ...nums.map(num => ({ keys: ['shift', num], argumentData: [{ value: num }] })) ]),
+    [CommandTargetName.SetChannel]: entry(CommandTargetName.SetChannel,
+        nums.map(o => ({ keys: [o], argumentData: [{ value: o }], invokeOptions: InvokeOptions.LastKeypress }))),
+    [CommandTargetName.SetRhythm]: entry(CommandTargetName.SetRhythm,
+        nums.map(o => ({ keys: ['alt', o], argumentData: [{ value: o }] }))),
+    [CommandTargetName.MoveChannelUp]: simple(CommandTargetName.MoveChannelUp, ['control', 'arrowup'], true),
+    [CommandTargetName.PatternDown]: simple(CommandTargetName.PatternDown, ['arrowdown'], true),
+    [CommandTargetName.SelectionDown]: simple(CommandTargetName.SelectionDown, ['shift', 'arrowdown'], true),
+    [CommandTargetName.MoveChannelDown]: simple(CommandTargetName.MoveChannelDown, ['control', 'arrowdown'], true),
+    [CommandTargetName.MovePatternLeft]: simple(CommandTargetName.MovePatternLeft, ['arrowleft'], true),
+    [CommandTargetName.ExtendSelectionLeft]: simple(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft'], true),
+    [CommandTargetName.MovePatternRight]: simple(CommandTargetName.MovePatternRight, ['arrowright'], true),
+    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true)
+};
 //#endregion
 
 //#region Shortcuts
@@ -755,16 +753,29 @@ export const enum CursorButtons {
 }
 
 /**
+ * Affects processing. Early forces early invocation (command is repeat-capable and fires on keypress).
+ * Last keypress matches only the most recent key pressed regardless of what's held, which is easier to use
+ * for keys the user might overlap with held keys while typing e.g. numbers.
+ */
+export const enum InvokeOptions {
+    Early = 0,
+    LastKeypress = 1
+}
+
+/**
  * A shortcut represented by any number of keyboard/mouse interactions, where all must be pressed to invoke.
  * Keys are toLowerCase() strings from a keydown event's .key property. Modifier keys (Control, Shift, Alt) are included.
  * Shortcuts can also define the arguments to a command via action data.
 */
 export interface IShortcut {
-    /** (uppercased) keys, or names of nonprintable keys as returned by KeyboardEvent.key, including modifiers. */
+    /** Lowercased keys, or names of nonprintable keys as returned by KeyboardEvent.key, including modifiers. */
     keys: string[]
 
     /** Cursor buttons, like left/right click as returned by MouseEvent.button. */
-    cursor: CursorButtons[]
+    cursor?: CursorButtons[]
+
+    /** Optional action data to pass to the command, specific to this shortcut.  */
+    argumentData?: CommandArgument[]
 
     /**
      * False by default. When true, after this shortcut matches, the user is given an opportunity to freely type data,
@@ -773,46 +784,78 @@ export interface IShortcut {
      */
     freeformEntry?: boolean
 
-    /** False by default. Allows repeat execution while inputs are held. Late-invoked commands naturally can't. */
-    allowRepeats?: boolean
+    /** Options to force early invocation or other modes. */
+    invokeOptions?: InvokeOptions
 
-    /** Optional action data to pass to the command, specific to this shortcut.  */
-    argumentData?: CommandArgument[]
+    /** False by default. If early-invoked, allows repeat execution while inputs are held. */
+    repeat?: boolean
 }
 
 /** For the freeform callback. Preview fires every time the freeform input changes. */
 export const enum FreeformEventType { Started, Canceled, NextArg, NextArgBlocked, Submit, SubmitBlocked, Preview }
 
 /** For simplicity, input handling is exposed from here. */
+type subscriber = (command: Command, actionData: CommandArgument[] | undefined) => void
 export class ShortcutHandler {
-    public static readonly defaultEasyPianoEscapes = ["backspace"]; // lowercase, can be multiple keys to handle e.g. `/~
-    public static readonly defaultEasyPianoPerform = ["capslock"]; // lowercase, can be multiple keys to handle e.g. '/"
+    public static readonly defaultEasyPianoEscapes = ["/", "?"]; // lowercase, can be multiple keys 
+    public static readonly defaultEasyPianoPerform = ["capslock"]; // lowercase, can be multiple keys
+    private readonly _subscribers: subscriber[] = [];
     private readonly _commandContexts: CommandContext[] = []; // List of active contexts, set by SongEditor.
-    public readonly recordedInputs: { cursor: CursorButtons[], keys: string[] } = { cursor: [], keys: [] }; // All actively-held inputs.
-    private _earlyCommands: { [key: string]: [Command, IShortcut][] }; // Commands that can invoke early (key press)
-    private _lateCommands: { [key: string]: [Command, IShortcut][] }; // Commands that only invoke late (key release)
+    public readonly heldInputs: { cursor: CursorButtons[], keys: string[] } = { cursor: [], keys: [] }; // All actively-held inputs.
+    private _earlyCommands: { [key: string]: [Command, IShortcut][] } = {}; // Commands that can invoke early (key press)
+    private _lateCommands: { [key: string]: [Command, IShortcut][] } = {}; // Commands that only invoke late (key release)
+    private _onkeyCommands: { [key: string]: [Command, IShortcut][] } = {}; // Commands that fire based on last keypress.
     private _commandHasFired = false; // If a command fires in early invocation, this prevents it from firing again in late invocation (input release).
     private _freeform: { cmd: Command, defaultData: CommandArgument[], argInputs: CommandArgument[], numericType?: string } | undefined; // Tracks all relevant data in freeform input mode.
-    private _onInvoke: (command: Command, actionData: CommandArgument[] | undefined) => void;
 
-    /** While recording if easy notes is enabled, hold this lower/uppercase key (usually `/~) to fire shortcuts. */
+    /** While recording if easy notes is enabled, hold this lowercase key (usually `/~) to fire shortcuts. */
     public easyPianoEscape = ShortcutHandler.defaultEasyPianoEscapes;
-    /** While recording if easy shortcuts is enabled, hold this key (usually capslock) to play notes. */
+    /** While recording if easy shortcuts is enabled, hold this lowercase key (usually capslock) to play notes. */
     public easyPianoPerform = ShortcutHandler.defaultEasyPianoPerform;
 
     /** Assembles available commands, sets the callback when invoked. It's up to the consumer to handle behavior. */
-    constructor(disabledBuiltInIDs: number[], customCommands: Command[], onInvoke: (command: Command, actionData: CommandArgument[] | undefined) => void) {
-        this.setCommands(disabledBuiltInIDs, customCommands);
-        this._onInvoke = onInvoke;
+    constructor(builtInEditsByID: BuiltInLookup, customCommands: Command[], listener: subscriber) {
+        this.setCommands(builtInEditsByID, customCommands);
+        this._subscribers.push(listener);
     }
 
-    public setCommands(disabledBuiltInIDs: number[], customCommands: Command[]) {
-        const commandsAvailable = builtInCommands.filter(cmd => disabledBuiltInIDs.indexOf(cmd.BuiltInId!) === -1)
-            .concat(customCommands);
+    /** Adds a callback for shortcut handling (if new). All callbacks are invoked in order on command invocation. */
+    public subscribe(listener: (command: Command, actionData: CommandArgument[] | undefined) => void) {
+        if (!this._subscribers.includes(listener)) {
+            this._subscribers.push(listener);
+        }
+    }
+
+    /** Removes a subscribed callback to command invocation if present. */
+    public unsubscribe(listener: any) {
+        const index = this._subscribers.indexOf(listener);
+        if (index !== -1) {
+            this._subscribers.splice(index, 1);
+        }
+    }
+
+    /**
+     * Tracks all commands available to be matched by the shortcut editor from a custom list and dictionary of
+     * replacements to built-in commands.
+     * 
+    */
+    public setCommands(builtInEditsByID: BuiltInLookup, customCommands: Command[]) {
+        // Use the edited built-in if it exists, else the unedited one
+        // For nulls or if a command target has no entry in built-ins, array will be unassigned at index gaps
+        const builtins: Command[] = [];
+        Object.entries(builtInCommands).forEach(entry => {
+            const key = entry[0] as unknown as keyof typeof builtInCommands;
+            if (builtInEditsByID[key] !== null) {
+                builtins[key] = builtInEditsByID[key] === undefined
+                    ? entry[1] : builtInEditsByID[key] as Command;
+            }
+        });
 
         // Sorts all shortcuts of all commands by their hashed set of inputs.
+        const allCommands = builtins.concat(customCommands);
         const allShortcuts: [string, Command, IShortcut][] = [];
-        for (const command of commandsAvailable) {
+        for (const command of allCommands) {
+            if (command === undefined) { continue; } // skip unassigned index gaps
             for (const entry of command.Shortcuts) {
                 allShortcuts.push([this.toHash(entry), command, entry]);
             }
@@ -822,8 +865,13 @@ export class ShortcutHandler {
         // Separates by early/late invocation into objects for O(1) access.
         this._earlyCommands = {};
         this._lateCommands = {};
+        this._onkeyCommands = {};
         for (let i = 1; i < allShortcuts.length; i++) {
-            const list = allShortcuts[i][0].startsWith(allShortcuts[i - 1][0]) ? this._lateCommands : this._earlyCommands;
+            const list = (allShortcuts[i][2].invokeOptions !== undefined ||
+                !allShortcuts[i][0].startsWith(allShortcuts[i - 1][0]))
+                ? allShortcuts[i][2].invokeOptions === InvokeOptions.LastKeypress ? this._onkeyCommands : this._earlyCommands
+                : this._lateCommands;
+
             if (!Object.hasOwn(list, allShortcuts[i][0])) {
                 list[allShortcuts[i][0]] = [[allShortcuts[i][1], allShortcuts[i][2]]];
             } else {
@@ -833,7 +881,7 @@ export class ShortcutHandler {
     }
 
     private toHash(shortcut: IShortcut): string {
-        return [...shortcut.keys.toSorted(), ...shortcut.cursor.toSorted().map(o => `m${o}`)].join('\n')
+        return [...shortcut.keys.toSorted(), ...(shortcut.cursor?.toSorted().map(o => `m${o}`) ?? [])].join('\n')
     }
 
     /** Adds the context if add is true, removes if false. Won't add twice. Won't error out if absent during removal. */
@@ -859,13 +907,15 @@ export class ShortcutHandler {
     public handleKeyPressed = (event: KeyboardEvent, easyPianoKeys: boolean): void => {
         if (event.isComposing) { return; }
         this._updateModifierKeys(event);
+
         if (this._freeform === undefined) {
             // Push and handle shortcuts on keypress. Shortcuts also fire for other input types.
-            if (!this.recordedInputs.keys.includes(event.key.toLowerCase())) {
-                this.recordedInputs.keys.push(event.key.toLowerCase());
+            if (!this.heldInputs.keys.includes(event.key.toLowerCase())) {
+                this.heldInputs.keys.push(event.key.toLowerCase());
             }
 
             this._matchCommands(event, true, event.repeat, easyPianoKeys);
+            this._commandHasFired = false;
         }
 
         // Handle freeform input. Skip repeat keypresses, we only care about new keypresses.
@@ -915,7 +965,7 @@ export class ShortcutHandler {
                     arg.value = withDefaults.value;
                     arg.metadata = withDefaults.metadata;
                     this.onFreeform?.(FreeformEventType.Submit, this._freeform.cmd, args);
-                    this._onInvoke(this._freeform.cmd, args);
+                    this._subscribers.forEach(o => o?.(this._freeform!.cmd, args));
                     this._freeform = undefined;
                 } else {
                     this.onFreeform?.(FreeformEventType.SubmitBlocked, this._freeform.cmd, args);
@@ -974,18 +1024,19 @@ export class ShortcutHandler {
             this._matchCommands(event, false, event.repeat, easyPianoKeys);
         }
 
-        const index = this.recordedInputs.keys.indexOf(event.key.toLowerCase());
-        if (index !== -1) { this.recordedInputs.keys.splice(index, 1); }
+        const index = this.heldInputs.keys.indexOf(event.key.toLowerCase());
+        if (index !== -1) { this.heldInputs.keys.splice(index, 1); }
         this._commandHasFired = false;
     }
 
     /** On mouse button press, fire early invocation (deferred=true). */
     public handleCursorDown = (event: MouseEvent, easyPianoKeys: boolean) => {
         if (this._freeform !== undefined) { return; }
-        if (!this.recordedInputs.cursor.includes(event.button)) {
-            this.recordedInputs.cursor.push(event.button);
+        if (!this.heldInputs.cursor.includes(event.button)) {
+            this.heldInputs.cursor.push(event.button);
 
             this._matchCommands(event, true, false, easyPianoKeys);
+            this._commandHasFired = false;
         }
     }
 
@@ -996,8 +1047,8 @@ export class ShortcutHandler {
             this._matchCommands(event, false, false, easyPianoKeys);
         }
 
-        const index = this.recordedInputs.cursor.indexOf(event.button);
-        if (index !== -1) { this.recordedInputs.cursor.splice(index, 1); }
+        const index = this.heldInputs.cursor.indexOf(event.button);
+        if (index !== -1) { this.heldInputs.cursor.splice(index, 1); }
         this._commandHasFired = false;
     }
 
@@ -1008,11 +1059,10 @@ export class ShortcutHandler {
     public handleWheel = (event: WheelEvent, easyPianoKeys: boolean) => {
         if (this._freeform !== undefined) { return; }
         if (event.deltaY !== 0) {
-            this.recordedInputs.cursor.push(event.deltaY > 0 ? CursorButtons.WheelDown : CursorButtons.WheelUp);
+            this.heldInputs.cursor.push(event.deltaY > 0 ? CursorButtons.WheelDown : CursorButtons.WheelUp);
             this._matchCommands(event, false, false, easyPianoKeys);
+            this.heldInputs.cursor.pop();
         }
-
-        this.recordedInputs.cursor = this.recordedInputs.cursor.filter(o => o !== CursorButtons.WheelDown && o !== CursorButtons.WheelUp);
     }
 
     /** If set, this is called on cancelation, submission, or preview (input updates) of freeform input. */
@@ -1020,21 +1070,21 @@ export class ShortcutHandler {
 
     /** Modifiers often get stuck due to focus shifting. If a discrepancy to the browser exists, clear all. */
     private _updateModifierKeys(event: KeyboardEvent | WheelEvent | MouseEvent) {
-        if ((!event.metaKey && this.recordedInputs.keys.indexOf("meta") !== -1) ||
-            (!event.ctrlKey && this.recordedInputs.keys.indexOf("control") !== -1) ||
-            (!event.altKey && this.recordedInputs.keys.indexOf("alt") !== -1) ||
-            (!event.shiftKey && this.recordedInputs.keys.indexOf("shift") !== -1))
+        if ((!event.metaKey && this.heldInputs.keys.indexOf("meta") !== -1) ||
+            (!event.ctrlKey && this.heldInputs.keys.indexOf("control") !== -1) ||
+            (!event.altKey && this.heldInputs.keys.indexOf("alt") !== -1) ||
+            (!event.shiftKey && this.heldInputs.keys.indexOf("shift") !== -1))
         {
-            this.recordedInputs.keys = [];
-            this.recordedInputs.cursor = [];
+            this.heldInputs.keys = [];
+            this.heldInputs.cursor = [];
         }
 
-        const index = this.recordedInputs.keys.indexOf("capslock");
+        const index = this.heldInputs.keys.indexOf("capslock");
         if (event.getModifierState("CapsLock") && index === -1) {
-            this.recordedInputs.keys.push("capslock");
+            this.heldInputs.keys.push("capslock");
         }
         if (!event.getModifierState("CapsLock") && index !== -1) {
-            this.recordedInputs.keys.splice(index, 1);
+            this.heldInputs.keys.splice(index, 1);
         }
     }
 
@@ -1057,33 +1107,47 @@ export class ShortcutHandler {
     {
         let requestingFreeform: [Command, IShortcut] | undefined; 
         const shortcutMap = deferFiring ? this._earlyCommands : this._lateCommands;
-        let matchedShortcuts = shortcutMap[this.toHash(this.recordedInputs)] ?? [];
+        const matchedShortcuts = shortcutMap[this.toHash(this.heldInputs)] ?? [];
+        const matchGroups = [matchedShortcuts];
 
         // When the easy shortcuts key is *always* held, we need to include commands where it's not held down
         if (easyPianoKeys && this._commandContexts.includes(CommandContext.Recording)) {
-            matchedShortcuts = matchedShortcuts.concat(shortcutMap[this.toHash({
-                keys: this.recordedInputs.keys.filter((o => !this.easyPianoEscape.includes(o))),
-                cursor: this.recordedInputs.cursor })] ?? []);
+            matchGroups.push(shortcutMap[this.toHash({
+                keys: this.heldInputs.keys.filter((o => !this.easyPianoEscape.includes(o))),
+                cursor: this.heldInputs.cursor }
+            )] ?? []);
         }
 
-        for (const entry of matchedShortcuts) {
-            if (Command.ValidContext(entry[0], this._commandContexts)) {
-                // Set freeform to the first that requests it, dropping others, and invoke the rest.
-                if (entry[1].freeformEntry && targets[entry[0].Target].params.length > 0) {
-                    requestingFreeform ??= entry;
-                } else if (!isRepeating || entry[1].allowRepeats) {
-                    this._onInvoke(entry[0], entry[1].argumentData ?? entry[0].ArgumentData);
-                }
+        // Shortcuts for the very last keypress input from the onkey commands. Only if no other command fires.
+        let lastkeysGroup: [Command, IShortcut][] | undefined;
+        if (deferFiring && this.heldInputs.keys.length > 0) {
+            lastkeysGroup = this._onkeyCommands[this.heldInputs.keys[this.heldInputs.keys.length - 1]];
+            if (lastkeysGroup !== undefined) {
+                matchGroups.push(lastkeysGroup);
+            }
+        }
 
-                this._commandHasFired = true;
-                event.preventDefault();
+        for (const group of matchGroups) {
+            if (group === lastkeysGroup && this._commandHasFired) { continue; }
+            for (const entry of group) {
+                if (Command.ValidContext(entry[0], this._commandContexts)) {
+                    // Set freeform to the first that requests it, dropping others, and invoke the rest.
+                    if (entry[1].freeformEntry && targets[entry[0].Target].params.length > 0) {
+                        requestingFreeform ??= entry;
+                    } else if (!isRepeating || entry[1].repeat) {
+                        this._subscribers.forEach(o => o?.(entry[0], entry[1].argumentData ?? entry[0].ArgumentData));
+                    }
+
+                    this._commandHasFired = true;
+                    event.preventDefault();
+                }
             }
         }
 
         // Handle freeform request.
         if (requestingFreeform !== undefined) {
-            this.recordedInputs.cursor = [];
-            this.recordedInputs.keys = [];
+            this.heldInputs.cursor = [];
+            this.heldInputs.keys = [];
 
             this._freeform = {
                 cmd: requestingFreeform[0],
@@ -1095,5 +1159,93 @@ export class ShortcutHandler {
             this.onFreeform?.(FreeformEventType.Started, this._freeform.cmd, this._freeform.argInputs);
         }
     }
+}
+
+/**
+ * Returns a user-legible string like "Ctrl﹢A﹢Wheel up" for the key sequence of a shortcut.
+ * "menu" format optimizes space by shortening the string where possible.
+ * "html" format wraps key names in kbd tags and all of it in a span for the sake of CSS.
+ */
+export function ShowCut(shortcut: IShortcut, formatFor?: 'menu'|'html'): string | HTMLSpanElement
+{
+    const asHTML = formatFor === 'html';
+    const asMenu = formatFor === 'menu';
+    const keys = [...shortcut.keys];
+    const keysList: string[] = [];
+
+    // Start with modifier keys, then other keyboard keys, then mouse inputs.
+    ["meta", "control", "shift", "alt", "compose"].forEach(modifierKey => {
+        const index = keys.indexOf(modifierKey);
+        if (index !== -1) {
+            keysList.push(
+                (asMenu && modifierKey === "control") ? "Ctrl" :
+                (asMenu && modifierKey === "shift") ? "⇧" :
+                modifierKey[0].toUpperCase() + modifierKey.slice(1));
+            keys.splice(index, 1);
+        }
+    });
+
+    for (const key of keys) {
+        if (key === " ") { keysList.push("Space"); }
+        else if (asMenu && key === "backspace") { keysList.push("⌫"); }
+        else if (asMenu && key === "enter") { keysList.push("⏎"); }
+        else if (key === "arrowup") { keysList.push(asMenu ? "↑" : "Up"); }
+        else if (key === "arrowleft") { keysList.push(asMenu ? "←" : "Left"); }
+        else if (key === "arrowdown") { keysList.push(asMenu ? "↓" : "Down"); }
+        else if (key === "arrowright") { keysList.push(asMenu ? "→" : "Right"); }
+        else if (key.length === 1) { keysList.push(key.toUpperCase()); }
+        else if (key.length > 0) { keysList.push(key); }
+    }
+
+    if (shortcut.cursor) {
+        for (const button of shortcut.cursor) {
+            switch (button) {
+                case CursorButtons.LeftButton: keysList.push(asMenu ? "Click" : "Left-click"); break;
+                case CursorButtons.RightButton: keysList.push(asMenu ? "RMB" : "Right-click"); break;
+                case CursorButtons.MiddleButton: keysList.push(asMenu ? "MMB" : "Middle-click"); break;
+                case CursorButtons.BrowserBack: keysList.push("Mouse 4"); break;
+                case CursorButtons.BrowserForward: keysList.push("Mouse 5"); break;
+                case CursorButtons.WheelDown: keysList.push("Wheel down"); break;
+                case CursorButtons.WheelUp: keysList.push("Wheel up"); break;
+                default: (button satisfies never)
+            }
+        }
+    }
+
+    if (keysList.length === 0) { return asHTML ? span() : ""; }
+
+    return asHTML
+        ? span(keysList.flatMap(key => [kbd(key), span(" ")]).slice(0, -1))
+        : asMenu
+            ? keysList.join("﹢").replaceAll("⇧﹢", "⇧").replaceAll("⇧Alt", "Shift﹢Alt")
+            : keysList.join("﹢");
+}
+
+/** Displays multiple shortcuts with separators. Menu format uses just the shortest shortcut instead. */
+export function ShowCuts(shortcuts: IShortcut[], formatFor?: 'menu'|'html', bound?: boolean): string | HTMLSpanElement {
+    let result: string | HTMLSpanElement;
+    const asHTML = formatFor === 'html';
+
+    if (shortcuts.length === 0) { return asHTML ? span() : ""; }
+    if (formatFor === 'menu') {
+        result = ShowCut(shortcuts.toSorted((a, b) => a.keys.length - b.keys.length)[0], formatFor);
+    } else {
+        result = asHTML
+            ? span(shortcuts.flatMap(o => [ShowCut(o, formatFor), "｜"]).slice(0, -1))
+            : shortcuts.map(o => ShowCut(o, formatFor)).join("｜")
+    }
+
+    return bound
+        ? asHTML ? span('(', result, ')') : `(${result})`
+        : result;
+}
+
+/** Convenience shorthand to display shortcut(s) of a built-in command if bound. */
+export function Cut(targets: (keyof typeof builtInCommands)[], formatFor?: 'menu'|'html', bound: boolean = true) {
+    const result = formatFor === 'html'
+        ? span(targets.flatMap(o => [ShowCuts(builtInCommands[o].Shortcuts, formatFor), " or "]).slice(0, -1))
+        : targets.map(o => ShowCuts(builtInCommands[o].Shortcuts, formatFor)).join(" or ");
+
+    return bound && formatFor === 'html' ? span('(', result, ')') : bound ? `(${result})` : result;
 }
 //#endregion

@@ -4,8 +4,9 @@ import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { Prompt } from "./Prompt";
 import { SongDocument } from "./SongDocument";
 import { Config } from "../synth/SynthConfig";
+import { modulatorStrings } from "./ModulatorStrings";
 
-const { button, div, p, span, h2, h3, ul, li } = HTML;
+const { button, div, p, span, h2, h3 } = HTML;
 
 export class TipPrompt implements Prompt {
 	private readonly _closeButton: HTMLButtonElement = button({class: "cancelButton"});
@@ -210,7 +211,7 @@ export class TipPrompt implements Prompt {
 					p("First, you could enable multiple simultaneous instruments per channel. All of the channel's instruments will play all of the notes in the channel at the same time, and you can click an instrument number to view and edit its settings."),
 					p("Second, you could enable different instruments per pattern. Only one of the instruments will play at any given time, but you can click the instrument number to change which instrument is used for the currently selected pattern(s)."),
 					p("Finally, you can enable them both, in which case you can click an instrument number once to view it, and again to toggle whether the instrument is used for the currently selected pattern(s)."),
-					p("Either way, you can click the + button to add more instruments to a channel, and you can press shift and a number key on your keyboard to select an instrument as if you had clicked the corresponding button here."),
+					p("Either way, you can click the + button to add more instruments to a channel, or shift and a number to select an instrument."),
 				)];
 			} break;
 			case "instrumentVolume": {
@@ -701,9 +702,10 @@ export class TipPrompt implements Prompt {
 					let modNum: number = +type[type.length - 1];
 					let modulator: number = _doc.song.channels[_doc.channel].instruments[_doc.getCurrentInstrument()].modulators[modNum];
 					let pList: HTMLParagraphElement[] = [];
-					for (let s: number = 0; s < Config.modulators[modulator].promptDesc.length; s++) {
+					const promptEntry = modulatorStrings[Config.modulators[modulator].name as keyof typeof modulatorStrings];
+					for (let s: number = 0; s < promptEntry.promptDesc.length; s++) {
 						pList.push(p(
-							Config.modulators[modulator].promptDesc[s]
+							promptEntry.promptDesc[s]
 								.replace("$LO", "" + Config.modulators[modulator].convertRealFactor)
 								.replace("$MID", "" + (Config.modulators[modulator].convertRealFactor + Config.modulators[modulator].maxRawVol / 2))
 								.replace("$HI", "" + (Config.modulators[modulator].convertRealFactor + Config.modulators[modulator].maxRawVol))
@@ -713,7 +715,7 @@ export class TipPrompt implements Prompt {
 					// Last element for mod settings is just some miscellaneous data for nerds like me.
 					pList[pList.length-1].style.setProperty("color", "var(--secondary-text)");
 					this.messages = [div(
-						h2(Config.modulators[modulator].promptName),
+						h2(promptEntry.promptName),
 						pList,
 					)];
 					break;

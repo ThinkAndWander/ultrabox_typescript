@@ -2,7 +2,7 @@
 
 import { Scale, Config } from "../synth/SynthConfig";
 import { ColorConfig } from "../editor/ColorConfig";
-import { Command } from "./Commands";
+import { BuiltInLookup, Command, ShortcutHandler } from "./Commands";
 
 export class Preferences {
 	public static readonly defaultVisibleOctaves: number = 3;
@@ -32,7 +32,7 @@ export class Preferences {
 	public visibleOctaves: number = Preferences.defaultVisibleOctaves;
 	public preferEasyPianoOverShortcuts: boolean;
 	public keyboardLayout: string;
-	public builtInCommandDisabledIDs: number[];
+	public builtInEditsByID: BuiltInLookup;
 	public customCommands: Command[];
 	public easyPianoEscapeKey: string[];
 	public easyPianoPerformKey: string[];
@@ -87,10 +87,12 @@ export class Preferences {
 		this.closePromptByClickoff = window.localStorage.getItem("closePromptByClickoff") == "true";
 		this.frostedGlassBackground = window.localStorage.getItem("frostedGlassBackground") == "true";
 		this.keyboardLayout = window.localStorage.getItem("keyboardLayout") || "pianoTransposingC";
-		this.builtInCommandDisabledIDs = JSON.parse(window.localStorage.getItem("builtInCommandDisabledIDs") ?? '[]')
-		this.customCommands = Command.FromJSON(window.localStorage.getItem("customCommands") ?? '[]');
-		this.easyPianoEscapeKey = JSON.parse(window.localStorage.getItem("easyPianoEscapeKey") ?? '["escape"]');
-		this.easyPianoPerformKey = JSON.parse(window.localStorage.getItem("easyPianoPerformKey") ?? '["scrolllock"]');
+		this.builtInEditsByID = Command.FromJSONLookup(window.localStorage.getItem("builtInCommandEdits") ?? '{}');
+		this.customCommands = Command.FromJSONArray(window.localStorage.getItem("customCommands") ?? '[]');
+		let item = window.localStorage.getItem("easyPianoEscapeKey");
+		this.easyPianoEscapeKey = item ? JSON.parse(item) : ShortcutHandler.defaultEasyPianoEscapes;
+		item = window.localStorage.getItem("easyPianoPerformKey");
+		this.easyPianoPerformKey = item ? JSON.parse(item) : ShortcutHandler.defaultEasyPianoPerform;
 		this.bassOffset = (+(<any>window.localStorage.getItem("bassOffset"))) || 0;
 		this.layout = window.localStorage.getItem("layout") || "small";
 		this.colorTheme = window.localStorage.getItem("colorTheme") || ColorConfig.defaultTheme;
@@ -144,8 +146,8 @@ export class Preferences {
 		window.localStorage.setItem("closePromptByClickoff", this.closePromptByClickoff ? "true" : "false");
 		window.localStorage.setItem("frostedGlassBackground", this.frostedGlassBackground ? "true" : "false");
 		window.localStorage.setItem("keyboardLayout", this.keyboardLayout);
-		window.localStorage.setItem("builtInCommandDisabledIDs", JSON.stringify([...this.builtInCommandDisabledIDs]));
-		window.localStorage.setItem("customCommands", JSON.stringify(this.customCommands));
+		window.localStorage.setItem("builtInCommandEdits", Command.ToJSONLookup(this.builtInEditsByID));
+		window.localStorage.setItem("customCommands", Command.ToJSONArray(this.customCommands));
 		window.localStorage.setItem("easyPianoEscapeKey", JSON.stringify(this.easyPianoEscapeKey));
 		window.localStorage.setItem("easyPianoPerformKey", JSON.stringify(this.easyPianoPerformKey));
 		window.localStorage.setItem("bassOffset", String(this.bassOffset));

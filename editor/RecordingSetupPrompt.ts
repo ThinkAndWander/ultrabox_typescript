@@ -1,24 +1,25 @@
 // Copyright (c) 2012-2022 John Nesky and contributing authors, distributed under the MIT license, see accompanying the LICENSE.md file.
 
 import {Config} from "../synth/SynthConfig";
-import {EditorConfig} from "./EditorConfig";
 import {SongDocument} from "./SongDocument";
 import {Prompt} from "./Prompt";
 import {HTML} from "imperative-html/dist/esm/elements-strict";
 import {ColorConfig} from "./ColorConfig";
 import {KeyToPianoKey} from "./KeyToPianoKey";
 import {Piano} from "./Piano";
-import { Command, ShortcutHandler } from "./Commands";
+import { Cut, CommandTargetName, ShortcutHandler } from "./Commands";
 
 const {button, label, div, p, a, h2, input, select, option} = HTML;
 
 export class RecordingSetupPrompt implements Prompt {
 	private readonly _keyboardMode: HTMLSelectElement = select({style: "width: 100%;"},
 		option({value: "preferShortcuts"}, "simple shortcuts, use "
-			+ (this._doc.prefs.easyPianoPerformKey.length > 0 ? this._doc.prefs.easyPianoPerformKey : ShortcutHandler.defaultEasyPianoPerform).join("/")
+			+ (this._doc.prefs.easyPianoPerformKey.length > 0
+				? this._doc.prefs.easyPianoPerformKey : ShortcutHandler.defaultEasyPianoPerform).join(" or ")
 			+ " to play notes"),
 		option({value: "preferNotes"}, "simple notes, press "
-			+ (this._doc.prefs.easyPianoEscapeKey.length > 0 ? this._doc.prefs.easyPianoEscapeKey : ShortcutHandler.defaultEasyPianoEscapes).join("/")
+			+ (this._doc.prefs.easyPianoEscapeKey.length > 0
+				? this._doc.prefs.easyPianoEscapeKey : ShortcutHandler.defaultEasyPianoEscapes).join(" or ")
 			+ " for shortcuts"),
 	);
 	private readonly _keyboardLayout: HTMLSelectElement = select({style: "width: 100%;"},
@@ -48,7 +49,7 @@ export class RecordingSetupPrompt implements Prompt {
 	public readonly container: HTMLDivElement = div({class: "prompt noSelection recordingSetupPrompt", style: "width: 600px; text-align: right; max-height: 90%;"},
 		h2({style: "align-self: center;"}, "Note Recording Setup"),
 		div({style: "display: grid; overflow-y: auto; overflow-x: hidden; flex-shrink: 1;"},
-			p("UltraBox can record notes as you perform them. You can start recording by pressing Ctrl+Space (or " + EditorConfig.ctrlSymbol + "P)."),
+			p("UltraBox can record notes as you perform them. You can start recording by pressing ", Cut([CommandTargetName.ToggleRecording], 'html'), "."),
 			label({style: "display: flex; flex-direction: row; align-items: center; height: 2em; justify-content: center;"},
 				"Add ● record button next to ▶ play button:",
 				this._showRecordButton,

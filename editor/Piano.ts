@@ -5,6 +5,7 @@ import { SongDocument } from "./SongDocument";
 import { HTML, SVG } from "imperative-html/dist/esm/elements-strict";
 import { ColorConfig } from "./ColorConfig";
 import { Instrument } from "../synth/synth";
+import { modulatorStrings } from "./ModulatorStrings";
 
 export class Piano {
 		private readonly _pianoContainer: HTMLDivElement = HTML.div({style: "width: 100%; height: 100%; display: flex; flex-direction: column-reverse; align-items: stretch;"});
@@ -498,7 +499,7 @@ export class Piano {
 
 				// When unused, show name of mod on second row
 				if (usingSecondRow) {
-					secondRow = Config.modulators[modulator].pianoName;
+					secondRow = modulatorStrings[Config.modulators[modulator].name as keyof typeof modulatorStrings].pianoName;
 					if (modulator == Config.modulators.dictionary["none"].index) {
 						useSecondColor = ColorConfig.modLabelSecondaryText;
 						usingMod = false;

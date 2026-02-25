@@ -199,6 +199,16 @@ html {
 	scrollbar-color: var(--scrollbar-color, ${ColorConfig.uiWidgetBackground}) var(--scrollbar-background, ${ColorConfig.editorBackground});
 }
 
+kbd {
+  background-color: #373737;
+  padding: 0 6px;
+  font-family: sans-serif !important;
+  white-space: pre-wrap;
+  border-bottom: 2px solid #595959;
+  box-sizing: border-box;
+  border-radius: 4px;
+}
+
 .obtrusive-scrollbars, .obtrusive-scrollbars * {
 	scrollbar-width: thin;
 }
