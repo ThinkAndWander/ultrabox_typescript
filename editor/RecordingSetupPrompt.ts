@@ -49,7 +49,7 @@ export class RecordingSetupPrompt implements Prompt {
 	public readonly container: HTMLDivElement = div({class: "prompt noSelection recordingSetupPrompt", style: "width: 600px; text-align: right; max-height: 90%;"},
 		h2({style: "align-self: center;"}, "Note Recording Setup"),
 		div({style: "display: grid; overflow-y: auto; overflow-x: hidden; flex-shrink: 1;"},
-			p("UltraBox can record notes as you perform them. You can start recording by pressing ", Cut([CommandTargetName.ToggleRecording], 'html'), "."),
+			p("UltraBox can record notes as you perform them. You can start recording by pressing ", Cut(this._doc, [CommandTargetName.ToggleRecording], 'html'), "."),
 			label({style: "display: flex; flex-direction: row; align-items: center; height: 2em; justify-content: center;"},
 				"Add ● record button next to ▶ play button:",
 				this._showRecordButton,

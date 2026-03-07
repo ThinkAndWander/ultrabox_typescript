@@ -1796,6 +1796,22 @@ input.tab-settings-radio + div {
 	cursor: pointer;
 }
 
+.beepboxEditor .commandGroup {
+    border-width: 0 0 1px 0;
+	border-style: solid;
+	border-color: ${ColorConfig.uiWidgetBackground};
+	padding-bottom: 12px;
+}
+.beepboxEditor .commandListingName {
+    font-weight: bold;
+}
+.beepboxEditor .shortcutGroup {
+    margin-left: 12px;
+	margin-top: 12px;
+	background-color: ${ColorConfig.uiWidgetBackground};
+	display: inline-block;
+}
+
 li.select2-results__option[role=group] > strong:hover {
   background-color: #516fbb;
 }

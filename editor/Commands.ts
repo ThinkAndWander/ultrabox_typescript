@@ -1,4 +1,5 @@
 import {HTML} from "imperative-html/dist/esm/elements-strict";
+import { SongDocument } from "./SongDocument";
 const { span, kbd } = HTML;
 
 /**
@@ -23,12 +24,13 @@ const { span, kbd } = HTML;
  * CursorButtons enum for the latter, which is a superset that includes vertical mouse wheel up/down.
  * 
  * Shortcut handling tracks the currently-held inputs and contexts for the sake of identifying which commands to invoke
- * out of a potentially narrowed list (incremental search, for performance) of all commands. As inputs are pressed,
- * commands are evaluated for early invocation and again as inputs are released, for late invocation. These modes are
- * the same except that early invocation will not fire commands when ambiguous, e.g. [A] is held, there is a command
- * matching [A] but also one matching [A + B]. The idea is that a user might be typing [A + B] and it doesn't become
- * clear they only want to invoke [A] until they start releasing inputs. As such, late invocation occurs BEFORE the key
- * is released, or nothing would happen. The order of current held inputs / inputs in shortcut entries are irrelevant.
+ * via hashing the options to an object upfront and accessing the key matching hashed current input commands. As inputs
+ * are pressed, commands are evaluated for early invocation and again as inputs are released, for late invocation.
+ * These modes are the same except that early invocation will not fire commands when ambiguous, e.g. [A] is held, there
+ * is a command matching [A] but also one matching [A + B]. The idea is that a user might be typing [A + B] and it
+ * doesn't become clear they only want to invoke [A] until they start releasing inputs. As such, late invocation occurs
+ * BEFORE the key is released, or nothing would happen. The order of current held inputs / inputs in shortcut entries
+ * are irrelevant.
  * 
  * Shortcut handling supports holding down keys to invoke repeatedly, with the caveat that shortcuts that get deferred
  * until late invocation cannot be repeated.
@@ -128,7 +130,8 @@ export enum CommandTargetName {
     TransposeOctaveDown = 63,
     TransposeOctaveUp = 64,
     TransposeUp = 65,
-    Undo = 66
+    Undo = 66,
+    EditShortcutsAndCommands = 67
 }
 
 /**
@@ -492,7 +495,7 @@ export class Command
             }
         }
 
-        return (allShortcutsHaveArgsOrFreeform || this.ArgumentData !== undefined);
+        return (allShortcutsHaveArgsOrFreeform || (this.ArgumentData ?? []).length === targets[this.Target].params.length);
     }
 
     /**
@@ -521,7 +524,7 @@ export class Command
             jsonObj.T ?? CommandTargetName.None,
             jsonObj.C ?? "",
             jsonObj.S.map(o => ({ ...o, keys: o.keys.map(k => k.toLowerCase()) })),
-            jsonObj.D ?? [],
+            jsonObj.D,
             jsonObj.V);
 
         if (!command.ValidArguments()) { return undefined; } // Don't rehydrate bad arguments
@@ -619,7 +622,8 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.TransposeOctaveDown]: { name: 'Move notes down an octave', params: [] },
     [CommandTargetName.TransposeOctaveUp]: { name: 'Move notes up an octave', params: [] },
     [CommandTargetName.TransposeUp]: { name: 'Move notes up a step', params: [] },
-    [CommandTargetName.Undo]: { name: 'Undo', params: [] }
+    [CommandTargetName.Undo]: { name: 'Undo', params: [] },
+    [CommandTargetName.EditShortcutsAndCommands]: { name: 'Edit shortcuts and commands', params: [] }
 };
 
 // Just to keep below neat
@@ -808,10 +812,8 @@ export class ShortcutHandler {
     private _commandHasFired = false; // If a command fires in early invocation, this prevents it from firing again in late invocation (input release).
     private _freeform: { cmd: Command, defaultData: CommandArgument[], argInputs: CommandArgument[], numericType?: string } | undefined; // Tracks all relevant data in freeform input mode.
 
-    /** While recording if easy notes is enabled, hold this lowercase key (usually `/~) to fire shortcuts. */
-    public easyPianoEscape = ShortcutHandler.defaultEasyPianoEscapes;
-    /** While recording if easy shortcuts is enabled, hold this lowercase key (usually capslock) to play notes. */
-    public easyPianoPerform = ShortcutHandler.defaultEasyPianoPerform;
+    public easyPianoEscape = ShortcutHandler.defaultEasyPianoEscapes; // hold to fire shortcuts (in easy notes)
+    public easyPianoPerform = ShortcutHandler.defaultEasyPianoPerform; // hold to play notes (in easy shortcuts)
 
     /** Assembles available commands, sets the callback when invoked. It's up to the consumer to handle behavior. */
     constructor(builtInEditsByID: BuiltInLookup, customCommands: Command[], listener: subscriber) {
@@ -837,9 +839,14 @@ export class ShortcutHandler {
     /**
      * Tracks all commands available to be matched by the shortcut editor from a custom list and dictionary of
      * replacements to built-in commands.
-     * 
     */
     public setCommands(builtInEditsByID: BuiltInLookup, customCommands: Command[]) {
+        // Reset most states.
+        this._commandHasFired = false;
+        this._freeform = undefined;
+        this.heldInputs.keys = [];
+        this.heldInputs.cursor = [];
+
         // Use the edited built-in if it exists, else the unedited one
         // For nulls or if a command target has no entry in built-ins, array will be unassigned at index gaps
         const builtins: Command[] = [];
@@ -1194,7 +1201,7 @@ export function ShowCut(shortcut: IShortcut, formatFor?: 'menu'|'html'): string 
         else if (key === "arrowdown") { keysList.push(asMenu ? "↓" : "Down"); }
         else if (key === "arrowright") { keysList.push(asMenu ? "→" : "Right"); }
         else if (key.length === 1) { keysList.push(key.toUpperCase()); }
-        else if (key.length > 0) { keysList.push(key); }
+        else if (key.length > 0) { keysList.push(key[0].toUpperCase() + key.slice(1)); }
     }
 
     if (shortcut.cursor) {
@@ -1240,11 +1247,13 @@ export function ShowCuts(shortcuts: IShortcut[], formatFor?: 'menu'|'html', boun
         : result;
 }
 
-/** Convenience shorthand to display shortcut(s) of a built-in command if bound. */
-export function Cut(targets: (keyof typeof builtInCommands)[], formatFor?: 'menu'|'html', bound: boolean = true) {
+/** Convenience shorthand to display shortcut(s) of a built-in command (with possible edits) if bound. */
+export function Cut(doc: SongDocument, targets: (keyof typeof builtInCommands)[], formatFor?: 'menu'|'html', bound: boolean = true) {
     const result = formatFor === 'html'
-        ? span(targets.flatMap(o => [ShowCuts(builtInCommands[o].Shortcuts, formatFor), " or "]).slice(0, -1))
-        : targets.map(o => ShowCuts(builtInCommands[o].Shortcuts, formatFor)).join(" or ");
+        ? span(targets.flatMap(
+            o => [ShowCuts(doc.prefs.builtInEditsByID[o]?.Shortcuts ?? builtInCommands[o].Shortcuts, formatFor), " or "]).slice(0, -1))
+        : targets.map(
+            o => ShowCuts(doc.prefs.builtInEditsByID[o]?.Shortcuts ?? builtInCommands[o].Shortcuts, formatFor)).join(" or ");
 
     return bound && formatFor === 'html' ? span('(', result, ')') : bound ? `(${result})` : result;
 }

@@ -745,12 +745,12 @@ export class SongEditor {
     );
     private readonly _piano: Piano = new Piano(this._doc);
     private readonly _octaveScrollBar: OctaveScrollBar = new OctaveScrollBar(this._doc, this._piano);
-    private readonly _playButton: HTMLButtonElement = button({ class: "playButton", type: "button", title: "Play " + Cut([CommandTargetName.PlayOrPause]) }, span("Play"));
-    private readonly _pauseButton: HTMLButtonElement = button({ class: "pauseButton", style: "display: none;", type: "button", title: "Pause " + Cut([CommandTargetName.PlayOrPause]) }, "Pause");
-    private readonly _recordButton: HTMLButtonElement = button({ class: "recordButton", style: "display: none;", type: "button", title: "Record " + Cut([CommandTargetName.ToggleRecording]) }, span("Record"));
-    private readonly _stopButton: HTMLButtonElement = button({ class: "stopButton", style: "display: none;", type: "button", title: "Stop Recording " + Cut([CommandTargetName.PlayOrPause]) }, "Stop Recording");
-    private readonly _prevBarButton: HTMLButtonElement = button({ class: "prevBarButton", type: "button", title: "Previous Bar " + Cut([CommandTargetName.PrevBar]) });
-    private readonly _nextBarButton: HTMLButtonElement = button({ class: "nextBarButton", type: "button", title: "Next Bar " + Cut([CommandTargetName.NextBar]) });
+    private readonly _playButton: HTMLButtonElement = button({ class: "playButton", type: "button" }, span("Play"));
+    private readonly _pauseButton: HTMLButtonElement = button({ class: "pauseButton", style: "display: none;", type: "button" }, "Pause");
+    private readonly _recordButton: HTMLButtonElement = button({ class: "recordButton", style: "display: none;", type: "button" }, span("Record"));
+    private readonly _stopButton: HTMLButtonElement = button({ class: "stopButton", style: "display: none;", type: "button" }, "Stop Recording");
+    private readonly _prevBarButton: HTMLButtonElement = button({ class: "prevBarButton", type: "button" });
+    private readonly _nextBarButton: HTMLButtonElement = button({ class: "nextBarButton", type: "button" });
     private readonly _volumeSlider: Slider = new Slider(input({ title: "main volume", style: "width: 5em; flex-grow: 1; margin: 0;", type: "range", min: "0", max: "75", value: "50", step: "1" }), this._doc, null, false);
     private readonly _outVolumeBarBg: SVGRectElement = SVG.rect({ "pointer-events": "none", width: "90%", height: "50%", x: "5%", y: "25%", fill: ColorConfig.uiWidgetBackground });
     private readonly _outVolumeBar: SVGRectElement = SVG.rect({ "pointer-events": "none", height: "50%", width: "0%", x: "5%", y: "25%", fill: "url('#volumeGrad2')" });
@@ -769,42 +769,53 @@ export class SongEditor {
     private readonly _volumeBarBox: HTMLDivElement = div({ class: "playback-volume-bar", style: "height: 12px; align-self: center;" },
         this._volumeBarContainer,
     );
+    private readonly _fileMenuNew = option({ value: "new" });
+    private readonly _fileMenuImport = option({ value: "import" });
+    private readonly _fileMenuExport = option({ value: "export" });
+    private readonly _fileMenuPlayer = option({ value: "viewPlayer" });
+    private readonly _fileMenuSongRecovery = option({ value: "songRecovery" });
     private readonly _fileMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "File"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
-        option({ value: "new" }, "+ New Blank Song " + Cut([CommandTargetName.NewSong], 'menu')),
-        option({ value: "import" }, "↑ Import Song... " + Cut([CommandTargetName.Import], 'menu')),
-        option({ value: "export" }, "↓ Export Song... " + Cut([CommandTargetName.Export], 'menu')),
+        this._fileMenuNew,
+        this._fileMenuImport,
+        this._fileMenuExport,
         option({ value: "copyUrl" }, "⎘ Copy Song URL"),
         option({ value: "shareUrl" }, "⤳ Share Song URL"),
         option({ value: "configureShortener" }, "🛠 Customize Url Shortener..."),
         option({ value: "shortenUrl" }, "… Shorten Song URL"),
-        option({ value: "viewPlayer" }, "▶ View in Song Player " + Cut([CommandTargetName.OpenSongPlayer], 'menu')),
+        this._fileMenuPlayer,
         option({ value: "copyEmbed" }, "⎘ Copy HTML Embed Code"),
-        option({ value: "songRecovery" }, "⚠ Recover Recent Song... " + Cut([CommandTargetName.SongRecovery], 'menu')),
+        this._fileMenuSongRecovery,
     );
+    private readonly _editMenuUndo = option({ value: "undo" });
+    private readonly _editMenuRedo = option({ value: "redo" });
+    private readonly _editMenuCopy = option({ value: "copy" });
+    private readonly _editMenuPasteNotes = option({ value: "pasteNotes" });
+    private readonly _editMenuPasteNumber = option({ value: "pasteNumbers" });
+    private readonly _editMenuInsertBars = option({ value: "insertBars" });
+    private readonly _editMenuDeleteBars = option({ value: "deleteBars" });
+    private readonly _editMenuInsertChannel = option({ value: "insertChannel" });
+    private readonly _editMenuDeleteChannel = option({ value: "deleteChannel" });
+    private readonly _editMenuSelectChannel = option({ value: "selectChannel" });
+    private readonly _editMenuSelectAll = option({ value: "selectAll" });
+    private readonly _editMenuDuplicatePatterns = option({ value: "duplicatePatterns" });
+    private readonly _editMenuTransposeUp = option({ value: "transposeUp" });
+    private readonly _editMenuTransposeDown = option({ value: "transposeDown" });
+    private readonly _editMenuMoveNotesSideways = option({ value: "moveNotesSideways" });
+    private readonly _editMenuGenerateEuclideanRhythm = option({ value: "generateEuclideanRhythm" });
+    private readonly _editMenuBeatsPerBar = option({ value: "beatsPerBar" });
+    private readonly _editMenuBarCount = option({ value: "barCount" });
+    private readonly _editMenuChannelSettings = option({ value: "channelSettings" });
+    private readonly _editMenuLimiterSettings = option({ value: "limiterSettings" });
+    private readonly _editMenuAddSamples = option({ value: "addExternal" });
     private readonly _editMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "Edit"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
-        option({ value: "undo" }, "Undo " + Cut([CommandTargetName.Undo], 'menu')),
-        option({ value: "redo" }, "Redo " + Cut([CommandTargetName.Redo], 'menu')),
-        option({ value: "copy" }, "Copy Pattern " + Cut([CommandTargetName.CopyPattern], 'menu')),
-        option({ value: "pasteNotes" }, "Paste Pattern Notes " + Cut([CommandTargetName.PastePattern], 'menu')),
-        option({ value: "pasteNumbers" }, "Paste Pattern Numbers " + Cut([CommandTargetName.PastePatternNumbers], 'menu')),
-        option({ value: "insertBars" }, "Insert Bar " + Cut([CommandTargetName.InsertBarNext], 'menu')),
-        option({ value: "deleteBars" }, "Delete Selected Bars " + Cut([CommandTargetName.DeleteBar], 'menu')),
-        option({ value: "insertChannel" }, "Insert Channel " + Cut([CommandTargetName.InsertChannel], 'menu')),
-        option({ value: "deleteChannel" }, "Delete Selected Channels " + Cut([CommandTargetName.DeleteChannel], 'menu')),
-        option({ value: "selectChannel" }, "Select Channel " + Cut([CommandTargetName.SelectChannel], 'menu')),
-        option({ value: "selectAll" }, "Select All " + Cut([CommandTargetName.SelectAllPatterns], 'menu')),
-        option({ value: "duplicatePatterns" }, "Duplicate Reused Patterns " + Cut([CommandTargetName.DuplicatePattern], 'menu')),
-        option({ value: "transposeUp" }, "Move Notes Up " + Cut([CommandTargetName.TransposeUp, CommandTargetName.TransposeOctaveUp], 'menu')),
-        option({ value: "transposeDown" }, "Move Notes Down " + Cut([CommandTargetName.TransposeDown, CommandTargetName.TransposeOctaveDown], 'menu')),
-        option({ value: "moveNotesSideways" }, "Move All Notes Sideways... " + Cut([CommandTargetName.MoveNotesSideways], 'menu')),
-	    option({ value: "generateEuclideanRhythm" }, "Generate Euclidean Rhythm... " + Cut([CommandTargetName.GenerateEuclideanRhythm], 'menu')),
-        option({ value: "beatsPerBar" }, "Change Beats Per Bar... " + Cut([CommandTargetName.EditBeatsPerBar], 'menu')),
-        option({ value: "barCount" }, "Change Song Length... " + Cut([CommandTargetName.EditSongLength], 'menu')),
-        option({ value: "channelSettings" }, "Channel Settings... " + Cut([CommandTargetName.EditChannelSettings], 'menu')),
-        option({ value: "limiterSettings" }, "Limiter Settings... " + Cut([CommandTargetName.EditLimiter], 'menu')),
-	    option({ value: "addExternal" }, "Add Custom Samples... " + Cut([CommandTargetName.EditCustomSamples], 'menu')),
+        this._editMenuUndo, this._editMenuRedo, this._editMenuCopy, this._editMenuPasteNotes,
+        this._editMenuPasteNumber, this._editMenuInsertBars, this._editMenuDeleteBars, this._editMenuInsertChannel,
+        this._editMenuDeleteChannel, this._editMenuSelectChannel, this._editMenuSelectAll, this._editMenuDuplicatePatterns,
+        this._editMenuTransposeUp, this._editMenuTransposeDown, this._editMenuMoveNotesSideways, this._editMenuGenerateEuclideanRhythm,
+        this._editMenuBeatsPerBar, this._editMenuBarCount, this._editMenuChannelSettings, this._editMenuLimiterSettings,
+        this._editMenuAddSamples,
     );
     private readonly _optionsMenu: HTMLSelectElement = select({ style: "width: 100%;" },
         option({ selected: true, disabled: true, hidden: false }, "Preferences"), // todo: "hidden" should be true but looks wrong on mac chrome, adds checkmark next to first visible option even though it's not selected. :(
@@ -836,7 +847,7 @@ export class SongEditor {
         option({ value: "showOscilloscope" }, "Show Oscilloscope"),
         option({ value: "showSampleLoadingStatus" }, "Show Sample Loading Status"),
         option({ value: "showDescription" }, "Show Description"),
-        option({ value: "shortcutsAndCommands" }, "Shortcuts and Commands..."),
+        option({ value: "shortcutsAndCommands" }, "Shortcuts..."),
         option({ value: "layout" }, "Set Layout..."),
         option({ value: "colorTheme" }, "Set Theme..."),
 	    option({ value: "customTheme" }, "Custom Theme..."),
@@ -1434,7 +1445,6 @@ export class SongEditor {
     private _modRecTimeout: number = -1;
 
     constructor(private _doc: SongDocument) {
-
         this._doc.notifier.watch(this.whenUpdated);
         this._doc.modRecordingHandler = () => { this.handleModRecording() };
         new MidiInputHandler(this._doc);
@@ -1745,6 +1755,45 @@ export class SongEditor {
             layoutOption.disabled = true;
             layoutOption.setAttribute("hidden", "");
         }
+
+        this._updateShortcutDisplays(); // Set defaults.
+    }
+
+    private _updateShortcutDisplays() {
+        this._fileMenuNew.replaceChildren("+ New Blank Song " + Cut(this._doc, [CommandTargetName.NewSong]));
+        this._fileMenuImport.replaceChildren("↑ Import Song... " + Cut(this._doc, [CommandTargetName.Import], 'menu'));
+        this._fileMenuExport.replaceChildren("↓ Export Song... " + Cut(this._doc, [CommandTargetName.Export], 'menu'));
+        this._fileMenuPlayer.replaceChildren("▶ View in Song Player " + Cut(this._doc, [CommandTargetName.OpenSongPlayer], 'menu'));
+        this._fileMenuSongRecovery.replaceChildren("⚠ Recover Recent Song... " + Cut(this._doc, [CommandTargetName.SongRecovery], 'menu'));
+
+        this._editMenuUndo.replaceChildren("Undo " + Cut(this._doc, [CommandTargetName.Undo], 'menu'));
+        this._editMenuRedo.replaceChildren("Redo " + Cut(this._doc, [CommandTargetName.Redo], 'menu'));
+        this._editMenuCopy.replaceChildren("Copy Pattern " + Cut(this._doc, [CommandTargetName.CopyPattern], 'menu'));
+        this._editMenuPasteNotes.replaceChildren("Paste Pattern Notes " + Cut(this._doc, [CommandTargetName.PastePattern], 'menu'));
+        this._editMenuPasteNumber.replaceChildren("Paste Pattern Numbers " + Cut(this._doc, [CommandTargetName.PastePatternNumbers], 'menu'));
+        this._editMenuInsertBars.replaceChildren("Insert Bar " + Cut(this._doc, [CommandTargetName.InsertBarNext], 'menu'));
+        this._editMenuDeleteBars.replaceChildren("Delete Selected Bars " + Cut(this._doc, [CommandTargetName.DeleteBar], 'menu'));
+        this._editMenuInsertChannel.replaceChildren("Insert Channel " + Cut(this._doc, [CommandTargetName.InsertChannel], 'menu'));
+        this._editMenuDeleteChannel.replaceChildren("Delete Selected Channels " + Cut(this._doc, [CommandTargetName.DeleteChannel], 'menu'));
+        this._editMenuSelectChannel.replaceChildren("Select Channel " + Cut(this._doc, [CommandTargetName.SelectChannel], 'menu'));
+        this._editMenuSelectAll.replaceChildren("Select All " + Cut(this._doc, [CommandTargetName.SelectAllPatterns], 'menu'));
+        this._editMenuDuplicatePatterns.replaceChildren("Duplicate Reused Patterns " + Cut(this._doc, [CommandTargetName.DuplicatePattern], 'menu'));
+        this._editMenuTransposeUp.replaceChildren("Move Notes Up " + Cut(this._doc, [CommandTargetName.TransposeUp, CommandTargetName.TransposeOctaveUp], 'menu'));
+        this._editMenuTransposeDown.replaceChildren("Move Notes Down " + Cut(this._doc, [CommandTargetName.TransposeDown, CommandTargetName.TransposeOctaveDown], 'menu'));
+        this._editMenuMoveNotesSideways.replaceChildren("Move All Notes Sideways... " + Cut(this._doc, [CommandTargetName.MoveNotesSideways], 'menu'));
+        this._editMenuGenerateEuclideanRhythm.replaceChildren("Generate Euclidean Rhythm... " + Cut(this._doc, [CommandTargetName.GenerateEuclideanRhythm], 'menu'));
+        this._editMenuBeatsPerBar.replaceChildren("Change Beats Per Bar... " + Cut(this._doc, [CommandTargetName.EditBeatsPerBar], 'menu'));
+        this._editMenuBarCount.replaceChildren("Change Song Length... " + Cut(this._doc, [CommandTargetName.EditSongLength], 'menu'));
+        this._editMenuChannelSettings.replaceChildren("Channel Settings... " + Cut(this._doc, [CommandTargetName.EditChannelSettings], 'menu'));
+        this._editMenuLimiterSettings.replaceChildren("Limiter Settings... " + Cut(this._doc, [CommandTargetName.EditLimiter], 'menu'));
+        this._editMenuAddSamples.replaceChildren("Add Custom Samples... " + Cut(this._doc, [CommandTargetName.EditCustomSamples], 'menu'));
+
+        this._playButton.title = "Play " + Cut(this._doc, [CommandTargetName.PlayOrPause]);
+        this._pauseButton.title = "Pause " + Cut(this._doc, [CommandTargetName.PlayOrPause]);
+        this._recordButton.title = "Record " + Cut(this._doc, [CommandTargetName.ToggleRecording]);
+        this._stopButton.title = "Stop Recording " + Cut(this._doc, [CommandTargetName.PlayOrPause]);
+        this._prevBarButton.title = "Previous Bar " + Cut(this._doc, [CommandTargetName.PrevBar]);
+        this._nextBarButton.title = "Next Bar " + Cut(this._doc, [CommandTargetName.NextBar]);
     }
 
     private _whenSampleLoadingStatusClicked = (): void => {
@@ -2102,7 +2151,7 @@ export class SongEditor {
                     this.prompt = new ThemePrompt(this._doc);
                     break;
                 case "shortcutsAndCommands":
-                    this.prompt = new ShortcutsAndCommandsPrompt(this._doc);
+                    this.prompt = new ShortcutsAndCommandsPrompt(this, this._doc);
                     break;
                 case "layout":
                     this.prompt = new LayoutPrompt(this._doc);
@@ -3768,7 +3817,9 @@ export class SongEditor {
 
         // If a prompt is open, defer inputs to it, and escape to close it.
         if (this.prompt) {
-            if (event.key === "Escape") {
+            if (this.prompt instanceof ShortcutsAndCommandsPrompt) {
+                this.prompt.onKeyDown(event); // Supercedes escape to allow rebinding keys to escape.
+            } else if (event.key === "Escape") {
                 this._doc.undo();
             } else if (this.prompt instanceof CustomChipPrompt || this.prompt instanceof LimiterPrompt || this.prompt instanceof CustomScalePrompt || this.prompt instanceof CustomFilterPrompt) {
                 this.prompt.whenKeyPressed(event);
@@ -3862,8 +3913,12 @@ export class SongEditor {
         this._ctrlHeld = event.ctrlKey;
         this._shiftHeld = event.shiftKey;
 
-        this._shortcutHandler.handleKeyReleased(event, this._doc.prefs.preferEasyPianoOverShortcuts); // Perform shortcuts
-        this._keyToPianoKeyHandler.performPianoKey(event, false); // Never allow live previews to get stuck, if any.
+        if (this.prompt instanceof ShortcutsAndCommandsPrompt) {
+            this.prompt.onKeyUp(event);
+        } else {
+            this._shortcutHandler.handleKeyReleased(event, this._doc.prefs.preferEasyPianoOverShortcuts); // Perform shortcuts
+            this._keyToPianoKeyHandler.performPianoKey(event, false); // Never allow live previews to get stuck, if any.
+        }
     }
 
     private _handleCursorDown = (event: MouseEvent) => { this._shortcutHandler.handleCursorDown(event, this._doc.prefs.preferEasyPianoOverShortcuts); }
@@ -4293,6 +4348,9 @@ export class SongEditor {
             case CommandTargetName.Undo:
                 this._doc.undo();
                 return;
+            case CommandTargetName.EditShortcutsAndCommands:
+                this._openPrompt("shortcutsAndCommands");
+                return;
             default:
                 (command.Target satisfies CommandTargetName.None) // Catch missing TS cases
         }
@@ -4350,6 +4408,11 @@ export class SongEditor {
             this._doc.performance.play();
             this._shortcutHandler.setContext(CommandContext.LivePlayback, true);
         }
+    }
+
+    public reloadShortcuts = (): void => {
+        this._shortcutHandler.setCommands(this._doc.prefs.builtInEditsByID, this._doc.prefs.customCommands);
+        this._updateShortcutDisplays();
     }
 
     private _toggleRecord = (): void => {
