@@ -808,6 +808,28 @@ export class Selection {
         this._doc.record(this._changeTrack, canReplaceLastChange);
     }
 
+    public search(seekFrom?: number, notes?: boolean, pins?: boolean, gaps?: boolean, edges?: boolean, back?: boolean, exclusive?: boolean, pitchIndex?: number) {
+        const seek = seekFrom ?? (this.patternSelectionActive
+            ? (back ? this.patternSelectionStart : this.patternSelectionEnd)
+            : (back ? this._doc.song.partsPerPattern : 0));
+        const pitchIfMod = this._doc.song.getChannelIsMod(this._doc.channel) ? pitchIndex : undefined;
+        const result = search(this._doc, this._doc.getCurrentPattern(0)!, back, seek, notes, pins, gaps, edges, pitchIfMod);
+
+        let x1 = this._doc.selection.patternSelectionStart;
+        let x2 = this._doc.selection.patternSelectionEnd;
+        if (result) {
+            if (exclusive) {
+                x1 = back ? result.x1 : seek > x1 ? result.x1 : Math.min(x1, result.x1);
+                x2 = !back ? result.x2 : seek > x2 ? result.x2 : Math.min(x2, result.x2);
+            } else {
+                x1 = back ? result.x1 : Math.min(x1, result.x1);
+                x2 = !back ? result.x2 : Math.max(x2, result.x2);
+            }
+        }
+
+        return { x1, x2 };
+    }
+
     /**
      * Merges notes, optionally only adjacent ones. This requires adjacent mode on mod channels.
      * 

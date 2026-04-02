@@ -267,15 +267,13 @@ export class MuteEditor {
 	}
 
 	public onKeyUp(event: KeyboardEvent): void {
-		switch (event.keyCode) {
-			case 27: // esc
+		switch (event.key) {
+			case 'Escape': // esc
 				this._channelDropDownOpen = false;
-				//console.log("close");
 				this._channelNameDisplay.style.setProperty("display", "none");
 				break;
-			case 13: // enter
+			case 'Enter': // enter
 				this._channelDropDownOpen = false;
-				//console.log("close");
 				this._channelNameDisplay.style.setProperty("display", "none");
 				break;
 			default:

@@ -1691,6 +1691,20 @@ input.tab-settings-radio + div {
   cursor: default;
 }
 
+.beepboxEditor .wideCheckbox {
+  width: 3em;
+  margin-left: 1em;
+}
+
+.beepboxEditor .argumentData {
+  margin-left: 1rem;
+  margin-top: 0.4rem;
+  height: 2.5rem;
+  width: 27rem;
+  background-color: ${ColorConfig.uiWidgetBackground};
+  color: ${ColorConfig.primaryText};
+}
+
 .beepboxEditor input[type=range] {
 	-webkit-appearance: none;
 	color: inherit;
@@ -1802,14 +1816,30 @@ input.tab-settings-radio + div {
 	border-color: ${ColorConfig.uiWidgetBackground};
 	padding-bottom: 12px;
 }
-.beepboxEditor .commandListingName {
-    font-weight: bold;
+.beepboxEditor .commandExpandButton {
+    background: none;
+	display: inline-block;
+	font-weight: bold;
+	margin-top:12px;
+}
+.beepboxEditor .shortcutUnbound {
+    color: ${ColorConfig.primaryText};
+    margin-left: 0.5rem;
+}
+.beepboxEditor .shortcutGroupOuter {
+    border: 1px solid ${ColorConfig.uiWidgetFocus};
+	padding: 0 0 12px 0;
 }
 .beepboxEditor .shortcutGroup {
     margin-left: 12px;
 	margin-top: 12px;
 	background-color: ${ColorConfig.uiWidgetBackground};
 	display: inline-block;
+}
+.beepboxEditor .shortcutArgReport {
+    color: ${ColorConfig.primaryText};
+	margin-left: 1rem;
+	margin-right: 1rem;
 }
 
 li.select2-results__option[role=group] > strong:hover {

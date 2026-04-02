@@ -36,7 +36,7 @@ import { OctaveScrollBar } from "./OctaveScrollBar";
 import { MidiInputHandler } from "./MidiInput";
 import { KeyToPianoKey } from "./KeyToPianoKey";
 import { PatternEditor } from "./PatternEditor";
-import { EditorTabSelection } from './EditorTabSelection';
+import { EditorTabSelection, buttonPresets, funcBendsPresets, funcPitchPresets, funcVolPresets } from './EditorTabSelection';
 import { Piano } from "./Piano";
 import { Prompt } from "./Prompt";
 import { SongDocument } from "./SongDocument";
@@ -57,7 +57,8 @@ import { SampleLoadingStatusPrompt } from "./SampleLoadingStatusPrompt";
 import { AddSamplesPrompt } from "./AddSamplesPrompt";
 import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
-import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands } from "./Commands";
+import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands, actionDataAsNumber, actionDataAsBool } from "./Commands";
+import { IStepData } from "./changesNoteOps";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -2074,10 +2075,9 @@ export class SongEditor {
             default:
                 return null;
         }
-
     }
 
-    private _openPrompt(promptName: string): void {
+    private _openPrompt(promptName: string | null): void {
         this._doc.openPrompt(promptName);
         this._setPrompt(promptName);
     }
@@ -3933,6 +3933,7 @@ export class SongEditor {
             return;
         }
 
+        let temp: any;
         switch (command.Target) {
             case CommandTargetName.CopyInstrument:
                 this._copyInstrument();
@@ -4350,6 +4351,126 @@ export class SongEditor {
                 return;
             case CommandTargetName.EditShortcutsAndCommands:
                 this._openPrompt("shortcutsAndCommands");
+                return;
+            case CommandTargetName.Macro:
+                // TODO: implement this!
+                return;
+            case CommandTargetName.NotesMirror:
+                temp = actionDataAsNumber(actionData![1], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteMirrorAcross(actionDataAsBool(actionData![0], false), temp === -1 ? undefined : temp);
+                return;
+            case CommandTargetName.NotesBridge:
+                temp = actionDataAsNumber(actionData![2], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteBridge(actionDataAsBool(actionData![0], false), actionDataAsBool(actionData![1], false), temp === -1 ? undefined : temp);
+                return;
+            case CommandTargetName.NotesFadeIn:
+                temp = actionDataAsNumber(actionData![1], 0, 0, Config.modCount) - 1;
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [
+                    { value: actionDataAsBool(actionData![0], false) ? (temp === -1 ? 'studio fade in' : 'studio fade in-mod') : 'fade in' },
+                    { value: temp }]);
+                return;
+            case CommandTargetName.NotesFadeOut:
+                temp = actionDataAsNumber(actionData![1], 0, 0, Config.modCount) - 1;
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [
+                    { value: actionDataAsBool(actionData![0], false) ? (temp === -1 ? 'studio fade out' : 'studio fade out-mod') : 'fade out' },
+                    { value: temp }]);
+                return;
+            case CommandTargetName.NotesFlatten:
+                temp = actionDataAsNumber(actionData![2], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteFlattenAcross(!actionDataAsBool(actionData![0], false), actionDataAsBool(actionData![1], false), temp === -1 ? undefined : temp);
+                return;
+            case CommandTargetName.NotesGainIn:
+                temp = actionDataAsNumber(actionData![0], 0, 0, Config.modCount) - 1;
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [{ value: 'gain start' }, { value: temp }]);
+                return;
+            case CommandTargetName.NotesGainOut:
+                temp = actionDataAsNumber(actionData![0], 0, 0, Config.modCount) - 1;
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [{ value: 'gain end' }, { value: temp }]);
+                return;
+            case CommandTargetName.NotesMaxContrast:
+                temp = actionDataAsNumber(actionData![0], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteStepAcross(buttonPresets['max contrast'], temp === -1 ? undefined : temp);
+                return;
+            case CommandTargetName.NotesMerge:
+                temp = actionDataAsNumber(actionData![0], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteMerge(!actionDataAsBool(actionData![0], false), temp === -1 ? undefined : temp);
+                break;
+            case CommandTargetName.NotesSplit:
+                temp = actionDataAsNumber(actionData![3], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteSplitAcross(
+                    actionDataAsNumber(actionData![0], 1, 1, this._doc.song.partsPerPattern / 2),
+                    actionDataAsBool(actionData![2], false),
+                    !actionDataAsBool(actionData![1], false),
+                    temp === -1 ? undefined : temp);
+                break;
+            case CommandTargetName.NotesSpread:
+                temp = actionDataAsNumber(actionData![2], 0, 0, Config.modCount) - 1;
+                this._doc.selection.noteSpreadAcross(
+                    actionDataAsBool(actionData![0], false),
+                    actionDataAsBool(actionData![1], false),
+                    temp === -1 ? undefined : temp);
+                break;
+            case CommandTargetName.NotesVolumeDown:
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [{ value: 'volume down' }, { value: temp }]);
+                return;
+            case CommandTargetName.NotesVolumeUp:
+                this._handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [{ value: 'volume up' }, { value: temp }]);
+                return;
+            case CommandTargetName.RunNoteFunction:
+                temp = actionDataAsNumber(actionData![1], 0, 0, Config.modCount) - 1;
+                let stepData: string | IStepData = actionData![0].value;
+                stepData = buttonPresets[stepData as keyof typeof buttonPresets] ??
+                funcVolPresets[stepData as keyof typeof funcVolPresets] ??
+                funcPitchPresets[stepData as keyof typeof funcPitchPresets] ??
+                funcBendsPresets[stepData as keyof typeof funcBendsPresets];
+                if (stepData) {
+                    let add = (stepData.affect === "vol") // Scale volume by range, consistent with EditorTabSelection.
+                        ? stepData.add?.map(str => `(${str}) / (maxrange - minrange)`)
+                        : stepData.add;
+                    this._doc.selection.noteStepAcross({...stepData, add}, temp === -1 ? undefined : temp);
+                }
+                return;
+            case CommandTargetName.SelectByFeature:
+                let notes, pins, gaps, edges, back, exclusive;
+                for (let i = 0; i < actionData![0].value.length; i++) {
+                    switch (actionData![0].value[i]) {
+                        case 'b': back = true; break;
+                        case 'e': edges = true; break;
+                        case 'g': gaps = true; break;
+                        case 'n': notes = true; break;
+                        case 'p': pins = true; break;
+                        case 'x': exclusive = true; break;
+                    }
+                }
+
+                temp = actionDataAsNumber(actionData![1], 0, 0, Config.modCount) - 1;
+                const searchResults = this._doc.selection.search(undefined, notes, pins, gaps, edges, back, exclusive, temp === -1 ? undefined : temp);
+                new ChangePatternSelection(this._doc, searchResults.x1, searchResults.x2);
+                return;
+            case CommandTargetName.SetNoteSelection:
+                temp = {
+                    x0: actionDataAsNumber(actionData![0], 0, 0, this._doc.song.partsPerPattern),
+                    x1: actionDataAsNumber(actionData![1], 0, 0, this._doc.song.partsPerPattern)
+                };
+                if (temp.x0 === -1) { temp.x0 = this._doc.selection.patternSelectionStart; }
+                if (temp.x1 === -1) { temp.x1 = this._doc.selection.patternSelectionEnd; }
+                if (temp.x0 === temp.x1) { new ChangePatternSelection(this._doc, 0, 0); }
+                else { new ChangePatternSelection(this._doc, Math.min(temp.x0, temp.x1), Math.max(temp.x0, temp.x1)); }
+                return;
+            case CommandTargetName.InvertSelection:
+                if (!this._doc.selection.patternSelectionActive) {
+                    new ChangePatternSelection(this._doc, 0, this._doc.song.partsPerPattern);
+                } else if (this._doc.selection.patternSelectionStart === 0
+                    && this._doc.selection.patternSelectionEnd === this._doc.song.partsPerPattern)
+                {
+                    new ChangePatternSelection(this._doc, 0, 0);                    
+                } else if ((this._doc.selection.patternSelectionEnd === this._doc.song.partsPerPattern)
+                    || actionDataAsBool(actionData![0], false) && this._doc.selection.patternSelectionStart !== 0)
+                {
+                    new ChangePatternSelection(this._doc, 0, this._doc.selection.patternSelectionStart);
+                } else {
+                    new ChangePatternSelection(this._doc, this._doc.selection.patternSelectionEnd, this._doc.song.partsPerPattern);
+                }
                 return;
             default:
                 (command.Target satisfies CommandTargetName.None) // Catch missing TS cases

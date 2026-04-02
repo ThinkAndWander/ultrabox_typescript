@@ -11,7 +11,7 @@ import { ColorConfig } from "./ColorConfig";
 	const {button, div, span, h2, input, br, select, option} = HTML;
 
 export class SongDurationPrompt implements Prompt {
-		private readonly _barsStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "1"});
+		private readonly _barsStepper: HTMLInputElement = input({class: "wideCheckbox", type: "number", step: "1"});
 		private readonly _positionSelect: HTMLSelectElement = select({style: "width: 100%;"},
 			option({value: "end"},       "Apply change at end of song."),
 			option({value: "beginning"}, "Apply change at beginning of song."),

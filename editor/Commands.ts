@@ -131,7 +131,25 @@ export enum CommandTargetName {
     TransposeOctaveUp = 64,
     TransposeUp = 65,
     Undo = 66,
-    EditShortcutsAndCommands = 67
+    Macro = 67,
+    EditShortcutsAndCommands = 68,
+    SetNoteSelection = 69,
+    InvertSelection = 70,
+    SelectByFeature = 71,
+    NotesMerge = 72,
+    NotesBridge = 73,
+    NotesSpread = 74,
+    NotesMirror = 75,
+    NotesFlatten = 76,
+    NotesSplit = 77,
+    NotesVolumeUp = 78,
+    NotesVolumeDown = 79,
+    NotesFadeOut = 80,
+    NotesFadeIn = 81,
+    NotesGainIn = 82,
+    NotesGainOut = 83,
+    NotesMaxContrast = 84,
+    RunNoteFunction = 85
 }
 
 /**
@@ -174,10 +192,10 @@ export interface CommandTargetInfo {
     params: (Param | ParamNum)[]
 }
 
-interface Param { type: CommandActionDataType }
-interface ParamNum extends Param { type: CommandActionDataType.Number, isInt: boolean }
+export interface Param { type: CommandActionDataType, hint: string }
+export interface ParamNum extends Param { type: CommandActionDataType.Number, isInt: boolean }
 
-function isArgumentValid(param: Param, data: CommandArgument): boolean {
+export function isArgumentValid(param: Param, data: CommandArgument): boolean {
     switch (param.type) {
         case CommandActionDataType.String:
             return true;
@@ -252,7 +270,7 @@ function isArgumentValid(param: Param, data: CommandArgument): boolean {
 }
 
 /** Interprets data as a number, returning origValue if anything is wrong. */
-export function actionDataAsNumber(actiondata: CommandArgument, origValue: number, minValue: number, maxValue: number): number {
+export function actionDataAsNumber(actiondata: CommandArgument, origValue: number, min: number, max: number): number {
     let data = actiondata.value;
     let metadata = actiondata.metadata ?? "set"; // Treat undefined as set.
 
@@ -271,7 +289,7 @@ export function actionDataAsNumber(actiondata: CommandArgument, origValue: numbe
         for (let i = 0; i < numberStrings.length; i++) {
             num = +numberStrings[i];
             if (Number.isFinite(num) && !Number.isNaN(num)) {
-                numbers.push(clamp(num, minValue, maxValue));
+                numbers.push(clamp(num, min, max));
             }
         }
         if (numbers.length === 0) {
@@ -338,11 +356,11 @@ export function actionDataAsNumber(actiondata: CommandArgument, origValue: numbe
         if (numbers.length < 1) { return origValue; }
 
         const pickedNumber = numbers[Math.round(Math.random() * numbers.length)];
-        if (metadata === "random-list-set") { return clamp(pickedNumber, minValue, maxValue); }
-        if (metadata === "random-list-add") { return clamp(origValue + pickedNumber, minValue, maxValue); }
-        if (metadata === "random-list-sub") { return clamp(origValue - pickedNumber, minValue, maxValue); }
-        if (metadata === "random-list-mul") { return clamp(origValue * pickedNumber, minValue, maxValue); }
-        if (metadata === "random-list-div") { return clamp(origValue / pickedNumber, minValue, maxValue); }
+        if (metadata === "random-list-set") { return clamp(pickedNumber, min, max); }
+        if (metadata === "random-list-add") { return clamp(origValue + pickedNumber, min, max); }
+        if (metadata === "random-list-sub") { return clamp(origValue - pickedNumber, min, max); }
+        if (metadata === "random-list-mul") { return clamp(origValue * pickedNumber, min, max); }
+        if (metadata === "random-list-div") { return clamp(origValue / pickedNumber, min, max); }
         return origValue;
     }
     else if (metadata.startsWith("random")) {
@@ -356,11 +374,11 @@ export function actionDataAsNumber(actiondata: CommandArgument, origValue: numbe
         }
         if (numbers.length !== 2) { return origValue; }
         const randomNumber = numbers[0] + Math.random() * Math.abs(numbers[1] - numbers[0]);
-        if (metadata === "random-set") { return clamp(randomNumber, minValue, maxValue); }
-        if (metadata === "random-add") { return clamp(origValue + randomNumber, minValue, maxValue); }
-        if (metadata === "random-sub") { return clamp(origValue - randomNumber, minValue, maxValue); }
-        if (metadata === "random-mul") { return clamp(origValue * randomNumber, minValue, maxValue); }
-        if (metadata === "random-div") { return clamp(randomNumber === 0 ? maxValue : origValue / randomNumber, minValue, maxValue); }
+        if (metadata === "random-set") { return clamp(randomNumber, min, max); }
+        if (metadata === "random-add") { return clamp(origValue + randomNumber, min, max); }
+        if (metadata === "random-sub") { return clamp(origValue - randomNumber, min, max); }
+        if (metadata === "random-mul") { return clamp(origValue * randomNumber, min, max); }
+        if (metadata === "random-div") { return clamp(randomNumber === 0 ? max : origValue / randomNumber, min, max); }
         return origValue;
     }
 
@@ -370,16 +388,16 @@ export function actionDataAsNumber(actiondata: CommandArgument, origValue: numbe
     */
     let value = +data;
     if (!Number.isFinite(value) || Number.isNaN(value)) { return origValue; }
-    if (metadata === "set") { return clamp(value, minValue, maxValue); }
-    if (metadata === "add") { return clamp(origValue + value, minValue, maxValue); }
-    if (metadata === "sub") { return clamp(origValue - value, minValue, maxValue); }
-    if (metadata === "mul") { return clamp(origValue * value, minValue, maxValue); }
-    if (metadata === "div") { return clamp(value === 0 ? maxValue : origValue / value, minValue, maxValue); }
+    if (metadata === "set") { return clamp(value, min, max); }
+    if (metadata === "add") { return clamp(origValue + value, min, max); }
+    if (metadata === "sub") { return clamp(origValue - value, min, max); }
+    if (metadata === "mul") { return clamp(origValue * value, min, max); }
+    if (metadata === "div") { return clamp(value === 0 ? max : origValue / value, min, max); }
     if (metadata === "add-wrap" || metadata === "sub-wrap") {
         let val = metadata === "add-wrap" ? origValue + value : origValue - value;
-        while (val < minValue) { val += maxValue + (1 - minValue); }
-        while (val > maxValue) { val -= maxValue + (1 - minValue); }
-        return clamp(val, minValue, maxValue);
+        while (val < min) { val += max + (1 - min); }
+        while (val > max) { val -= max + (1 - min); }
+        return clamp(val, min, max);
     }
 
     return origValue;
@@ -452,7 +470,7 @@ export class Command
     public ArgumentData?: CommandArgument[]
 
     /**
-     * Custom commands are versioned for backwards compatibility. The current version is set a constant maintained
+     * Custom commands are versioned for backwards compatibility. The current version is set to a constant maintained
      * by the custom shortcut editor.
      */
     public Version?: number
@@ -554,6 +572,7 @@ export class Command
 }
 
 /** The metadata of all possible targets. Names here are for actions, but argument-less commands often reuse them. */
+const channelparam = { hint: 'mod channel index (0 to ignore)', type: CommandActionDataType.Number };
 export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.None]: { name: '', params: [] },
     [CommandTargetName.CopyInstrument]: { name: 'Copy instrument', params: [] },
@@ -609,9 +628,12 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.SelectChannel]: { name: 'Select channel', params: [] },
     [CommandTargetName.SelectionDown]: { name: 'Selection down', params: [] },
     [CommandTargetName.SelectionUp]: { name: 'Selection up', params: [] },
-    [CommandTargetName.SetInstrument]: { name: 'Set instrument #', params: [{ type: CommandActionDataType.Number, isInt: true }] },
-    [CommandTargetName.SetChannel]: { name: 'Set channel', params: [{ type: CommandActionDataType.Number, isInt: true }] },
-    [CommandTargetName.SetRhythm]: { name: 'Set rhythm', params: [{ type: CommandActionDataType.Number, isInt: true }] },
+    [CommandTargetName.SetInstrument]: { name: 'Set instrument #', params: [
+        { hint: 'instrument #', type: CommandActionDataType.Number, isInt: true }] },
+    [CommandTargetName.SetChannel]: { name: 'Set channel', params: [
+        { hint: 'channel #', type: CommandActionDataType.Number, isInt: true }] },
+    [CommandTargetName.SetRhythm]: { name: 'Set rhythm', params: [
+        { hint: 'rhythm (3, 4, 6, 8, 12)', type: CommandActionDataType.Number, isInt: true }] },
     [CommandTargetName.SnapPlayheadToBeginning]: { name: 'Snap playhead to start', params: [] },
     [CommandTargetName.SnapPlayheadToLoopStart]: { name: 'Snap playhead to loop start', params: [] },
     [CommandTargetName.SnapPlayheadToSelected]: { name: 'Snap playhead to selected', params: [] },
@@ -623,7 +645,54 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.TransposeOctaveUp]: { name: 'Move notes up an octave', params: [] },
     [CommandTargetName.TransposeUp]: { name: 'Move notes up a step', params: [] },
     [CommandTargetName.Undo]: { name: 'Undo', params: [] },
-    [CommandTargetName.EditShortcutsAndCommands]: { name: 'Edit shortcuts and commands', params: [] }
+    [CommandTargetName.Macro]: { name: 'Macro', params: [
+        { hint: 'List of command names followed by (), with args inside', type: CommandActionDataType.String }]},
+    [CommandTargetName.EditShortcutsAndCommands]: { name: 'Edit shortcuts and commands', params: [] },
+    [CommandTargetName.SetNoteSelection]: { name: 'Set note selection', params: [
+        { hint: 'Start (-1 no change)', type: CommandActionDataType.Number, isInt: true },
+        { hint: 'End (-1 no change)', type: CommandActionDataType.Number, isInt: true }]},
+    [CommandTargetName.InvertSelection]: { name: 'Invert selection', params: [
+        { hint: 'Prefer left side? (prefers right otherwise)', type: CommandActionDataType.Bool }]},
+    [CommandTargetName.SelectByFeature]: { name: 'Select by feature', params: [
+        { hint: 'any/all (n=notes g=gaps e=ends p=pins b=backwards, x=exclusive)', type: CommandActionDataType.String },
+        channelparam]},
+    [CommandTargetName.NotesMerge]: { name: 'Note merge adjacent', params: [
+        { hint: 'all?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesBridge]: { name: 'Note bridge', params: [
+        { hint: 'grow?', type: CommandActionDataType.Bool },
+        { hint: 'bend?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesSpread]: { name: 'Note spread', params: [
+        { hint: 'stack?', type: CommandActionDataType.Bool },
+        { hint: 'pitch?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesMirror]: { name: 'Mirror notes horizontally', params: [
+        { hint: 'vertical? (otherwise horizontal)', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesFlatten]: { name: 'Note flatten', params: [
+        { hint: 'pitch?', type: CommandActionDataType.Bool },
+        { hint: 'volume?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesSplit]: { name: 'Note split', params: [
+        { hint: '# splits', type: CommandActionDataType.Number, isInt: true },
+        { hint: 'across?', type: CommandActionDataType.Bool },
+        { hint: 'absolute?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesVolumeUp]: { name: 'Note volume up', params: [ channelparam ] },
+    [CommandTargetName.NotesVolumeDown]: { name: 'Note volume down', params: [ channelparam ] },
+    [CommandTargetName.NotesFadeOut]: { name: 'Note fade out', params: [
+        { hint: 'quadratic fade?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesFadeIn]: { name: 'Note fade in', params: [
+        { hint: 'quadratic fade?', type: CommandActionDataType.Bool },
+        channelparam]},
+    [CommandTargetName.NotesGainIn]: { name: 'Note gain in', params: [ channelparam ] },
+    [CommandTargetName.NotesGainOut]: { name: 'Note gain out', params: [ channelparam ] },
+    [CommandTargetName.NotesMaxContrast]: { name: 'Note max contrast', params: [ channelparam ] },
+    [CommandTargetName.RunNoteFunction]: { name: 'Run note function', params: [
+        { hint: 'preset name or JSON', type: CommandActionDataType.String },
+        channelparam]},
 };
 
 // Just to keep below neat
@@ -636,7 +705,7 @@ const entry = (target: CommandTargetName, shortcuts: IShortcut[]) => {
 }
 
 /**
- * The built-in commands list, indexed by command target (one entry each). Indexing into it 
+ * The built-in commands list, indexed by command target (one entry each).
  * 
  * Built-in commands. These are indexed by target so the GUI can find and display shortcuts, though fair warning, not
  * all targets have an entry. Most borrow the display name of their target as most aren't parameterized, so this is
@@ -650,6 +719,7 @@ const entry = (target: CommandTargetName, shortcuts: IShortcut[]) => {
  * Avoid default keybinds that use Meta or Alt due to OS/browser interception when assigning defaults.
  * Control also has some shortcuts in use among browsers. Try to avoid those.
  */
+const argFalse = { value: "false" }, argTrue = { value: "true" }, arg0 = { value: "0" }; // avoid redundance
 export const builtInCommands = {
     [CommandTargetName.PlayOrPause]: simple(CommandTargetName.PlayOrPause, [' ']),
     [CommandTargetName.PlayAtCursor]: simple(CommandTargetName.PlayAtCursor, ['shift', ' ']),
@@ -660,12 +730,12 @@ export const builtInCommands = {
     [CommandTargetName.NewSong]: simple(CommandTargetName.NewSong, ['shift', '~']),
     [CommandTargetName.SongRecovery]: simple(CommandTargetName.SongRecovery, ['`']),
     [CommandTargetName.Undo]: entry(CommandTargetName.Undo, [
-        { keys: ['z'] },
-        { keys: ['control', 'z'] }]),
+        { keys: ['z'], repeat: true },
+        { keys: ['control', 'z'], repeat: true }]),
     [CommandTargetName.Redo]: entry(CommandTargetName.Redo, [
-        { keys: ['y'] },
-        { keys: ['control', 'y'] },
-        { keys: ['shift', 'z'] }]),
+        { keys: ['y'], repeat: true },
+        { keys: ['control', 'y'], repeat: true },
+        { keys: ['shift', 'z'], repeat: true }]),
     [CommandTargetName.ResetBoxSelection]: simple(CommandTargetName.ResetBoxSelection, ['escape']),
     [CommandTargetName.CutPattern]: entry(CommandTargetName.CutPattern, [
         { keys: ['x'] },
@@ -737,7 +807,89 @@ export const builtInCommands = {
     [CommandTargetName.MovePatternLeft]: simple(CommandTargetName.MovePatternLeft, ['arrowleft'], true),
     [CommandTargetName.ExtendSelectionLeft]: simple(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft'], true),
     [CommandTargetName.MovePatternRight]: simple(CommandTargetName.MovePatternRight, ['arrowright'], true),
-    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true)
+    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true),
+    [CommandTargetName.SetNoteSelection]: entry(CommandTargetName.SetNoteSelection, [
+        { keys: ['s', ' ', 'arrowleft'], argumentData: [{ value: "-1", metadata: "add" }, { value: "-1" }], repeat: true },
+        { keys: ['s', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], repeat: true },
+        { keys: ['shift', 's', ' ', 'arrowleft'], argumentData: [{ value: "1", metadata: "add" }, { value: "-1" }], repeat: true },
+        { keys: ['shift', 's', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "-1", metadata: "add" }], repeat: true },
+        { keys: ['s', ' ', '1'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], freeformEntry: true },
+        { keys: ['s', ' ', '2'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], freeformEntry: true }]),
+    [CommandTargetName.InvertSelection]: entry(CommandTargetName.InvertSelection, [
+        { keys: ['s', 'i'], argumentData: [argFalse]},
+        { keys: ['s', 'i', 'arrowright'], argumentData: [argFalse]},
+        { keys: ['s', 'i', 'arrowleft'], argumentData: [argTrue]}]),
+    [CommandTargetName.SelectByFeature]: entry(CommandTargetName.SelectByFeature, [
+        { keys: ['s', 'arrowleft'], argumentData: [ { value: "bxn" }, arg0 ]},
+        { keys: ['s', 'arrowright'], argumentData: [ { value: "xn" }, arg0 ]},
+        { keys: ['alt', 's', 'arrowleft'], argumentData: [ { value: "bn" }, arg0 ]},
+        { keys: ['alt', 's', 'arrowright'], argumentData: [ { value: "n" }, arg0 ]},
+        { keys: ['s', 'p', 'arrowleft'], argumentData: [ { value: "bxp" }, arg0 ]}, // TODO: not working
+        { keys: ['s', 'p', 'arrowright'], argumentData: [ { value: "xp" }, arg0 ]}, // TODO: not working
+        { keys: ['alt', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" }, arg0 ]}, // TODO: not working
+        { keys: ['alt', 's', 'p', 'arrowright'], argumentData: [ { value: "p" }, arg0 ]}, // TODO: not working
+        { keys: ['s', 'f', 'arrowleft'], argumentData: [ { value: "bnge" }, arg0 ]}, // TODO: not working
+        { keys: ['s', 'f', 'arrowright'], argumentData: [ { value: "nge" }, arg0 ]},
+        { keys: ['shift', 's', 'f'], argumentData: [ { value: "ben" }, arg0 ], freeformEntry: true }]),
+    [CommandTargetName.NotesMerge]: entry(CommandTargetName.NotesMerge, [
+        { keys: [ 'z', 'm' ], argumentData: [argFalse, arg0]},
+        { keys: [ 'z', 'm', 'a' ], argumentData: [argTrue, arg0]},
+        { keys: [ 'shift', 'z', 'm' ], argumentData: [argFalse, arg0], freeformEntry: true }]),
+    [CommandTargetName.NotesBridge]: entry(CommandTargetName.NotesBridge, [
+        { keys: ['z', 'b'], argumentData: [argTrue, argFalse, arg0]},
+        { keys: ['shift', 'z', 'b'], argumentData: [argTrue, argFalse, arg0], freeformEntry: true }]),
+    [CommandTargetName.NotesSpread]: entry(CommandTargetName.NotesSpread, [
+        { keys: ['z', ' '], argumentData: [argFalse, argFalse, arg0 ]},
+        { keys: ['z', ' ', 'arrowleft'], argumentData: [argTrue, argFalse, arg0 ]},
+        { keys: ['z', ' ', 'p'], argumentData: [argFalse, argTrue, arg0 ]},
+        { keys: ['shift', 'z', ' '], argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+    [CommandTargetName.NotesMirror]: entry(CommandTargetName.NotesMirror, [
+        { keys: ['z', 'h'], argumentData: [argFalse, arg0]},
+        { keys: ['z', 'v'], argumentData: [argTrue, arg0]},
+        { keys: ['shift', 'z', 'h'], argumentData: [argFalse, arg0], freeformEntry: true }]),
+    [CommandTargetName.NotesFlatten]: entry(CommandTargetName.NotesFlatten, [
+        { keys: ['z', 'f'], argumentData: [argFalse, argFalse, arg0 ]},
+        { keys: ['z', 'f', 'p'], argumentData: [argTrue, argFalse, arg0 ]},
+        { keys: ['z', 'f', 'v'], argumentData: [argFalse, argTrue, arg0 ]},
+        { keys: ['shift', 'z', 'f'], argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+    [CommandTargetName.NotesSplit]: entry(CommandTargetName.NotesSplit, [
+        { keys: ['z', 's'], argumentData: [{ value: "1" }, argFalse, argFalse, arg0]},
+        { keys: ['shift', 'z', 's'], argumentData: [{ value: "1" }, argFalse, argFalse, arg0], freeformEntry: true }]),
+    [CommandTargetName.NotesVolumeUp]: entry(CommandTargetName.NotesVolumeUp, [
+        { keys: ['v', 'arrowup'], argumentData: [arg0], repeat: true },
+        { keys: ['v'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
+    [CommandTargetName.NotesVolumeDown]: entry(CommandTargetName.NotesVolumeDown, [
+        { keys: ['v', 'arrowdown'], argumentData: [arg0], repeat: true },
+        { keys: ['v'], cursor: [CursorButtons.WheelDown], argumentData: [arg0] }]),
+    [CommandTargetName.NotesFadeOut]: entry(CommandTargetName.NotesFadeOut, [
+        { keys: ['v', 'arrowright', 'arrowdown'], argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowright', 'arrowdown'], argumentData: [argTrue, arg0]}]),
+    [CommandTargetName.NotesFadeIn]: entry(CommandTargetName.NotesFadeIn, [
+        { keys: ['v', 'arrowleft', 'arrowdown'], argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowleft', 'arrowdown'], argumentData: [argTrue, arg0]}]),
+    [CommandTargetName.NotesGainIn]: entry(CommandTargetName.NotesGainIn, [
+        { keys: ['v', 'arrowleft', 'arrowup'], argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowleft', 'arrowup'], argumentData: [argTrue, arg0]}]),
+    [CommandTargetName.NotesGainOut]: entry(CommandTargetName.NotesGainOut, [
+        { keys: ['v', 'arrowleft', 'arrowup'], argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowleft', 'arrowup'], argumentData: [argTrue, arg0]}]),
+    [CommandTargetName.NotesMaxContrast]: entry(CommandTargetName.NotesMaxContrast, [
+        { keys: ['v', 'c', 'arrowup'], argumentData: [arg0] },
+        { keys: ['v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
+    [CommandTargetName.RunNoteFunction]: entry(CommandTargetName.RunNoteFunction, [
+        { keys: ['z', 'r'], argumentData: [{ value: "" }, arg0], freeformEntry: true },
+        { keys: ['shift', 'v', 'arrowup'], argumentData: [{ value: "Raise by 1" }, arg0], repeat: true },
+        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Raise by 1" }, arg0]},
+        { keys: ['shift', 'v', 'arrowdown'], argumentData: [{ value: "Lower by 1" }, arg0], repeat: true },
+        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Lower by 1" }, arg0]},
+        { keys: ['shift', 'v', 'c', 'arrowup'], argumentData: [{ value: "Double contrast" }, arg0]},
+        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Double contrast" }, arg0]},
+        { keys: ['shift', 'v', 'c', 'arrowdown'], argumentData: [{ value: "Halve contrast" }, arg0]},
+        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Halve contrast" }, arg0]},
+        { keys: ['z', ' ', 'v'], argumentData: [{ value: "Stagger volume" }, arg0], repeat: true },
+        { keys: ['z', ' ', 'n'], argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
+        { keys: ['shift', 'z', ' ', 'n'], argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
+        { keys: ['z', ' ', 'b'], argumentData: [{ value: "Random bends" }, arg0], repeat: true }])
 };
 //#endregion
 
@@ -858,24 +1010,49 @@ export class ShortcutHandler {
             }
         });
 
-        // Sorts all shortcuts of all commands by their hashed set of inputs.
+        // Sorts all shortcuts of all commands by their hashed set of inputs, i.e. makes them ordered sets.
         const allCommands = builtins.concat(customCommands);
-        const allShortcuts: [string, Command, IShortcut][] = [];
+        const allShortcuts: [string, Command, IShortcut, string[]][] = [];
         for (const command of allCommands) {
             if (command === undefined) { continue; } // skip unassigned index gaps
             for (const entry of command.Shortcuts) {
-                allShortcuts.push([this.toHash(entry), command, entry]);
+                const set = ShortcutHandler.toOrderedSet(entry);
+                allShortcuts.push([set.join(' '), command, entry, set]);
             }
         }
-        allShortcuts.sort();
+        allShortcuts.sort((a, b) => a[0].localeCompare(b[0]));
 
         // Separates by early/late invocation into objects for O(1) access.
         this._earlyCommands = {};
         this._lateCommands = {};
         this._onkeyCommands = {};
-        for (let i = 1; i < allShortcuts.length; i++) {
-            const list = (allShortcuts[i][2].invokeOptions !== undefined ||
-                !allShortcuts[i][0].startsWith(allShortcuts[i - 1][0]))
+
+        // Identify subsets by adding every combination (except the full set) of each shortcut's inputs as keys to an
+        // object. Those are all potential subsets. Then, iterate again to sort objects into early/late invocation.
+        // We're trading memory for performance here. If this is too slow a UB-tree could have better results.
+        const subsets: { [key: string]: true } = {};
+        for (let i = 0; i < allShortcuts.length; i++) {
+            const combinationTotal = 2 ** allShortcuts[i][3].length;
+
+            // Gets all combinations by moving around an exclusion condition.
+            for (let j = 1; j < combinationTotal - 1; j++) { // -1 to skip final combination
+                let combination: string[] = [];
+                for (let k = 0; k < allShortcuts[i][3].length; k++) {
+                    if (j & (1 << k)) {
+                        combination.push(allShortcuts[i][3][k]);
+                    }
+                }
+
+                // combination should match the format of toHash.
+                if (combination.length > 0) {
+                    subsets[combination.join(' ')] = true;
+                }
+            }
+        }
+
+        // Add to lists indexed by the shortcut's hash. These are buckets since many shortcuts can map to it.
+        for (let i = 0; i < allShortcuts.length; i++) {
+            const list = (allShortcuts[i][2].invokeOptions !== undefined || !subsets[allShortcuts[i][0]])
                 ? allShortcuts[i][2].invokeOptions === InvokeOptions.LastKeypress ? this._onkeyCommands : this._earlyCommands
                 : this._lateCommands;
 
@@ -887,8 +1064,14 @@ export class ShortcutHandler {
         }
     }
 
-    private toHash(shortcut: IShortcut): string {
-        return [...shortcut.keys.toSorted(), ...(shortcut.cursor?.toSorted().map(o => `m${o}`) ?? [])].join('\n')
+    /** Hashes shortcut inputs to an unambiguous string for comparison or direct access. */
+    public static toHash(shortcut: IShortcut) { return this.toOrderedSet(shortcut).join(' ') }
+
+    private static toOrderedSet(shortcut: IShortcut) {
+        const inputs = [...shortcut.keys];
+        if (shortcut.cursor) { inputs.concat(shortcut.cursor.map(o => `m${o}`)); }
+
+        return inputs.toSorted();
     }
 
     /** Adds the context if add is true, removes if false. Won't add twice. Won't error out if absent during removal. */
@@ -913,7 +1096,9 @@ export class ShortcutHandler {
     /** On key down, handle early invocations (deferred=true). Compare all keyboard inputs as uppercase. */
     public handleKeyPressed = (event: KeyboardEvent, easyPianoKeys: boolean): void => {
         if (event.isComposing) { return; }
+
         this._updateModifierKeys(event);
+        event.preventDefault();
 
         if (this._freeform === undefined) {
             // Push and handle shortcuts on keypress. Shortcuts also fire for other input types.
@@ -980,7 +1165,7 @@ export class ShortcutHandler {
                 }
             }
 
-            // For strings, append printable characters (length=1) which I'd claim is a safe way to distinguish
+            // For strings, append printable characters (length=1) which I'd claim is a safe way to distinguish.
             else if (argInfo.type === CommandActionDataType.String && event.key.length === 1) {
                 arg.value += event.key;
                 this.onFreeform?.(FreeformEventType.Preview, this._freeform.cmd, args);
@@ -1022,7 +1207,7 @@ export class ShortcutHandler {
         }
     }
 
-    /** On key release, first fire late invocation (deferred=false), then remove inputs (compared as uppercase). */
+    /** On key release, first fire late invocation (deferred=false), then remove inputs. */
     public handleKeyReleased = (event: KeyboardEvent, easyPianoKeys: boolean): void => {
         if (event.isComposing) { return; }
         this._updateModifierKeys(event);
@@ -1114,12 +1299,12 @@ export class ShortcutHandler {
     {
         let requestingFreeform: [Command, IShortcut] | undefined; 
         const shortcutMap = deferFiring ? this._earlyCommands : this._lateCommands;
-        const matchedShortcuts = shortcutMap[this.toHash(this.heldInputs)] ?? [];
+        const matchedShortcuts = shortcutMap[ShortcutHandler.toHash(this.heldInputs)] ?? [];
         const matchGroups = [matchedShortcuts];
 
         // When the easy shortcuts key is *always* held, we need to include commands where it's not held down
         if (easyPianoKeys && this._commandContexts.includes(CommandContext.Recording)) {
-            matchGroups.push(shortcutMap[this.toHash({
+            matchGroups.push(shortcutMap[ShortcutHandler.toHash({
                 keys: this.heldInputs.keys.filter((o => !this.easyPianoEscape.includes(o))),
                 cursor: this.heldInputs.cursor }
             )] ?? []);

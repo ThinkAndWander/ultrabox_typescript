@@ -37,7 +37,7 @@ export class TipPrompt implements Prompt {
 			case "selectionResizeSnapping": {
 				this.messages = [div(
 					h2("Selection resize snapping"),
-					p("Normally grabbing the edges of a selection to extend it will snap to the grid based on the song rhythm, but you can also hold shift before you drag the edge for an alternate snapping mode. You can snap to the ends of notes, or all features (notes and gaps around them). Exclusive snapping changes BOTH of the selection bounds, try it out!")
+					p("Normally grabbing the edges of a selection to extend it will snap to the grid based on the song rhythm, but you can also hold shift before you drag the edge for an alternate snapping mode. You can snap to the ends of notes, to note pins, or other features (notes and gaps around them). Exclusive snapping changes BOTH of the selection bounds, try it out!")
 				)];
 				break;
 			}

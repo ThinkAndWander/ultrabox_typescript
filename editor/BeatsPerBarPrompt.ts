@@ -9,7 +9,7 @@ import { ChangeBeatsPerBar } from "./changes";
 	const {button, div, span, h2, input, br, select, option} = HTML;
 
 export class BeatsPerBarPrompt implements Prompt {
-	private readonly _beatsStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "1"});
+	private readonly _beatsStepper: HTMLInputElement = input({class: "wideCheckbox", type: "number", step: "1"});
 	private readonly _conversionStrategySelect: HTMLSelectElement = select({style: "width: 100%;"},
 		option({value: "splice"}, "Splice beats at end of bars."),
 		option({value: "stretch"}, "Stretch notes to fit in bars."),

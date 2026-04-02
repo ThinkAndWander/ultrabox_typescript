@@ -36,6 +36,8 @@ export enum SelectionResizeSnapping {
     SnapFeaturesUnion,
     /** Snaps to the ends of only notes. Replaces selection (intersection) */
     SnapNotesIntersect,
+    /** Snaps to pins within notes. Replaces selection (intersection) */
+    SnapPinsIntersect,
     /** Snaps to the nearest ends of a note or gap, unioning with existing selection. */
     SnapNotesUnion
 }
@@ -1805,22 +1807,19 @@ export class PatternEditor {
                         newEnd = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
                     }
                 } else if (this._shiftHeld && pattern !== null) { // Shift+drag for special snapping.
-                    const snapAll =
+                    const pins = this._selectionSnapping === SelectionResizeSnapping.SnapPinsIntersect;
+                    const features =
                         this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
                         this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesUnion;
+                    const exclusive =
+                        this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
+                        this._selectionSnapping === SelectionResizeSnapping.SnapNotesIntersect ||
+                        this._selectionSnapping === SelectionResizeSnapping.SnapPinsIntersect;
 
-                    const result = search(this._doc, pattern, false, currentPart, true, snapAll, snapAll);
+                    const result = this._doc.selection.search(currentPart, true, pins, features, features, this._draggingStartOfSelection, exclusive);
 
-                    if (result) { // Perform interesect, else union.
-                        if (this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
-                            this._selectionSnapping === SelectionResizeSnapping.SnapNotesIntersect) {
-                            newStart = this._draggingStartOfSelection ? result.x1 : currentPart > newStart ? result.x1 : Math.min(newStart, result.x1);
-                            newEnd = this._draggingEndOfSelection ? result.x2 : currentPart > newEnd ? result.x2 : Math.min(newEnd, result.x2);
-                        } else {
-                            newStart = this._draggingStartOfSelection ? result.x1 : Math.min(newStart, result.x1);
-                            newEnd = this._draggingEndOfSelection ? result.x2 : Math.max(newEnd, result.x2);
-                        }
-                    }
+                    newStart = result.x1;
+                    newEnd = result.x2;
                 }
 
                 // In wrap-around mode, dragging selection ends shifts the wrap amount instead of adjusting bounds.

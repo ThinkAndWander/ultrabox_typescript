@@ -11,7 +11,7 @@ const {button, div, h2, input, label, br} = HTML;
 export class InstrumentExportPrompt implements Prompt {
 		private readonly _cancelButton: HTMLButtonElement = button({class: "cancelButton"});
         private readonly _exportButton: HTMLButtonElement = button({ class: "exportButton", style: "width:45%;" }, "Export");
-        private readonly _exportMultipleBox: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "checkbox"});
+        private readonly _exportMultipleBox: HTMLInputElement = input({class: "wideCheckbox", type: "checkbox"});
         private readonly _channelName: String = this._doc.song.channels[this._doc.channel].name == "" ? Config.jsonFormat + "-Instrument" : this._doc.song.channels[this._doc.channel].name;
         private readonly _fileName: HTMLInputElement = input({ type: "text", style: "width: 10em;", value: this._channelName, maxlength: 250, "autofocus": "autofocus" });
 

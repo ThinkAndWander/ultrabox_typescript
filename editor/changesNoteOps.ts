@@ -392,15 +392,14 @@ export class ChangeStepAcross extends ChangeSequence {
 
         // Runs guaranteed-safe eval on expressions in the array with variable substitutions.
         // whitelist is 0-9A-Za-z space and .!&|+-*/%=<>?:,() except the function sequences () and =>.
-        const matchVariables = /(?<!\w)([a-zA-Z]+)\w*/
-        const matchNotWhitelist = /[^0-9A-Za-z. !&|+\-*\/%=<>?:,()]|=\s*>/
-
         /** Given one expression or number, injects all variables and resolves everything to a number, or 0 on failure. */
         function resolve(entry: string | number, curr: number, stepInLength: number, endNum: number, info: noteData) {
             if (typeof entry === 'number') { return entry; }
             const scaleForVol = (data.affect === 'vol') ? volRange : 1
             const relPrev = (data.affect === 'vol') ? info.notePinSize.prev : (data.affect === 'bends') ? info.notePinInterval.prev : info.notePitch.prev
             const relAvg = (data.affect === 'vol') ? info.notePinSize.avg : (data.affect === 'bends') ? info.notePinInterval.avg : info.notePitch.avg
+            const matchVariables = /(?<!\w)([a-zA-Z]+)\w*/g
+            const matchNotWhitelist = /[^0-9A-Za-z. !&|+\-*\/%=<>?:,()]|=\s*>/g
 
             try {
                 entry = entry
@@ -806,17 +805,19 @@ export class ChangeStepAcross extends ChangeSequence {
             // If pins were interacted with, remove excess pins to keep UI clean.
             if (data.affect === 'vol' || data.affect === 'bends') {
                 removeRedundantPins(note.pins);
+            }
+        }
 
-                // When pins are edited, notes should re-merge at the ends of the selection in case it was split, as pin edits
-                // don't logically involve splitting notes, but it was necessary to greatly simplify iterating the notes.
-                if (!isModChannel) {
-                    if (intersects.L !== -1) {
-                        this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.L].start, pattern.notes[intersects.L + 1].end, pitchIndex))
-                        intersects.R--;
-                    }
-                    if (intersects.R > -1) {
-                        this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.R - 1].start, pattern.notes[intersects.R].end, pitchIndex))
-                    }
+        if (data.affect === 'vol' || data.affect === 'bends') {
+            // When pins are edited, notes should re-merge at the ends of the selection in case it was split, as pin edits
+            // don't logically involve splitting notes, but it was necessary to greatly simplify iterating the notes.
+            if (!isModChannel) {
+                if (intersects.L !== -1) {
+                    this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.L].start, pattern.notes[intersects.L + 1].end, pitchIndex))
+                    intersects.R--;
+                }
+                if (intersects.R > -1) {
+                    this.append(new ChangeMergeAcross(doc, pattern, pattern.notes[intersects.R - 1].start, pattern.notes[intersects.R].end, pitchIndex))
                 }
             }
         }
@@ -1574,13 +1575,14 @@ export function getIntersects(doc: SongDocument, pattern: Pattern, x1: number, x
  * @param seekFrom The x-position to start searching from. If not provided and a selection is active, starts from
  * selection end (or start if backwards is true). If not provided and no selection is active, defaults to 0.
  * @param notes Whether to seek for notes (default false)
+ * @param pins Whether to seek for places in notes where a pin exists (default false)
  * @param gaps Whether to seek for gaps between notes (default false)
  * @param edges Whether to seek for the gaps at the start/end of a pattern (default false)
  * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
  * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
-export function search(doc: SongDocument, pattern: Pattern, backwards: boolean, seekFrom?: number,
-    notes?: boolean, gaps?: boolean, edges?: boolean, pitchIndex?: number): ({x1: number, x2: number} | null)
+export function search(doc: SongDocument, pattern: Pattern, backwards?: boolean, seekFrom?: number,
+    notes?: boolean, pins?: boolean, gaps?: boolean, edges?: boolean, pitchIndex?: number): ({x1: number, x2: number} | null)
 {
     let seek = seekFrom !== undefined ? seekFrom : doc.selection.patternSelectionActive
         ? backwards ? doc.selection.patternSelectionStart : doc.selection.patternSelectionEnd
@@ -1604,6 +1606,13 @@ export function search(doc: SongDocument, pattern: Pattern, backwards: boolean, 
             // Match pattern edge start-gap, else this gap, else this note
             if (edges && !prev && note.end < seek) { return { x1: note.end, x2: doc.song.partsPerPattern } }
             if (gaps && prev && prev.start >= seek && note.end < seek) { return { x1: note.start, x2: prev.end } }
+            if (pins) {
+                for (let i = note.pins.length - 1; i > 0; i--) {
+                    if (note.end - note.pins[i].time < seek) {
+                        return { x1: note.end - note.pins[i - 1].time, x2: note.end - note.pins[i].time }
+                    }
+                }
+            }
             if (notes) { return { x1: note.start, x2: note.end }; }
             seek = note.start;
         }
@@ -1617,6 +1626,13 @@ export function search(doc: SongDocument, pattern: Pattern, backwards: boolean, 
             // Match pattern edge start-gap, else this gap, else this note
             if (edges && !prev && note.start > seek) { return { x1: 0, x2: note.start } }
             if (gaps && prev && prev.end <= seek && note.start > seek) { return { x1: prev.end, x2: note.start } }
+            if (pins) {
+                for (let i = 0; i < note.pins.length - 1; i++) {
+                    if (note.start + note.pins[i].time > seek) {
+                        return { x1: note.start + note.pins[i].time, x2: note.start + note.pins[i + 1].time }
+                    }
+                }
+            }
             if (notes) { return { x1: note.start, x2: note.end }; }
             seek = note.end;
         }

@@ -10,7 +10,7 @@ import { ColorConfig } from "./ColorConfig";
 	const {button, div, span, h2, input, br, select, option} = HTML;
 
 export class MoveNotesSidewaysPrompt implements Prompt {
-		private readonly _beatsStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "0.01", value: "0"});
+		private readonly _beatsStepper: HTMLInputElement = input({class: "wideCheckbox", type: "number", step: "0.01", value: "0"});
 		private readonly _conversionStrategySelect: HTMLSelectElement = select({style: "width: 100%;"},
 			option({value: "overflow"}, "Overflow notes across bars."),
 			option({value: "wrapAround"}, "Wrap notes around within bars."),

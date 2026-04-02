@@ -19,8 +19,9 @@ const funcSpecialPresetsMap = {
 }
 
 // Function presets based on the step function.
+// NOTE: these display strings are referenced by the RunNotePreset command, be careful with changes!
 const wave = (f1: number, f2: number, amp: number) => `(sin(pi/(${f1} + num/len*(${f2}-${f1})) * num)*${amp} + 1) / 2`;
-const funcVolPresets: { [key: string]: IStepData } = {
+export const funcVolPresets = {
     'Fade out every note': { affect: 'vol', per: 'pin', mult: [ '1 - num / len'], onlyExistingPins: true },
     'Wobble slow': { affect: 'vol', per: 'time', mult: [wave(16, 16, 0.5)] },
     'Wobble slow to medium': { affect: 'vol', per: 'time', mult: [wave(16, 8, 0.5)] },
@@ -40,8 +41,8 @@ const funcVolPresets: { [key: string]: IStepData } = {
     'Flip': { affect: 'vol', per: 'pin', add: ['((x - volsavg) * -2) * (maxrange - minrange)'], onlyExistingPins: true },
     'Random quiver': { affect: 'vol', per: 'time', mult: ['random() > 0.5 ? 0.5 : 1'] },
     'Random quiver at ends': { affect: 'vol', per: 'time', add: ['(random() > 0.5 ? -(maxrange-minrange) : 0) * (num/len)'] },
-};
-const funcPitchPresets: { [key: string]: IStepData } = {
+} satisfies { [key: string]: IStepData };
+export const funcPitchPresets = {
     'Stagger pitch': { affect: 'pitch', per: 'note', add: [-1, 1] },
     'Stagger 1:2': { affect: 'pitch', per: 'note', add: [1, 0, 0] },
     'Stagger 1:3': { affect: 'pitch', per: 'note', add: [1, 0, 0, 0] },
@@ -58,8 +59,8 @@ const funcPitchPresets: { [key: string]: IStepData } = {
     'Fade to bottom': { affect: 'pitch', add: ['(pitchesmin - pitch) * (num/len)'] },
     'More contrast': { affect: 'pitch', add: ['sign(pitch - pitchesavg)'] },
     'Less contrast': { affect: 'pitch', add: ['sign(pitchesavg - pitch)'] },
-};
-const funcBendsPresets: { [key: string]: IStepData } = {
+} satisfies { [key: string]: IStepData };
+export const funcBendsPresets = {
     'Bend notes to avg pitch': { affect: 'bends', per: 'pin', type: 'stretch', add: [0, 'pitchesavg - pitch - x'], onlyExistingPins: true },
     'Tremolo slow': { affect: 'bends', per: 'time', add: [wave(16, 16, 0.5)] },
     'Tremolo slow to medium': { affect: 'bends', per: 'time', add: [wave(16, 8, 0.5)] },
@@ -72,7 +73,20 @@ const funcBendsPresets: { [key: string]: IStepData } = {
     'Tremolo fast': { affect: 'bends', per: 'time', add: [wave(4, 4, 0.5)] },
     'Tremolo max': { affect: 'bends', per: 'pin', add: [-1, 1] },
     'Random bends': { affect: 'bends', per: 'pin', add: ['random() > 0.95 ? 1 : 0'] },
-};
+} satisfies { [key: string]: IStepData };
+export const buttonPresets = {
+    'volume up': { affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : x'], onlyExistingPins: true },
+    'volume down': { affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? -x : -x/2'], onlyExistingPins: true },
+    'fade out': { affect: 'vol', per: 'time', mult: [1, 0], onlyExistingPins: true },
+    'fade in': { affect: 'vol', per: 'time', mult: [0, 1], onlyExistingPins: true },
+    'gain end': { affect: 'vol', per: 'time', type: 'stretch', add: [0, '1 / (maxrange - minrange)'], mult: [1, 2], onlyExistingPins: true },
+    'gain start': { affect: 'vol', per: 'time', type: 'stretch', add: ['1 / (maxrange - minrange)', 0], mult: [2, 1], onlyExistingPins: true },
+    'studio fade out': { affect: 'vol', per: 'time', mult: [1, 0.5625, 0.25, 0.0625, 0] },
+    'studio fade out-mod': { affect: 'vol', per: 'time', mult: ['1 - pow(num / (len - 1), 2)'] },
+    'studio fade in': { affect: 'vol', per: 'time', mult: [0, 0.0625, 0.25, 0.5625, 1] },
+    'studio fade in-mod': { affect: 'vol', per: 'time', mult: ['pow(num / (len - 1), 2)'] },
+    'max contrast': { affect: 'vol', type: 'stretch', per: 'pin', add: ['x / volsmax * (1 - volsmax)'], onlyExistingPins: true }
+} satisfies { [key: string]: IStepData };
 
 /** This contains the controls for the Selection tab in the song editor. */
 export class EditorTabSelection {
@@ -144,7 +158,10 @@ export class EditorTabSelection {
             { lbl: 'Move', val: SelectionResizeMode.Move, x: true },
             { lbl: 'Stretch', val: SelectionResizeMode.Stretch },
             { lbl: 'Wrap around', val: SelectionResizeMode.WrapAround }
-        ].forEach(o => this._resizeModeDropdown.appendChild(option({ value: o.val, selected: o.x}, o.lbl)));
+        ].forEach(o => {
+            if (o.x) { this._resizeModeDropdown.appendChild(option({ value: o.val, selected: true }, o.lbl)); }
+            else { this._resizeModeDropdown.appendChild(option({ value: o.val }, o.lbl)); }
+        });
         this._resizeModeDropdown.addEventListener('change', this._setResizeMode);
 
         this._snappingModeDropdown = select();
@@ -153,8 +170,12 @@ export class EditorTabSelection {
             { lbl: 'Features', val: SelectionResizeSnapping.SnapFeaturesUnion, x: true },
             { lbl: 'Notes', val: SelectionResizeSnapping.SnapNotesUnion },
             { lbl: 'Notes (exclusive)', val: SelectionResizeSnapping.SnapNotesIntersect },
+            { lbl: 'Pins (exclusive)', val: SelectionResizeSnapping.SnapPinsIntersect },
             { lbl: 'Features (exclusive)', val: SelectionResizeSnapping.SnapFeaturesIntersect }
-        ].forEach(o => this._snappingModeDropdown.appendChild(option({ value: o.val, selected: o.x }, o.lbl)));
+        ].forEach(o => {
+            if (o.x) { this._snappingModeDropdown.appendChild(option({ value: o.val, selected: true }, o.lbl)); }
+            else { this._snappingModeDropdown.appendChild(option({ value: o.val }, o.lbl)); }
+        });
         this._snappingModeDropdown.addEventListener('change', this._setSnapMode);
 
         this._affectModChannelNum = input({ type: "number", step: "1", min: 1, max: Config.modCount, value: "1" });
@@ -334,31 +355,25 @@ export class EditorTabSelection {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
             this._splitAbsolute.checked, !this._splitAcross.checked, modTrackIndex)
         } else if (event.target === this._volUp) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? 1 / (maxrange - minrange) : x'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['volume up'], modTrackIndex);
 		} else if (event.target === this._volDown) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'pin', add: ['x <= (1 / (maxrange - minrange) + 0.001) ? -x : -x/2'], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['volume down'], modTrackIndex);
 		} else if (event.target === this._volFadeOut) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [1, 0], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['fade out'], modTrackIndex);
 		} else if (event.target === this._volFadeIn) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', mult: [0, 1], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['fade in'], modTrackIndex);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: [0, '1 / (maxrange - minrange)'], mult: [1, 2], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['gain end'], modTrackIndex);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross({ affect: 'vol', per: 'time', type: 'stretch', add: ['1 / (maxrange - minrange)', 0], mult: [2, 1], onlyExistingPins: true }, modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['gain start'], modTrackIndex);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel
-                ? { affect: 'vol', per: 'time', mult: ['1 - pow(num / (len - 1), 2)'] }
-                : { affect: 'vol', per: 'time', mult: [1, 0.5625, 0.25, 0.0625, 0] },
-                modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade out-mod'] : buttonPresets['studio fade out'], modTrackIndex);
 		} else if (event.target === this._volStudioFadeIn) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel
-                ? { affect: 'vol', per: 'time', mult: ['pow(num / (len - 1), 2)'] }
-                : { affect: 'vol', per: 'time', mult: [0, 0.0625, 0.25, 0.5625, 1] },
-                modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade in-mod'] : buttonPresets['studio fade in'], modTrackIndex);
 		} else if (event.target === this._volContrastMax) {
-            this._doc.selection.noteStepAcross({ affect: 'vol', type: 'stretch', per: 'pin', add: ['x / volsmax * (1 - volsmax)'], onlyExistingPins: true }, modTrackIndex);
+            this._doc.selection.noteStepAcross(buttonPresets['max contrast'], modTrackIndex);
 		}
     }
 
@@ -367,9 +382,9 @@ export class EditorTabSelection {
         if (specialFunction !== undefined) {
             this._setSpecialFunction(specialFunction);
         } else {
-            const preset = funcVolPresets[this._functionSelect.value] ??
-                funcPitchPresets[this._functionSelect.value] ??
-                funcBendsPresets[this._functionSelect.value];
+            const preset = funcVolPresets[this._functionSelect.value as keyof typeof funcVolPresets] ??
+                funcPitchPresets[this._functionSelect.value as keyof typeof funcPitchPresets] ??
+                funcBendsPresets[this._functionSelect.value as keyof typeof funcBendsPresets];
 
             if (preset) {
                 this._getStepFunctionGUI(preset);

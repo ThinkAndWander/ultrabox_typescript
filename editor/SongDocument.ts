@@ -393,7 +393,7 @@ export class SongDocument {
 		this._recoveryUid = generateUid();
 	}
 		
-	public openPrompt(prompt: string): void {
+	public openPrompt(prompt: string | null): void {
 		this.prompt = prompt;
 		const hash: string = this.song.toBase64String();
 		this._sequenceNumber++;

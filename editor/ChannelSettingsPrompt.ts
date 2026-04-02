@@ -10,12 +10,12 @@ import {ChangePatternsPerChannel, ChangeInstrumentsFlags, ChangeChannelCount} fr
 const {button, div, label, br, h2, input} = HTML;
 
 export class ChannelSettingsPrompt implements Prompt {
-		private readonly _patternsStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "1"});
-		private readonly _pitchChannelStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "1"});
-		private readonly _drumChannelStepper: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "number", step: "1"});
-		private readonly _modChannelStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", step: "1" });
-		private readonly _layeredInstrumentsBox: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "checkbox"});
-		private readonly _patternInstrumentsBox: HTMLInputElement = input({style: "width: 3em; margin-left: 1em;", type: "checkbox"});
+		private readonly _patternsStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", step: "1"});
+		private readonly _pitchChannelStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", step: "1"});
+		private readonly _drumChannelStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", step: "1"});
+		private readonly _modChannelStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", step: "1" });
+		private readonly _layeredInstrumentsBox: HTMLInputElement = input({ class: "wideCheckbox", type: "checkbox"});
+		private readonly _patternInstrumentsBox: HTMLInputElement = input({ class: "wideCheckbox", type: "checkbox"});
 
 		private readonly _cancelButton: HTMLButtonElement = button({class: "cancelButton"});
 		private readonly _okayButton: HTMLButtonElement = button({class: "okayButton", style: "width:45%;"}, "Okay");

@@ -217,17 +217,17 @@ export class EuclideanRhythmPrompt implements Prompt {
 	private readonly _clockWire: SVGCircleElement = SVG.circle({ cx: this._clockWidth / 2, cy: this._clockHeight / 2, r: this._clockRadius, stroke: ColorConfig.primaryText, "stroke-width": "0.5", fill: "none" });
 	private readonly _clockPoints: SVGSVGElement = SVG.svg({ "pointer-events": "none" });
 
-	private readonly _stepsStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: this._minSteps, max: this._maxSteps, value: "8", step: "1" });
-	private readonly _pulsesStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "0", max: "8", value: "5", step: "1" });
-	private readonly _rotationStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "0", max: this._maxSteps, value: "0", step: "1" });
-	private readonly _stepSizeNumeratorStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "1", max: Config.partsPerBeat, value: "1", step: "1" });
-	private readonly _stepSizeDenominatorStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "1", max: Config.partsPerBeat, value: "4", step: "1" });
+	private readonly _stepsStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: this._minSteps, max: this._maxSteps, value: "8", step: "1" });
+	private readonly _pulsesStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "0", max: "8", value: "5", step: "1" });
+	private readonly _rotationStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "0", max: this._maxSteps, value: "0", step: "1" });
+	private readonly _stepSizeNumeratorStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "1", max: Config.partsPerBeat, value: "1", step: "1" });
+	private readonly _stepSizeDenominatorStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "1", max: Config.partsPerBeat, value: "4", step: "1" });
 
 	// Keep in mind this counts from 1 (to match the rest of the UI).
-	private readonly _channelStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "1", max: this._maxChannel + 1, value: "1", step: "1" });
+	private readonly _channelStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "1", max: this._maxChannel + 1, value: "1", step: "1" });
 
-	private readonly _pitchStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "0", max: Config.maxPitch, value: "0", step: "1" });
-	private readonly _barAmountStepper: HTMLInputElement = input({ style: "width: 3em; margin-left: 1em;", type: "number", min: "1", max: Config.barCountMax, value: "1", step: "1" });
+	private readonly _pitchStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "0", max: Config.maxPitch, value: "0", step: "1" });
+	private readonly _barAmountStepper: HTMLInputElement = input({ class: "wideCheckbox", type: "number", min: "1", max: Config.barCountMax, value: "1", step: "1" });
 
 	private readonly _extendUntilLoopButton: HTMLButtonElement = button({ style: "height: auto; min-height: var(--button-size); margin-left: 1em;" }, "Extend until loop");
 
