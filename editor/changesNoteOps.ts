@@ -377,6 +377,15 @@ export interface IStepData {
     onlyExistingPins?: boolean
 }
 
+export function isValidStepData(obj: IStepData) {
+    return (obj.affect === "vol" || obj.affect === "pitch" || obj.affect === "bends") &&
+        (obj.type === undefined || obj.type === "cycle" || obj.type === "step" || obj.type === "stretch") &&
+        (obj.per === undefined || obj.per === "note" || obj.per === "pin" || obj.per === "time") &&
+        (obj.onlyExistingPins === undefined || typeof obj.onlyExistingPins === 'boolean') &&
+        (obj.add?.every(o => typeof o === 'number' || typeof o === 'string')) &&
+        (obj.mult?.every(o => typeof o === 'number' || typeof o === 'string'));
+}
+
 /** Adjusts volume/pitch across the given range using arrays of expressions & numbers to add and multiply.
  * 
  * You supply value(s) to multiply or add, in that order, and they're applied according to the interpretation behavior,

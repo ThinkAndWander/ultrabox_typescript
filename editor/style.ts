@@ -1810,6 +1810,34 @@ input.tab-settings-radio + div {
 	cursor: pointer;
 }
 
+.beepboxEditor .toast {
+	position: absolute;
+	left: 50%;
+	translate: -50%;
+	margin-top:0.5rem;
+	padding: 0.5rem 0.2rem 0.5rem 0.2rem;
+	background-color: rgba(0,0,0,0.5);
+	border-radius: 0.5rem;
+}
+
+.beepboxEditor .toastText {
+    font-size: 16px;
+	font-weight: bold;
+    color: ${ColorConfig.primaryText};
+	text-align: center;
+}
+
+.beepboxEditor .toastSubtext {
+    color: ${ColorConfig.secondaryText};
+	text-align: center;
+}
+
+.beepboxEditor .toastCommandArg {
+    border: 1px solid ${ColorConfig.uiWidgetFocus};
+	display: inline-block;
+	min-width: 2rem;
+}
+
 .beepboxEditor .commandGroup {
     border-width: 0 0 1px 0;
 	border-style: solid;

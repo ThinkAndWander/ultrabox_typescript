@@ -149,7 +149,8 @@ export enum CommandTargetName {
     NotesGainIn = 82,
     NotesGainOut = 83,
     NotesMaxContrast = 84,
-    RunNoteFunction = 85
+    RunNoteFunction = 85,
+    RunCommand = 86
 }
 
 /**
@@ -445,9 +446,6 @@ interface BuiltInLookupJSON {[key: string]: CommandJSON | null}
  */
 export class Command
 {
-    /** Only built-in commands can set this value. When true, the command palette will omit this command. */
-    public HideInPalette: boolean | undefined
-
     /** Display name of the command, used by e.g. a shortcut manager or command palette. */
     public Name: string
 
@@ -656,7 +654,7 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.SelectByFeature]: { name: 'Select by feature', params: [
         { hint: 'any/all (n=notes g=gaps e=ends p=pins b=backwards, x=exclusive)', type: CommandActionDataType.String },
         channelparam]},
-    [CommandTargetName.NotesMerge]: { name: 'Note merge adjacent', params: [
+    [CommandTargetName.NotesMerge]: { name: 'Note merge', params: [
         { hint: 'all?', type: CommandActionDataType.Bool },
         channelparam]},
     [CommandTargetName.NotesBridge]: { name: 'Note bridge', params: [
@@ -667,7 +665,7 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
         { hint: 'stack?', type: CommandActionDataType.Bool },
         { hint: 'pitch?', type: CommandActionDataType.Bool },
         channelparam]},
-    [CommandTargetName.NotesMirror]: { name: 'Mirror notes horizontally', params: [
+    [CommandTargetName.NotesMirror]: { name: 'Mirror notes', params: [
         { hint: 'vertical? (otherwise horizontal)', type: CommandActionDataType.Bool },
         channelparam]},
     [CommandTargetName.NotesFlatten]: { name: 'Note flatten', params: [
@@ -693,12 +691,13 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.RunNoteFunction]: { name: 'Run note function', params: [
         { hint: 'preset name or JSON', type: CommandActionDataType.String },
         channelparam]},
+    [CommandTargetName.RunCommand]: { name: 'Run command', params: [] }
 };
 
 // Just to keep below neat
 const nums = ['0','1','2','3','4','5','6','7','8','9'];
-const simple = (target: CommandTargetName, keys: string[], repeat?: boolean) => {
-    return new Command(targets[target].name, target, "", [{ keys, repeat }]);
+const simple = (target: CommandTargetName, keys: string[], repeat?: boolean, early?: boolean) => {
+    return new Command(targets[target].name, target, "", [{ keys, repeat, invokeOptions: early ? InvokeOptions.Early : undefined }]);
 }
 const entry = (target: CommandTargetName, shortcuts: IShortcut[]) => {
     return new Command(targets[target].name, target, "", shortcuts);
@@ -786,13 +785,19 @@ export const builtInCommands = {
     [CommandTargetName.RandomInstrumentGenerated]: simple(CommandTargetName.RandomInstrumentGenerated, ['shift', 'r']),
     [CommandTargetName.NextBar]: simple(CommandTargetName.NextBar, [']'], true),
     [CommandTargetName.PrevBar]: simple(CommandTargetName.PrevBar, ['['], true),
-    [CommandTargetName.TransposeDown]: simple(CommandTargetName.TransposeDown, ['-'], true),
-    [CommandTargetName.TransposeUp]: simple(CommandTargetName.TransposeUp, ['='], true),
-    [CommandTargetName.TransposeOctaveDown]: simple(CommandTargetName.TransposeOctaveDown, ['shift', '_'], true),
-    [CommandTargetName.TransposeOctaveUp]: simple(CommandTargetName.TransposeOctaveUp, ['shift', '+'], true),
+    [CommandTargetName.TransposeDown]: entry(CommandTargetName.TransposeDown, [
+        { keys: ['-'], repeat: true, invokeOptions: InvokeOptions.Early },
+        { keys: ['s', 'arrowdown'], repeat: true, invokeOptions: InvokeOptions.Early },
+        { keys: ['s'], cursor: [CursorButtons.WheelDown], repeat: true, invokeOptions: InvokeOptions.Early }]),
+    [CommandTargetName.TransposeUp]: entry(CommandTargetName.TransposeUp, [
+        { keys: ['='], repeat: true, invokeOptions: InvokeOptions.Early },
+        { keys: ['s', 'arrowup'], repeat: true, invokeOptions: InvokeOptions.Early },
+        { keys: ['s'], cursor: [CursorButtons.WheelUp], repeat: true, invokeOptions: InvokeOptions.Early }]),
+    [CommandTargetName.TransposeOctaveDown]: simple(CommandTargetName.TransposeOctaveDown, ['shift', '_'], true, true),
+    [CommandTargetName.TransposeOctaveUp]: simple(CommandTargetName.TransposeOctaveUp, ['shift', '+'], true, true),
     [CommandTargetName.RemovePattern]: simple(CommandTargetName.RemovePattern, ['delete']),
-    [CommandTargetName.PatternUp]: simple(CommandTargetName.PatternUp, ['arrowup'], true),
-    [CommandTargetName.SelectionUp]: simple(CommandTargetName.SelectionUp, ['shift', 'arrowup'], true),
+    [CommandTargetName.PatternUp]: simple(CommandTargetName.PatternUp, ['arrowup'], true, true),
+    [CommandTargetName.SelectionUp]: simple(CommandTargetName.SelectionUp, ['shift', 'arrowup'], true, true),
     [CommandTargetName.SetInstrument]: entry(CommandTargetName.SetInstrument, [
         ...nums.map(num => ({ keys: ['control', num], argumentData: [{ value: num }] })),
         ...nums.map(num => ({ keys: ['shift', num], argumentData: [{ value: num }] })) ]),
@@ -801,33 +806,32 @@ export const builtInCommands = {
     [CommandTargetName.SetRhythm]: entry(CommandTargetName.SetRhythm,
         nums.map(o => ({ keys: ['alt', o], argumentData: [{ value: o }] }))),
     [CommandTargetName.MoveChannelUp]: simple(CommandTargetName.MoveChannelUp, ['control', 'arrowup'], true),
-    [CommandTargetName.PatternDown]: simple(CommandTargetName.PatternDown, ['arrowdown'], true),
-    [CommandTargetName.SelectionDown]: simple(CommandTargetName.SelectionDown, ['shift', 'arrowdown'], true),
+    [CommandTargetName.PatternDown]: simple(CommandTargetName.PatternDown, ['arrowdown'], true, true),
+    [CommandTargetName.SelectionDown]: simple(CommandTargetName.SelectionDown, ['shift', 'arrowdown'], true, true),
     [CommandTargetName.MoveChannelDown]: simple(CommandTargetName.MoveChannelDown, ['control', 'arrowdown'], true),
-    [CommandTargetName.MovePatternLeft]: simple(CommandTargetName.MovePatternLeft, ['arrowleft'], true),
-    [CommandTargetName.ExtendSelectionLeft]: simple(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft'], true),
-    [CommandTargetName.MovePatternRight]: simple(CommandTargetName.MovePatternRight, ['arrowright'], true),
-    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true),
+    [CommandTargetName.MovePatternLeft]: simple(CommandTargetName.MovePatternLeft, ['arrowleft'], true, true),
+    [CommandTargetName.ExtendSelectionLeft]: simple(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft'], true, true),
+    [CommandTargetName.MovePatternRight]: simple(CommandTargetName.MovePatternRight, ['arrowright'], true, true),
+    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true, true),
     [CommandTargetName.SetNoteSelection]: entry(CommandTargetName.SetNoteSelection, [
         { keys: ['s', ' ', 'arrowleft'], argumentData: [{ value: "-1", metadata: "add" }, { value: "-1" }], repeat: true },
         { keys: ['s', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowleft'], argumentData: [{ value: "1", metadata: "add" }, { value: "-1" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "-1", metadata: "add" }], repeat: true },
-        { keys: ['s', ' ', '1'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], freeformEntry: true },
-        { keys: ['s', ' ', '2'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], freeformEntry: true }]),
+        { keys: ['shift', 's', ' '], argumentData: [{ value: "0" }, { value: "0" }], freeformEntry: true }]),
     [CommandTargetName.InvertSelection]: entry(CommandTargetName.InvertSelection, [
         { keys: ['s', 'i'], argumentData: [argFalse]},
         { keys: ['s', 'i', 'arrowright'], argumentData: [argFalse]},
         { keys: ['s', 'i', 'arrowleft'], argumentData: [argTrue]}]),
     [CommandTargetName.SelectByFeature]: entry(CommandTargetName.SelectByFeature, [
-        { keys: ['s', 'arrowleft'], argumentData: [ { value: "bxn" }, arg0 ]},
-        { keys: ['s', 'arrowright'], argumentData: [ { value: "xn" }, arg0 ]},
-        { keys: ['alt', 's', 'arrowleft'], argumentData: [ { value: "bn" }, arg0 ]},
-        { keys: ['alt', 's', 'arrowright'], argumentData: [ { value: "n" }, arg0 ]},
+        { keys: ['s', 'arrowleft'], argumentData: [ { value: "bxn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['s', 'arrowright'], argumentData: [ { value: "xn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['shift', 's', 'arrowleft'], argumentData: [ { value: "bn" }, arg0 ]},
+        { keys: ['shift', 's', 'arrowright'], argumentData: [ { value: "n" }, arg0 ]},
         { keys: ['s', 'p', 'arrowleft'], argumentData: [ { value: "bxp" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'p', 'arrowright'], argumentData: [ { value: "xp" }, arg0 ]}, // TODO: not working
-        { keys: ['alt', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" }, arg0 ]}, // TODO: not working
-        { keys: ['alt', 's', 'p', 'arrowright'], argumentData: [ { value: "p" }, arg0 ]}, // TODO: not working
+        { keys: ['shift', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" }, arg0 ]}, // TODO: not working
+        { keys: ['shift', 's', 'p', 'arrowright'], argumentData: [ { value: "p" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'f', 'arrowleft'], argumentData: [ { value: "bnge" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'f', 'arrowright'], argumentData: [ { value: "nge" }, arg0 ]},
         { keys: ['shift', 's', 'f'], argumentData: [ { value: "ben" }, arg0 ], freeformEntry: true }]),
@@ -889,7 +893,8 @@ export const builtInCommands = {
         { keys: ['z', ' ', 'v'], argumentData: [{ value: "Stagger volume" }, arg0], repeat: true },
         { keys: ['z', ' ', 'n'], argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
         { keys: ['shift', 'z', ' ', 'n'], argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
-        { keys: ['z', ' ', 'b'], argumentData: [{ value: "Random bends" }, arg0], repeat: true }])
+        { keys: ['z', ' ', 'b'], argumentData: [{ value: "Random bends" }, arg0], repeat: true }]),
+    [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/'])
 };
 //#endregion
 
@@ -962,6 +967,7 @@ export class ShortcutHandler {
     private _lateCommands: { [key: string]: [Command, IShortcut][] } = {}; // Commands that only invoke late (key release)
     private _onkeyCommands: { [key: string]: [Command, IShortcut][] } = {}; // Commands that fire based on last keypress.
     private _commandHasFired = false; // If a command fires in early invocation, this prevents it from firing again in late invocation (input release).
+    private _commandAllowLateFire = true; // After late invocation, prevents commands from firing on every key released
     private _freeform: { cmd: Command, defaultData: CommandArgument[], argInputs: CommandArgument[], numericType?: string } | undefined; // Tracks all relevant data in freeform input mode.
 
     public easyPianoEscape = ShortcutHandler.defaultEasyPianoEscapes; // hold to fire shortcuts (in easy notes)
@@ -993,11 +999,7 @@ export class ShortcutHandler {
      * replacements to built-in commands.
     */
     public setCommands(builtInEditsByID: BuiltInLookup, customCommands: Command[]) {
-        // Reset most states.
-        this._commandHasFired = false;
-        this._freeform = undefined;
-        this.heldInputs.keys = [];
-        this.heldInputs.cursor = [];
+        this.forgetInputStates();
 
         // Use the edited built-in if it exists, else the unedited one
         // For nulls or if a command target has no entry in built-ins, array will be unassigned at index gaps
@@ -1093,12 +1095,20 @@ export class ShortcutHandler {
         return this._commandContexts.includes(context);
     }
 
+    /** Resetting input on blur/focus avoids stuck states. */
+    public forgetInputStates = () => {
+        this._commandHasFired = false;
+        this._commandAllowLateFire = true;
+        this._freeform = undefined;
+        this.heldInputs.keys = [];
+        this.heldInputs.cursor = [];
+    }
+
     /** On key down, handle early invocations (deferred=true). Compare all keyboard inputs as uppercase. */
     public handleKeyPressed = (event: KeyboardEvent, easyPianoKeys: boolean): void => {
         if (event.isComposing) { return; }
 
         this._updateModifierKeys(event);
-        event.preventDefault();
 
         if (this._freeform === undefined) {
             // Push and handle shortcuts on keypress. Shortcuts also fire for other input types.
@@ -1106,12 +1116,13 @@ export class ShortcutHandler {
                 this.heldInputs.keys.push(event.key.toLowerCase());
             }
 
+            if (!event.repeat) { this._commandAllowLateFire = true; } // avoid unintended invokes from slow key release
             this._matchCommands(event, true, event.repeat, easyPianoKeys);
             this._commandHasFired = false;
         }
 
-        // Handle freeform input. Skip repeat keypresses, we only care about new keypresses.
-        else if (!event.repeat) {
+        // Handle freeform input.
+        else {
             let args = this._freeform.argInputs;
             const arg = args[args.length - 1];
             let argInfo = targets[this._freeform.cmd.Target].params[args.length - 1];
@@ -1122,9 +1133,12 @@ export class ShortcutHandler {
                 this._freeform = undefined;
             }
 
-            // Delete input towards this argument, or if none, jump to previous argument.
+            // Delete input towards this argument, or if none, jump to previous argument. Ctrl clears a full one.
             else if (event.key === "Backspace") {
-                if (argInfo.type !== CommandActionDataType.Bool && arg.value.length > 0) {
+                if (event.ctrlKey || argInfo.type === CommandActionDataType.Bool) {
+                    if (args.length > 1) { args.pop(); }
+                    else { arg.value = ""; }
+                } else if (arg.value.length > 0) {
                     arg.value = arg.value.slice(0, arg.value.length - 1);
                 } else if (args.length > 1) { args.pop(); }
                 this.onFreeform?.(FreeformEventType.Preview, this._freeform.cmd, args);
@@ -1143,8 +1157,8 @@ export class ShortcutHandler {
                     if (isArgumentValid(argInfo, withDefaults)) {
                         arg.value = withDefaults.value;
                         arg.metadata = withDefaults.metadata;
-                        this.onFreeform?.(FreeformEventType.NextArg, this._freeform.cmd, args);
                         args.push({ value: "" });
+                        this.onFreeform?.(FreeformEventType.NextArg, this._freeform.cmd, args);
                     } else {
                         this.onFreeform?.(FreeformEventType.NextArgBlocked, this._freeform.cmd, args);
                         this._freeform = undefined;
@@ -1173,8 +1187,8 @@ export class ShortcutHandler {
 
             // For bools, we set input rather than concat, and handle few keys.
             else if (argInfo.type === CommandActionDataType.Bool) {
-                if (event.key.toLowerCase() === "t" || event.key === "1") { arg.value = "t"; }
-                else if (event.key.toLowerCase() === "f" || event.key === "0") { arg.value = "f"; }
+                if (event.key.toLowerCase() === "t" || event.key === "1") { arg.value = "true"; }
+                else if (event.key.toLowerCase() === "f" || event.key === "0") { arg.value = "false"; }
                 else if (event.key === "!") { arg.value = "toggle"; }
                 this.onFreeform?.(FreeformEventType.Preview, this._freeform.cmd, args);
             }
@@ -1212,7 +1226,7 @@ export class ShortcutHandler {
         if (event.isComposing) { return; }
         this._updateModifierKeys(event);
         if (this._freeform !== undefined) { return; }
-        if (!this._commandHasFired) {
+        if (!this._commandHasFired && this._commandAllowLateFire) {
             this._matchCommands(event, false, event.repeat, easyPianoKeys);
         }
 
@@ -1227,6 +1241,7 @@ export class ShortcutHandler {
         if (!this.heldInputs.cursor.includes(event.button)) {
             this.heldInputs.cursor.push(event.button);
 
+            this._commandAllowLateFire = true;
             this._matchCommands(event, true, false, easyPianoKeys);
             this._commandHasFired = false;
         }
@@ -1235,7 +1250,7 @@ export class ShortcutHandler {
     /** On mouse button release, fire late invocation (deferred=false). */
     public handleCursorUp = (event: MouseEvent, easyPianoKeys: boolean) => {
         if (this._freeform !== undefined) { return; }
-        if (!this._commandHasFired) {
+        if (!this._commandHasFired && this._commandAllowLateFire) {
             this._matchCommands(event, false, false, easyPianoKeys);
         }
 
@@ -1271,6 +1286,12 @@ export class ShortcutHandler {
             this.heldInputs.cursor = [];
         }
 
+        // Contextmenu is not a key with a held state, it should not persist.
+        if ((event as KeyboardEvent).key !== 'ContextMenu') {
+            const menuIndex = this.heldInputs.keys.indexOf('contextmenu');
+            if (menuIndex !== -1) { this.heldInputs.keys.splice(menuIndex, 1); }
+        }
+
         const index = this.heldInputs.keys.indexOf("capslock");
         if (event.getModifierState("CapsLock") && index === -1) {
             this.heldInputs.keys.push("capslock");
@@ -1298,8 +1319,15 @@ export class ShortcutHandler {
     private _matchCommands(event: Event, deferFiring: boolean, isRepeating: boolean, easyPianoKeys: boolean): void
     {
         let requestingFreeform: [Command, IShortcut] | undefined; 
-        const shortcutMap = deferFiring ? this._earlyCommands : this._lateCommands;
-        const matchedShortcuts = shortcutMap[ShortcutHandler.toHash(this.heldInputs)] ?? [];
+        let shortcutMap = deferFiring ? this._earlyCommands : this._lateCommands;
+        let matchedShortcuts = shortcutMap[ShortcutHandler.toHash(this.heldInputs)] ?? [];
+
+        // Late-invoke shortcuts will be eligible to fire if held long enough to repeat.
+        if (matchedShortcuts.length === 0 && deferFiring && isRepeating) {
+            shortcutMap = this._lateCommands;
+            matchedShortcuts = shortcutMap[ShortcutHandler.toHash(this.heldInputs)] ?? [];
+        }
+
         const matchGroups = [matchedShortcuts];
 
         // When the easy shortcuts key is *always* held, we need to include commands where it's not held down
@@ -1331,6 +1359,7 @@ export class ShortcutHandler {
                     }
 
                     this._commandHasFired = true;
+                    this._commandAllowLateFire = false;
                     event.preventDefault();
                 }
             }

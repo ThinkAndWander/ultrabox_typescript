@@ -110,7 +110,9 @@ export class SongDocument {
 		this.viewedInstrument[this.channel] = state.instrument | 0;
 		this._recoveryUid = state.recoveryUid;
 		//this.barScrollPos = Math.max(0, this.bar - (this.trackVisibleBars - 6));
-		this.prompt = state.prompt;
+		// this.prompt is not restored from state on purpose, because we don't ever want to show it on undo. Keeping
+		// it closed this way allows us to e.g. repeatedly invoke commands that make unpredictable changes that can't
+		// dependably get tracked into a change list (which is the only other workaround).
 		this.selection.fromJSON(state.selection);
 		this.selection.scrollToSelectedPattern();
 			
@@ -230,7 +232,6 @@ export class SongDocument {
 			} catch (error) {
 				errorAlert(error);
 			}
-			this.prompt = state.prompt;
 			if (this.prefs.displayBrowserUrl) {
 				this._replaceState(state, this.song.toBase64String());
 			} else {
@@ -254,7 +255,6 @@ export class SongDocument {
 		this.channel = state.channel;
 		this.viewedInstrument[this.channel] = state.instrument;
 		this._sequenceNumber = state.sequenceNumber;
-		this.prompt = state.prompt;
 		try {
 			new ChangeSong(this, this._getHash());
 		} catch (error) {

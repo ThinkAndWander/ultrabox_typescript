@@ -82,7 +82,9 @@ export class PatternEditor {
         this._svgPreview,
         this._svgPlayhead,
     );
-    public readonly container: HTMLDivElement = HTML.div({ style: "height: 100%; overflow:hidden; position: relative; flex-grow: 1;" }, this._svg, this.modDragValueLabel);
+    private toastTimeoutToken: number;
+    public readonly toastContainer: HTMLDivElement = HTML.div({ class: "toast", style: "display: none;" });
+    public readonly container: HTMLDivElement = HTML.div({ style: "height: 100%; overflow:hidden; position: relative; flex-grow: 1;" }, this._svg, this.toastContainer, this.modDragValueLabel);
 
     private readonly _defaultModBorder: number = 34;
     private readonly _backgroundPitchRows: SVGRectElement[] = [];
@@ -2547,6 +2549,24 @@ export class PatternEditor {
         }
 
         this._redrawNotePatterns();
+    }
+
+    public setToastContent(content: HTMLElement | undefined, indefinite?: boolean) {
+        window.clearTimeout(this.toastTimeoutToken);
+
+        if (content === undefined) {
+            this.toastContainer.replaceChildren();
+            this.toastContainer.style.setProperty("display", "none");
+        } else {
+            this.toastContainer.replaceChildren(content);
+            this.toastContainer.style.removeProperty("display");
+
+            if (!indefinite) {
+                this.toastTimeoutToken = window.setTimeout(() => {
+                    this.setToastContent(undefined);
+                }, 3000);
+            }
+        }
     }
 
     private _redrawNotePatterns(): void {
