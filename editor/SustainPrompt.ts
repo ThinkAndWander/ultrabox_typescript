@@ -46,7 +46,7 @@ export class SustainPrompt implements Prompt {
 	}
 	
 	private _close = (): void => { 
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 	
 	public cleanUp = (): void => { 
@@ -65,7 +65,7 @@ export class SustainPrompt implements Prompt {
 		if (Config.enableAcousticSustain) {
 			const group: ChangeGroup = new ChangeGroup();
 			group.append(new ChangeStringSustainType(this._doc, <any> Config.sustainTypeNames.indexOf(this._typeSelect.value)));
-			this._doc.prompt = null;
+			this._doc.openPrompt(null);
 			this._doc.record(group, true);
 		} else {
 			this._close();

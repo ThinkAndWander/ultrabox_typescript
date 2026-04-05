@@ -58,8 +58,8 @@ export class BeatsPerBarPrompt implements Prompt {
 	}
 		
 		private _close = (): void => { 
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 		
 		public cleanUp = (): void => { 
 		this._okayButton.removeEventListener("click", this._saveChanges);
@@ -95,7 +95,7 @@ export class BeatsPerBarPrompt implements Prompt {
 		
 	private _saveChanges = (): void => {
 		window.localStorage.setItem("beatCountStrategy", this._conversionStrategySelect.value);
-		this._doc.prompt = null;
 		this._doc.record(new ChangeBeatsPerBar(this._doc, BeatsPerBarPrompt._validate(this._beatsStepper), this._conversionStrategySelect.value), true);
+		this._doc.openPrompt(null);
 	}
 }

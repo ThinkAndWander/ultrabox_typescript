@@ -545,13 +545,11 @@ export class VisualLoopControlsPrompt {
     }
 
     private _close = (): void => {
-        this._doc.prompt = null;
-        this._doc.undo();
+        this._doc.openPrompt(null);
     }
 
     private _saveChanges = (): void => {
         if (!this._chipWaveIsUnavailable) {
-            this._doc.prompt = null;
             this._instrument!.chipWaveLoopMode = this._initialChipWaveLoopMode!;
             this._instrument!.chipWaveStartOffset = this._initialChipWaveStartOffset!;
             this._instrument!.chipWaveLoopStart = this._initialChipWaveLoopStart!;
@@ -564,10 +562,9 @@ export class VisualLoopControlsPrompt {
             group.append(new ChangeChipWaveLoopEnd(this._doc, this._chipWaveLoopEnd));
             group.append(new ChangeChipWavePlayBackwards(this._doc, this._chipWavePlayBackwards));
             this._doc.record(group, true);
-        } else {
-            this._doc.prompt = null;
-            this._doc.undo();
         }
+
+        this._doc.openPrompt(null);
     }
 
     private _togglePlaySong = (): void => {

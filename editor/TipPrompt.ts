@@ -758,7 +758,7 @@ export class TipPrompt implements Prompt {
 
 	private _prevPage = () => this._changePage(this.page - 1)
 	private _nextPage = () => this._changePage(this.page + 1)
-	private _close = () => this._doc.undo()
+	private _close = () => this._doc.openPrompt(null)
 	
 	public cleanUp = (): void => { 
 		this._prevButton.removeEventListener("click", this._prevPage);

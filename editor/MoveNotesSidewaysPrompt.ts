@@ -57,8 +57,8 @@ export class MoveNotesSidewaysPrompt implements Prompt {
 	}
 		
 		private _close = (): void => { 
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 		
 		public cleanUp = (): void => { 
 		this._okayButton.removeEventListener("click", this._saveChanges);
@@ -83,7 +83,7 @@ export class MoveNotesSidewaysPrompt implements Prompt {
 		
 	private _saveChanges = (): void => {
 		window.localStorage.setItem("moveNotesSidewaysStrategy", this._conversionStrategySelect.value);
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 		this._doc.record(new ChangeMoveNotesSideways(this._doc, +this._beatsStepper.value, this._conversionStrategySelect.value), true);
 	}
 }

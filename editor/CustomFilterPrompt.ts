@@ -180,10 +180,9 @@ export class CustomFilterPrompt implements Prompt {
 	}
 
 	private _close = (): void => {
-		this._doc.prompt = null;
 		// Restore filter settings to default
 		this.filterEditor.resetToInitial();
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -195,7 +194,7 @@ export class CustomFilterPrompt implements Prompt {
 	}
 
 	public whenKeyPressed = (event: KeyboardEvent): void => {
-		if ((<Element>event.target).tagName != "BUTTON" && event.keyCode == 13) { // Enter key
+		if ((<Element>event.target).tagName != "BUTTON" && event.key === "Enter") {
 			this._saveChanges();
 		}
 		else if (event.keyCode == 32) { // space
@@ -225,7 +224,7 @@ export class CustomFilterPrompt implements Prompt {
 	}
 
 	private _saveChanges = (): void => {
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 		this.filterEditor.saveSettings();
 	}
 }

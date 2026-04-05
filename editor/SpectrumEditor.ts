@@ -430,8 +430,7 @@ export class SpectrumEditorPrompt implements Prompt {
 		// for (let i = 0; i < this.spectrumEditors.length; i++) {
 		//	 this.spectrumEditors[i].resetToInitial();
 		// }
-		this._doc.prompt = null;
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -500,6 +499,6 @@ export class SpectrumEditorPrompt implements Prompt {
 			group.append(this.spectrumEditors[i].saveSettings());
 		}
 		this._doc.record(group, true);
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 	}
 }

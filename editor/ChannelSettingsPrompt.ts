@@ -93,8 +93,8 @@ export class ChannelSettingsPrompt implements Prompt {
 	}
 		
 		private _close = (): void => { 
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 		
 		public cleanUp = (): void => { 
 		this._okayButton.removeEventListener("click", this._saveChanges);
@@ -139,7 +139,6 @@ export class ChannelSettingsPrompt implements Prompt {
 		group.append(new ChangeInstrumentsFlags(this._doc, this._layeredInstrumentsBox.checked, this._patternInstrumentsBox.checked));
 		group.append(new ChangePatternsPerChannel(this._doc, ChannelSettingsPrompt._validate(this._patternsStepper)));
 		group.append(new ChangeChannelCount(this._doc, ChannelSettingsPrompt._validate(this._pitchChannelStepper), ChannelSettingsPrompt._validate(this._drumChannelStepper), ChannelSettingsPrompt._validate(this._modChannelStepper)));
-		this._doc.prompt = null;
 		this._doc.record(group, true);
 	}
 }

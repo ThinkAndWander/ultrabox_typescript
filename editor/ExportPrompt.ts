@@ -200,8 +200,8 @@ export class ExportPrompt implements Prompt {
         this.outputStarted = false;
         this.stepStatusSynth = StepStatus.Ready;
         if (this.stepStatusAutoAmp !== StepStatus.Disabled) { this.stepStatusAutoAmp = StepStatus.Ready; }
-        this._doc.undo();
-    }
+            this._doc.openPrompt(null);
+        }
 
     public changeFileName(newValue: string) {
         this._fileName.value = newValue;

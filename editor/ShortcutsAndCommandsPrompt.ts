@@ -134,7 +134,7 @@ export class ShortcutsAndCommandsPrompt implements Prompt {
         
     private _close = (): void => {
         window.clearTimeout(this._rebinding?.timeoutIndex);
-        this._doc.undo();
+        this._doc.openPrompt(null);
     }
 
     public cleanUp = (): void => {

@@ -40,8 +40,8 @@ export class InstrumentExportPrompt implements Prompt {
 	}
 
 		private _close = (): void => {
-		this._doc.undo();
-	}
+		    this._doc.openPrompt(null);
+	    }
 
 		public cleanUp = (): void => {
 		this._cancelButton.removeEventListener("click", this._close);

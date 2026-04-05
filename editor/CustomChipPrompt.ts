@@ -321,8 +321,7 @@ export class CustomChipPrompt implements Prompt {
 	}
 
 	private _close = (): void => {
-		this._doc.prompt = null;
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -372,7 +371,7 @@ export class CustomChipPrompt implements Prompt {
 	}
 
 	private _saveChanges = (): void => {
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 		// Restore custom chip to starting values
 		new ChangeCustomWave(this._doc, this.customChipCanvas.startingChipData);
 		this._doc.record(new ChangeCustomWave(this._doc, this.customChipCanvas.chipData), true);

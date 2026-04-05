@@ -175,12 +175,11 @@ export class CustomThemePrompt implements Prompt {
 	}
 
 	private _close = (): void => {
-		this._doc.prompt = null;
-		this._doc.undo();
 		if(doReload) {
 			// The prompt seems to get stuck if reloading is done too quickly.
 			setTimeout(() => { window.location.reload(); }, 50);
 		}
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -216,7 +215,6 @@ export class CustomThemePrompt implements Prompt {
 		if (!file) return;
 		const reader: FileReader = new FileReader();
 		reader.addEventListener("load", (event: Event): void => {
-			//this._doc.prompt = null;
 			//this._doc.goBackToStart();
 			let base64 = <string>reader.result;
 			window.localStorage.setItem("customTheme", base64);
@@ -230,7 +228,6 @@ export class CustomThemePrompt implements Prompt {
 		if (!file) return;
 		const reader: FileReader = new FileReader();
 		reader.addEventListener("load", (event: Event): void => {
-			//this._doc.prompt = null;
 			//this._doc.goBackToStart();
 			let base64 = <string>reader.result;
 			window.localStorage.setItem("customTheme2", base64);

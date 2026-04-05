@@ -49,7 +49,7 @@ export class CustomScalePrompt implements Prompt {
     }
 
     private _close = (): void => {
-        this._doc.undo();
+        this._doc.openPrompt(null);
     }
 
     public cleanUp = (): void => {
@@ -69,8 +69,8 @@ export class CustomScalePrompt implements Prompt {
         for (var i = 1; i < this._scaleFlags.length; i++) {
             this._flags[i] = this._scaleFlags[i].checked;
         }
-        this._doc.prompt = null;
         this._doc.record(new ChangeCustomScale(this._doc, this._flags));
+        this._doc.openPrompt(null);
     }
 }
 //}

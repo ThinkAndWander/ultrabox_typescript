@@ -51,8 +51,8 @@ export class ImportPrompt implements Prompt {
 	}
 		
 		private _close = (): void => { 
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 		
 		public cleanUp = (): void => { 
 		this._fileInput.removeEventListener("change", this._whenFileSelected);
@@ -67,17 +67,17 @@ export class ImportPrompt implements Prompt {
 		if (extension == "json") {
 			const reader: FileReader = new FileReader();
 			reader.addEventListener("load", (event: Event): void => {
-				this._doc.prompt = null;
 				this._doc.goBackToStart();
 				this._doc.record(new ChangeSong(this._doc, <string>reader.result, this._modeImportSelect.value), true, true);
+				this._doc.openPrompt(null);
 			});
 			reader.readAsText(file);
 		} else if (extension == "midi" || extension == "mid") {
 			const reader: FileReader = new FileReader();
 			reader.addEventListener("load", (event: Event): void => {
-				this._doc.prompt = null;
 				this._doc.goBackToStart();
 				this._parseMidiFile(<ArrayBuffer>reader.result);
+				this._doc.openPrompt(null);
 			});
 			reader.readAsArrayBuffer(file);
 		} else {
@@ -962,8 +962,8 @@ export class ImportPrompt implements Prompt {
 		}
 		this._doc.goBackToStart();
 		for (const channel of this._doc.song.channels) channel.muted = false;
-		this._doc.prompt = null;
 		this._doc.record(new ChangeImportMidi(this._doc), true, true);
+		this._doc.openPrompt(null);
 	}
 }
 

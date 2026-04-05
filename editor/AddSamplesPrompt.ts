@@ -179,8 +179,7 @@ export class AddSamplesPrompt {
     }
 
     private _close = (): void => {
-        this._doc.prompt = null;
-        this._doc.undo();
+        this._doc.openPrompt(null);
         this._saveChanges();
     }
 

@@ -21,8 +21,7 @@ interface HistoryState {
 	channel: number;
 	instrument: number;
 	recoveryUid: string;
-	prompt: string | null;
-		selection: {x0: number, x1: number, y0: number, y1: number, start: number, end: number};
+	selection: {x0: number, x1: number, y0: number, y1: number, start: number, end: number};
 }
 
 export class SongDocument {
@@ -48,6 +47,7 @@ export class SongDocument {
 	public barScrollPos: number = 0;
 	public channelScrollPos: number = 0;
 	public prompt: string | null = null;
+	public promptWatchers: ((prompt: string | null) => void)[] = [];
 	
 	public addedEffect: boolean = false;
 	public addedEnvelope: boolean = false;
@@ -97,7 +97,7 @@ export class SongDocument {
 		let state: HistoryState | null = this._getHistoryState();
 		if (state == null) {
 			// When the page is first loaded, indicate that undo is NOT possible.
-			state = {canUndo: false, sequenceNumber: 0, bar: 0, channel: 0, instrument: 0, recoveryUid: generateUid(), prompt: null, selection: this.selection.toJSON()};
+			state = {canUndo: false, sequenceNumber: 0, bar: 0, channel: 0, instrument: 0, recoveryUid: generateUid(), selection: this.selection.toJSON()};
 		}
 		if (state.recoveryUid == undefined) state.recoveryUid = generateUid();
 		this._replaceState(state, songString);
@@ -110,9 +110,6 @@ export class SongDocument {
 		this.viewedInstrument[this.channel] = state.instrument | 0;
 		this._recoveryUid = state.recoveryUid;
 		//this.barScrollPos = Math.max(0, this.bar - (this.trackVisibleBars - 6));
-		// this.prompt is not restored from state on purpose, because we don't ever want to show it on undo. Keeping
-		// it closed this way allows us to e.g. repeatedly invoke commands that make unpredictable changes that can't
-		// dependably get tracked into a change list (which is the only other workaround).
 		this.selection.fromJSON(state.selection);
 		this.selection.scrollToSelectedPattern();
 			
@@ -226,7 +223,7 @@ export class SongDocument {
 			// The user changed the hash directly.
 			this._sequenceNumber++;
 			this._resetSongRecoveryUid();
-			const state: HistoryState = {canUndo: true, sequenceNumber: this._sequenceNumber, bar: this.bar, channel: this.channel, instrument: this.viewedInstrument[this.channel], recoveryUid: this._recoveryUid, prompt: null, selection: this.selection.toJSON()};
+			const state: HistoryState = {canUndo: true, sequenceNumber: this._sequenceNumber, bar: this.bar, channel: this.channel, instrument: this.viewedInstrument[this.channel], recoveryUid: this._recoveryUid, selection: this.selection.toJSON()};
 			try {
 				new ChangeSong(this, this._getHash());
 			} catch (error) {
@@ -360,7 +357,7 @@ export class SongDocument {
 		} else {
 			this._recovery.saveVersion(this._recoveryUid, this.song.title, hash);
 		}
-		let state: HistoryState = {canUndo: true, sequenceNumber: this._sequenceNumber, bar: this.bar, channel: this.channel, instrument: this.viewedInstrument[this.channel], recoveryUid: this._recoveryUid, prompt: this.prompt, selection: this.selection.toJSON()};
+		let state: HistoryState = {canUndo: true, sequenceNumber: this._sequenceNumber, bar: this.bar, channel: this.channel, instrument: this.viewedInstrument[this.channel], recoveryUid: this._recoveryUid, selection: this.selection.toJSON()};
 		if (this._stateShouldBePushed) {
 			this._pushState(state, hash);
 		} else {
@@ -395,10 +392,11 @@ export class SongDocument {
 		
 	public openPrompt(prompt: string | null): void {
 		this.prompt = prompt;
-		const hash: string = this.song.toBase64String();
-		this._sequenceNumber++;
-		const state = {canUndo: true, sequenceNumber: this._sequenceNumber, bar: this.bar, channel: this.channel, instrument: this.viewedInstrument[this.channel], recoveryUid: this._recoveryUid, prompt: this.prompt, selection: this.selection.toJSON()};
-		this._pushState(state, hash);
+		this.promptWatchers.forEach(o => o(prompt));
+	}
+
+	public subscribeToPromptNotifications(callback: (prompt: string | null) => void): void {
+		this.promptWatchers.push(callback);
 	}
 		
 	public undo(): void {

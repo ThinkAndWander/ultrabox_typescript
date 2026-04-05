@@ -351,8 +351,7 @@ export class HarmonicsEditorPrompt implements Prompt {
 	}
 
 	private _close = (): void => {
-		this._doc.prompt = null;
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -399,8 +398,7 @@ export class HarmonicsEditorPrompt implements Prompt {
 	}
 
 	private _saveChanges = (): void => {
-		this._doc.prompt = null;
 		this._doc.record(this.harmonicsEditor.saveSettings(), true);
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 	}
 }

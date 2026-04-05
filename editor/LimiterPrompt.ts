@@ -389,7 +389,7 @@ export class LimiterPrompt implements Prompt {
 		this.masterGainSlider.value = "" + this.startingMasterGain;
 
 		this._updateLimiter();
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 	}
 
 	public cleanUp = (): void => {
@@ -449,8 +449,7 @@ export class LimiterPrompt implements Prompt {
 
 	private _saveChanges = (): void => {
 		this._updateLimiter();
-		this._doc.prompt = null;
-
+		this._doc.openPrompt(null);
 	}
 }
 //}

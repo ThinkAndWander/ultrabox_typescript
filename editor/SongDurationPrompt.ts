@@ -61,8 +61,8 @@ export class SongDurationPrompt implements Prompt {
 	}
 		
 		private _close = (): void => { 
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 		
 	public cleanUp = (): void => {
 		this._okayButton.removeEventListener("click", this._saveChanges);
@@ -100,7 +100,7 @@ export class SongDurationPrompt implements Prompt {
 		window.localStorage.setItem("barCountPosition", this._positionSelect.value);
 		const group: ChangeGroup = new ChangeGroup();
 		group.append(new ChangeBarCount(this._doc, SongDurationPrompt._validate(this._barsStepper), this._positionSelect.value == "beginning"));
-		this._doc.prompt = null;
+		this._doc.openPrompt(null);
 		this._doc.record(group, true);
 	}
 }

@@ -471,12 +471,11 @@ export class EuclideanRhythmPrompt implements Prompt {
 	}
 
 	private _close = (): void => {
-		this._doc.undo();
+		this._doc.openPrompt(null);
 	}
 
 	private _saveChanges = (): void => {
-		this._doc.prompt = null;
-
+		this._doc.openPrompt(null);
 		const group: ChangeGroup = new ChangeGroup();
 
 		const beatsPerBar: number = this._doc.song.beatsPerBar;

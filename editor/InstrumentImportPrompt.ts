@@ -88,113 +88,108 @@ export class InstrumentImportPrompt implements Prompt {
 	}
 
 		private _close = (): void => {
-		this._doc.undo();
-	}
+			this._doc.openPrompt(null);
+		}
 
 		public cleanUp = (): void => {
 		this._fileInput.removeEventListener("change", this._whenFileSelected);
 		this._cancelButton.removeEventListener("click", this._close);
 	}
 
-        public _import_multiple = (file: any): void => {
-			const channel: Channel = this._doc.song.channels[this._doc.channel];
-			const currentInstrum: Instrument = channel.instruments[this._doc.getCurrentInstrument()];
-			switch (this._importStrategySelect.value) {
-				case "replace":
-					// console.log("multi replace");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					//Replace the current instrument with the first one, then add the rest
-					const firstInstrum = file[0];
-					this._doc.record(new ChangePasteInstrument(this._doc, currentInstrum, firstInstrum));
-					for (let i = 1; i < file.length; i++) {
-						const insturm: any = file[i];
-						if (!this._validate_instrument_limit(channel)) { 
-							alert("Max instruments reached! Some instruments were not imported.");
-							break;
-						}
-						this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+	public _import_multiple = (file: any): void => {
+		const channel: Channel = this._doc.song.channels[this._doc.channel];
+		const currentInstrum: Instrument = channel.instruments[this._doc.getCurrentInstrument()];
+		switch (this._importStrategySelect.value) {
+			case "replace":
+				// console.log("multi replace");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				//Replace the current instrument with the first one, then add the rest
+				const firstInstrum = file[0];
+				this._doc.record(new ChangePasteInstrument(this._doc, currentInstrum, firstInstrum));
+				for (let i = 1; i < file.length; i++) {
+					const insturm: any = file[i];
+					if (!this._validate_instrument_limit(channel)) { 
+						alert("Max instruments reached! Some instruments were not imported.");
+						break;
 					}
-					this._doc.record(new ChangeViewInstrument(this._doc, this._doc.getCurrentInstrument()))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-				case "all":
-					// console.log("multi all");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					//Delete all instruments then add these ones
-					channel.instruments.length = 0;
-					for (let insturm of file) {
-						if (!this._validate_instrument_limit(channel)) { 
-							alert("Max instruments reached! Some instruments were not imported.");
-							break;
-						}
-						this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+					this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+				}
+				this._doc.record(new ChangeViewInstrument(this._doc, this._doc.getCurrentInstrument()))
+				break;
+			case "all":
+				// console.log("multi all");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				//Delete all instruments then add these ones
+				channel.instruments.length = 0;
+				for (let insturm of file) {
+					if (!this._validate_instrument_limit(channel)) { 
+						alert("Max instruments reached! Some instruments were not imported.");
+						break;
 					}
-					this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-				default:
-					// console.log("multi append");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					//Add these instruments
-					for (let insturm of file) {
-						if (!this._validate_instrument_limit(channel)) { 
-							alert("Max instruments reached! Some instruments were not imported.");
-							break;
-						}
-						this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+					this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+				}
+				this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
+				break;
+			default:
+				// console.log("multi append");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				//Add these instruments
+				for (let insturm of file) {
+					if (!this._validate_instrument_limit(channel)) { 
+						alert("Max instruments reached! Some instruments were not imported.");
+						break;
 					}
-					this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-			}
-
-    }
-
-		public _validate_instrument_limit = (channel: Channel): boolean => {
-			if (this._doc.song.getMaxInstrumentsPerChannel()<=channel.instruments.length) {
-				return false;
-			}
-			return true;
+					this._doc.record(new ChangeAppendInstrument(this._doc, channel, insturm));
+				}
+				this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
+				break;
 		}
 
-        public _import_single = (file: any): void => {
-			const channel: Channel = this._doc.song.channels[this._doc.channel];
-			const currentInstrum: Instrument = channel.instruments[this._doc.getCurrentInstrument()];
-			switch (this._importStrategySelect.value) {
-				case "replace":
-					//Replace the current instrument with this one
-					// console.log("single replace");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					this._doc.record(new ChangePasteInstrument(this._doc, currentInstrum, file));
-					this._doc.record(new ChangeViewInstrument(this._doc, this._doc.getCurrentInstrument()))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-				case "all":
-					//Delete all instruments then add this one
-					// console.log("single all");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					channel.instruments.length = 1;
-					const firstInstrum = channel.instruments[0];
-					this._doc.record(new ChangePasteInstrument(this._doc, firstInstrum, file));
-					this._doc.record(new ChangeViewInstrument(this._doc, 0))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-				default:
-					//Add this instrument
-					if (!this._validate_instrument_limit(channel)) { alert("Max instruments reached! The instrument was not imported."); this._doc.prompt = null; return; }
-					// console.log("single append");
-					window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
-					this._doc.record(new ChangeAppendInstrument(this._doc, channel, file));
-					this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
-					this._doc.prompt = null;
-					this._doc.notifier.changed();
-					return;
-			}
-    }
+		this._doc.openPrompt(null);
+		this._doc.notifier.changed();
+	}
 
+	public _validate_instrument_limit = (channel: Channel): boolean => {
+		if (this._doc.song.getMaxInstrumentsPerChannel()<=channel.instruments.length) {
+			return false;
+		}
+		return true;
+	}
+
+	public _import_single = (file: any): void => {
+		const channel: Channel = this._doc.song.channels[this._doc.channel];
+		const currentInstrum: Instrument = channel.instruments[this._doc.getCurrentInstrument()];
+		switch (this._importStrategySelect.value) {
+			case "replace":
+				//Replace the current instrument with this one
+				// console.log("single replace");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				this._doc.record(new ChangePasteInstrument(this._doc, currentInstrum, file));
+				this._doc.record(new ChangeViewInstrument(this._doc, this._doc.getCurrentInstrument()))
+				break;
+			case "all":
+				//Delete all instruments then add this one
+				// console.log("single all");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				channel.instruments.length = 1;
+				const firstInstrum = channel.instruments[0];
+				this._doc.record(new ChangePasteInstrument(this._doc, firstInstrum, file));
+				this._doc.record(new ChangeViewInstrument(this._doc, 0))
+				break;
+			default:
+				//Add this instrument
+				if (!this._validate_instrument_limit(channel)) {
+					alert("Max instruments reached! The instrument was not imported.");
+					break;
+				}
+				// console.log("single append");
+				window.localStorage.setItem("instrumentImportStrategy", this._importStrategySelect.value);
+				this._doc.record(new ChangeAppendInstrument(this._doc, channel, file));
+				this._doc.record(new ChangeViewInstrument(this._doc, channel.instruments.length-1))
+				break;
+		}
+
+		this._doc.openPrompt(null);
+		this._doc.notifier.changed();			
+	}
 }

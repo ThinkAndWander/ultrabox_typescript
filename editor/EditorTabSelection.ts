@@ -141,10 +141,9 @@ export class EditorTabSelection {
 	private _volContrastMax: HTMLButtonElement;
     private _rememberDisabledValues: { chkbx: HTMLInputElement, val: boolean }[] = []
 	
-    constructor(doc: SongDocument, patternEditor: PatternEditor, tipHandler: TipHandler) {
+    constructor(doc: SongDocument, patternEditor: PatternEditor) {
         this._doc = doc;
         this._patternEditor = patternEditor;
-        this._tipHandler = tipHandler;
         this._constructHTML();
 
         this._doc.notifier.watch(this._monitorChannelType);
@@ -181,7 +180,7 @@ export class EditorTabSelection {
         this._affectModChannelNum = input({ type: "number", step: "1", min: 1, max: Config.modCount, value: "1" });
         this._affectModChannelContainer = div({ class: "selectionOps-action" },
             this._affectModChannelNum,
-            div({ class: "tip", onclick: () => this._tipHandler("selectionModTarget") }, "Modulation track #"))
+            div({ class: "tip", onclick: () => this._doc.openPrompt("selectionModTarget") }, "Modulation track #"))
         this._merge = button({ class: "selectionOps-actionbutton noteOpMerge" });
         this._mergeAll = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._bridge = button({ class: "selectionOps-actionbutton noteOpBridge" });
@@ -196,9 +195,9 @@ export class EditorTabSelection {
         this._flattenPitch = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._flattenVolume = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._split = button({ class: "selectionOps-actionbutton noteOpSplit" });
-        this._splitLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionSplit") }, "");
+        this._splitLabel = div({ class: "tip", onclick: () => this._doc.openPrompt("selectionSplit") }, "");
         this._splitDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
-		this._volLabel = div({ class: "tip", onclick: () => this._tipHandler("selectionVolOps") }, "Volume");
+		this._volLabel = div({ class: "tip", onclick: () => this._doc.openPrompt("selectionVolOps") }, "Volume");
 		this._volDropdown = button({ style: "height:1.5em; width: 10px; padding: 0px; font-size: 8px; margin-left: 0.2rem;" }, "▼");
 		this._volUp = button({ class: "selectionOps-actionbutton noteOpVolChange" });
 		this._volDown = button({ class: "selectionOps-actionbutton noteOpVolChange", style: 'transform: scaleY(-1);' });
@@ -256,33 +255,33 @@ export class EditorTabSelection {
         const patternControls = [
             selectionOpsDescription,
             div({ class: "selectionOps-action"},
-                div({ class: "tip", onclick: () => this._tipHandler("selectionResizeMode") }, "Selection resize"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionResizeMode") }, "Selection resize"),
                 div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._resizeModeDropdown)),
             div({ class: "selectionOps-action"},
-                div({ class: "tip", onclick: () => this._tipHandler("selectionResizeSnapping") }, "Selection snap"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionResizeSnapping") }, "Selection snap"),
                 div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._snappingModeDropdown)),
             this._affectModChannelContainer,
             div({ class: "selectionOps-action"},
                 this._merge,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionMerge") }, "Merge"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionMerge") }, "Merge"),
                 label({ class: "checkbox-container" }, this._mergeAll, "All")),
             div({ class: "selectionOps-action"},
                 this._bridge,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionBridge") }, "Bridge"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionBridge") }, "Bridge"),
                 label({ class: "checkbox-container" }, this._bridgeGrow, "Grow"),
                 label({ class: "checkbox-container" }, this._bridgeBend, "Bend")),
             div({ class: "selectionOps-action"},
                 this._spread,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionSpread") }, "Spread"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionSpread") }, "Spread"),
                 label({ class: "checkbox-container" }, this._spreadStack, "Stack"),
                 label({ class: "checkbox-container" }, this._spreadPitch, "Pitch")),
             div({ class: "selectionOps-action"},
                 this._mirrorH,
                 this._mirrorV,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionMirror") }, "Mirror")),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionMirror") }, "Mirror")),
             div({ class: "selectionOps-action"},
                 this._flatten,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionFlatten") }, "Flatten"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionFlatten") }, "Flatten"),
                 label({ class: "checkbox-container" }, this._flattenPitch, "Pitch"),
                 label({ class: "checkbox-container" }, this._flattenVolume, "Vol")),
             div({ class: "selectionOps-action"},
@@ -300,7 +299,7 @@ export class EditorTabSelection {
 			this._volDropdownGroup,
             div({ class: "selectionOps-action"},
                 this._functionRun,
-                div({ class: "tip", onclick: () => this._tipHandler("selectionFunction") }, "Function"),
+                div({ class: "tip", onclick: () => this._doc.openPrompt("selectionFunction") }, "Function"),
                 div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._functionSelect)
             ),
             this._functionParameterGroup
@@ -518,15 +517,15 @@ export class EditorTabSelection {
             return {
                 generated: [
                     div({ class: "selectionOps-action"}, label({ style: "width: 100%;" },
-                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepAffect") }, "Affect"),
+                        div({ class: "tip", onclick: () => this._doc.openPrompt("selectionStepAffect") }, "Affect"),
                         div({ class: "selectContainer", style: "width: 100%;" }, affect))),
                     div({ class: "selectionOps-action"}, label({ style: "width: 100%;" },
-                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepBehavior") }, "Behavior"),
+                        div({ class: "tip", onclick: () => this._doc.openPrompt("selectionStepBehavior") }, "Behavior"),
                         div({ class: "selectContainer", style: "width: 100%;" }, behavior))),
                     div({ class: "selectionOps-action"}, label({},
-                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepArrays") }, "Add"), add)),
+                        div({ class: "tip", onclick: () => this._doc.openPrompt("selectionStepArrays") }, "Add"), add)),
                     div({ class: "selectionOps-action"}, label({},
-                        div({ class: "tip", onclick: () => this._tipHandler("selectionStepArrays") }, "Multiply by"), multiplyBy)),
+                        div({ class: "tip", onclick: () => this._doc.openPrompt("selectionStepArrays") }, "Multiply by"), multiplyBy)),
                     div({ class: "selectionOps-action"}, label({ style: "width: 100%;" },
                         label({ class: "checkbox-container" }, onlyExistingPins, "Only Existing Pins?"))),
                     ...(isFirstRow ? [] : [div({ class: "inlineblock"}, remove)])],
