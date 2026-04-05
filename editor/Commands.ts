@@ -150,7 +150,8 @@ export enum CommandTargetName {
     NotesGainOut = 83,
     NotesMaxContrast = 84,
     RunNoteFunction = 85,
-    RunCommand = 86
+    RunCommand = 86,
+    RepeatLastCommand = 87
 }
 
 /**
@@ -691,7 +692,8 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.RunNoteFunction]: { name: 'Run note function', params: [
         { hint: 'preset name or JSON', type: CommandActionDataType.String },
         channelparam]},
-    [CommandTargetName.RunCommand]: { name: 'Run command', params: [] }
+    [CommandTargetName.RunCommand]: { name: 'Run command', params: [] },
+    [CommandTargetName.RepeatLastCommand]: { name: 'Repeat last command', params: [] }
 };
 
 // Just to keep below neat
@@ -894,7 +896,8 @@ export const builtInCommands = {
         { keys: ['z', ' ', 'n'], argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
         { keys: ['shift', 'z', ' ', 'n'], argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
         { keys: ['z', ' ', 'b'], argumentData: [{ value: "Random bends" }, arg0], repeat: true }]),
-    [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/'])
+    [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/']),
+    [CommandTargetName.RepeatLastCommand]: simple(CommandTargetName.RepeatLastCommand, ['shift', '?'])
 };
 //#endregion
 

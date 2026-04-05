@@ -1,7 +1,7 @@
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { SongDocument } from "./SongDocument";
 import { Prompt } from "./Prompt";
-import { BuiltInLookup, Command, CommandArgument, IShortcut, builtInCommands, ShowCut, CursorButtons, ShortcutHandler, InvokeOptions, targets, CommandActionDataType, ParamNum, Param, isArgumentValid, CommandTargetName } from "./Commands";
+import { BuiltInLookup, Command, CommandArgument, IShortcut, builtInCommands, ShowCut, CursorButtons, ShortcutHandler, InvokeOptions, targets, CommandActionDataType, ParamNum, Param, isArgumentValid } from "./Commands";
 import { SongEditor } from "./SongEditor";
 
 const { button, div, h2, input, option, select, span, textarea } = HTML;

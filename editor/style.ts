@@ -1838,6 +1838,41 @@ input.tab-settings-radio + div {
 	min-width: 2rem;
 }
 
+.beepboxEditor .paletteSearchbox {
+    display: inline;
+	box-sizing: border-box;
+	min-height: var(--button-size);
+	margin-right: 0.2rem;
+	text-align: left !important;
+	width: 100%;
+}
+
+.beepboxEditor .paletteTray {
+	max-height: 312px;
+	scroll-behavior: auto;
+	position: absolute;
+	top: 4.6rem;
+	left: 1.1rem;
+	min-width: 20rem;
+	text-align: left;
+	background-color: ${ColorConfig.uiWidgetBackground};
+	border: 1px solid ${ColorConfig.uiWidgetFocus};
+}
+
+.beepboxEditor .paletteEntry {
+	display: flex;
+	justify-content: space-between;
+	width: 100%;
+	text-align: left;
+}
+
+.beepboxEditor .paletteHint {
+	color: ${ColorConfig.secondaryText};
+    font-style: italic;
+	margin-top: 0.1rem;
+	text-align: left;
+}
+
 .beepboxEditor .commandGroup {
     border-width: 0 0 1px 0;
 	border-style: solid;

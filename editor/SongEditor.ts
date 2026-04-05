@@ -59,7 +59,7 @@ import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
 import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands, actionDataAsNumber, actionDataAsBool, FreeformEventType, targets, CommandActionDataType, ParamNum } from "./Commands";
 import { IStepData, isValidStepData } from "./changesNoteOps";
-import { CommandPalette } from "./CommandPalette";
+import { CommandPalette, lastExecutedCommand } from "./CommandPalette";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -739,7 +739,7 @@ export class SongEditor {
     private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0,
     );
     private readonly _patternEditorNext: PatternEditor = new PatternEditor(this._doc, false, 1);
-    private readonly _editorTabSelection = new EditorTabSelection(this._doc, this._patternEditor, this.openPrompt.bind(this));
+    private readonly _editorTabSelection = new EditorTabSelection(this._doc, this._patternEditor);
     private readonly _trackEditor: TrackEditor = new TrackEditor(this._doc, this
     );
     private readonly _muteEditor: MuteEditor = new MuteEditor(this._doc, this);
@@ -3513,8 +3513,6 @@ export class SongEditor {
             this.refocusStage();
         }
 
-        this._setPrompt(this._doc.prompt);
-
         if (prefs.autoFollow && !this._doc.synth.playing) {
             this._doc.synth.goToBar(this._doc.bar);
         }
@@ -3990,13 +3988,13 @@ export class SongEditor {
                     && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount)
                 {
                     this._doc.openPrompt("customNoteFilterSettings");
-                }
+                } else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Can't open note filter (check instrument effects).")); }
                 return;
             case CommandTargetName.EditSongEQ:
                 const instrument2: Instrument = this._doc.song.channels[this._doc.channel].instruments[this._doc.getCurrentInstrument()];
                 if (!instrument2.eqFilterType && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
                     this._doc.openPrompt("customEQFilterSettings");
-                }
+                } else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Can't open song EQ (instrument doesn't support EQ).")); }
                 return;
             case CommandTargetName.EditSongLength:
                 this._doc.openPrompt("barCount");
@@ -4452,6 +4450,11 @@ export class SongEditor {
             case CommandTargetName.RunCommand:
                 this._doc.openPrompt("runCommand");
                 return;
+            case CommandTargetName.RepeatLastCommand:
+                if (lastExecutedCommand) {
+                    this.handleCommand(lastExecutedCommand);
+                }
+                return;
             case CommandTargetName.SelectByFeature:
                 let notes, pins, gaps, edges, back, exclusive;
                 for (let i = 0; i < actionData![0].value.length; i++) {
@@ -4575,7 +4578,9 @@ export class SongEditor {
         nav = navigator;
 
         if (nav.clipboard && nav.clipboard.writeText) {
-            nav.clipboard.writeText(text).catch(() => {
+            nav.clipboard.writeText(text).then(() => {
+                this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Copied to clipboard"));
+            }).catch(() => {
                 window.prompt("Copy to clipboard:", text);
             });
             return;
@@ -4588,6 +4593,7 @@ export class SongEditor {
         textField.remove();
         this.refocusStage();
         if (!succeeded) window.prompt("Copy this:", text);
+        else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Copied to clipboard")); }
     }
 
     private _whenPrevBarPressed = (): void => {
