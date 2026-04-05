@@ -571,7 +571,7 @@ export class Command
 }
 
 /** The metadata of all possible targets. Names here are for actions, but argument-less commands often reuse them. */
-const channelparam = { hint: 'mod channel index (0 to ignore)', type: CommandActionDataType.Number };
+const channelparam = { hint: 'modulation track # (0 to ignore)', type: CommandActionDataType.Number };
 export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.None]: { name: '', params: [] },
     [CommandTargetName.CopyInstrument]: { name: 'Copy instrument', params: [] },
@@ -701,8 +701,8 @@ const nums = ['0','1','2','3','4','5','6','7','8','9'];
 const simple = (target: CommandTargetName, keys: string[], repeat?: boolean, early?: boolean) => {
     return new Command(targets[target].name, target, "", [{ keys, repeat, invokeOptions: early ? InvokeOptions.Early : undefined }]);
 }
-const entry = (target: CommandTargetName, shortcuts: IShortcut[]) => {
-    return new Command(targets[target].name, target, "", shortcuts);
+const entry = (target: CommandTargetName, shortcuts: IShortcut[], commandArgumentData?: CommandArgument[]) => {
+    return new Command(targets[target].name, target, "", shortcuts, commandArgumentData);
 }
 
 /**
@@ -820,82 +820,80 @@ export const builtInCommands = {
         { keys: ['s', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowleft'], argumentData: [{ value: "1", metadata: "add" }, { value: "-1" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "-1", metadata: "add" }], repeat: true },
-        { keys: ['shift', 's', ' '], argumentData: [{ value: "0" }, { value: "0" }], freeformEntry: true }]),
+        { keys: ['shift', 's', ' '], name: 'set note selection...', argumentData: [{ value: "0" }, { value: "0" }], freeformEntry: true }]),
     [CommandTargetName.InvertSelection]: entry(CommandTargetName.InvertSelection, [
         { keys: ['s', 'i'], argumentData: [argFalse]},
-        { keys: ['s', 'i', 'arrowright'], argumentData: [argFalse]},
-        { keys: ['s', 'i', 'arrowleft'], argumentData: [argTrue]}]),
+        { keys: ['s', 'i', 'arrowright'], name: 'invert selection right', argumentData: [argFalse]},
+        { keys: ['s', 'i', 'arrowleft'], name: 'invert selection left', argumentData: [argTrue]}]),
     [CommandTargetName.SelectByFeature]: entry(CommandTargetName.SelectByFeature, [
-        { keys: ['s', 'arrowleft'], argumentData: [ { value: "bxn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
-        { keys: ['s', 'arrowright'], argumentData: [ { value: "xn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
-        { keys: ['shift', 's', 'arrowleft'], argumentData: [ { value: "bn" }, arg0 ]},
-        { keys: ['shift', 's', 'arrowright'], argumentData: [ { value: "n" }, arg0 ]},
+        { keys: ['s', 'arrowleft'], name: 'select previous note', argumentData: [ { value: "bxn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['s', 'arrowright'], name: 'select next note', argumentData: [ { value: "xn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['shift', 's', 'arrowleft'], name: 'select previous note (expand)', argumentData: [ { value: "bn" }, arg0 ]},
+        { keys: ['shift', 's', 'arrowright'], name: 'select next note (expand)', argumentData: [ { value: "n" }, arg0 ]},
         { keys: ['s', 'p', 'arrowleft'], argumentData: [ { value: "bxp" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'p', 'arrowright'], argumentData: [ { value: "xp" }, arg0 ]}, // TODO: not working
         { keys: ['shift', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" }, arg0 ]}, // TODO: not working
         { keys: ['shift', 's', 'p', 'arrowright'], argumentData: [ { value: "p" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'f', 'arrowleft'], argumentData: [ { value: "bnge" }, arg0 ]}, // TODO: not working
         { keys: ['s', 'f', 'arrowright'], argumentData: [ { value: "nge" }, arg0 ]},
-        { keys: ['shift', 's', 'f'], argumentData: [ { value: "ben" }, arg0 ], freeformEntry: true }]),
+        { keys: ['shift', 's', 'f'], name: 'select notes...', argumentData: [ { value: "ben" }, arg0 ], freeformEntry: true }]),
     [CommandTargetName.NotesMerge]: entry(CommandTargetName.NotesMerge, [
-        { keys: [ 'z', 'm' ], argumentData: [argFalse, arg0]},
-        { keys: [ 'z', 'm', 'a' ], argumentData: [argTrue, arg0]},
+        { keys: [ 'z', 'm' ], name: 'merge adjacent notes', argumentData: [argFalse, arg0]},
+        { keys: [ 'z', 'm', 'a' ], name: 'merge all notes', argumentData: [argTrue, arg0]},
         { keys: [ 'shift', 'z', 'm' ], argumentData: [argFalse, arg0], freeformEntry: true }]),
     [CommandTargetName.NotesBridge]: entry(CommandTargetName.NotesBridge, [
-        { keys: ['z', 'b'], argumentData: [argTrue, argFalse, arg0]},
-        { keys: ['shift', 'z', 'b'], argumentData: [argTrue, argFalse, arg0], freeformEntry: true }]),
+        { keys: ['z', 'b'], name: 'bridge notes', argumentData: [argTrue, argFalse, arg0]},
+        { keys: ['shift', 'z', 'b'], name: 'bridge notes...', argumentData: [argTrue, argFalse, arg0], freeformEntry: true }]),
     [CommandTargetName.NotesSpread]: entry(CommandTargetName.NotesSpread, [
-        { keys: ['z', ' '], argumentData: [argFalse, argFalse, arg0 ]},
-        { keys: ['z', ' ', 'arrowleft'], argumentData: [argTrue, argFalse, arg0 ]},
-        { keys: ['z', ' ', 'p'], argumentData: [argFalse, argTrue, arg0 ]},
-        { keys: ['shift', 'z', ' '], argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+        { keys: ['z', ' '], name: 'spread notes', argumentData: [argFalse, argFalse, arg0 ]},
+        { keys: ['z', ' ', 'arrowleft'], name: 'stack notes', argumentData: [argTrue, argFalse, arg0 ]},
+        { keys: ['z', ' ', 'p'], name: 'sort notes on pitch', argumentData: [argFalse, argTrue, arg0 ]},
+        { keys: ['shift', 'z', ' '], name: 'spread/stack/sort notes...', argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
     [CommandTargetName.NotesMirror]: entry(CommandTargetName.NotesMirror, [
-        { keys: ['z', 'h'], argumentData: [argFalse, arg0]},
-        { keys: ['z', 'v'], argumentData: [argTrue, arg0]},
+        { keys: ['z', 'h'], name: "mirror horizontal", argumentData: [argFalse, arg0]},
+        { keys: ['z', 'v'], name: "mirror vertical", argumentData: [argTrue, arg0]},
         { keys: ['shift', 'z', 'h'], argumentData: [argFalse, arg0], freeformEntry: true }]),
     [CommandTargetName.NotesFlatten]: entry(CommandTargetName.NotesFlatten, [
-        { keys: ['z', 'f'], argumentData: [argFalse, argFalse, arg0 ]},
-        { keys: ['z', 'f', 'p'], argumentData: [argTrue, argFalse, arg0 ]},
-        { keys: ['z', 'f', 'v'], argumentData: [argFalse, argTrue, arg0 ]},
-        { keys: ['shift', 'z', 'f'], argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+        { keys: ['z', 'f'], name: 'flatten notes', argumentData: [argFalse, argFalse, arg0 ]},
+        { keys: ['z', 'f', 'p'], name: 'flatten note pitch', argumentData: [argTrue, argFalse, arg0 ]},
+        { keys: ['z', 'f', 'v'], name: 'flatten note volume', argumentData: [argFalse, argTrue, arg0 ]},
+        { keys: ['shift', 'z', 'f'], name: 'flatten notes...', argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
     [CommandTargetName.NotesSplit]: entry(CommandTargetName.NotesSplit, [
-        { keys: ['z', 's'], argumentData: [{ value: "1" }, argFalse, argFalse, arg0]},
-        { keys: ['shift', 'z', 's'], argumentData: [{ value: "1" }, argFalse, argFalse, arg0], freeformEntry: true }]),
+        { keys: ['z', 's'], name: 'split notes once', argumentData: [{ value: "1" }, argFalse, argFalse, arg0]},
+        { keys: ['shift', 'z', 's'], name: 'split notes...', argumentData: [{ value: "1" }, argFalse, argFalse, arg0], freeformEntry: true }]),
     [CommandTargetName.NotesVolumeUp]: entry(CommandTargetName.NotesVolumeUp, [
-        { keys: ['v', 'arrowup'], argumentData: [arg0], repeat: true },
+        { keys: ['v', 'arrowup'], name: 'note volume up', argumentData: [arg0], repeat: true },
         { keys: ['v'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
     [CommandTargetName.NotesVolumeDown]: entry(CommandTargetName.NotesVolumeDown, [
-        { keys: ['v', 'arrowdown'], argumentData: [arg0], repeat: true },
+        { keys: ['v', 'arrowdown'], name: 'note volume down', argumentData: [arg0], repeat: true },
         { keys: ['v'], cursor: [CursorButtons.WheelDown], argumentData: [arg0] }]),
     [CommandTargetName.NotesFadeOut]: entry(CommandTargetName.NotesFadeOut, [
-        { keys: ['v', 'arrowright', 'arrowdown'], argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowright', 'arrowdown'], argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowright', 'arrowdown'], name: 'note fade out', argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowright', 'arrowdown'], name: 'note studio fade out', argumentData: [argTrue, arg0]}]),
     [CommandTargetName.NotesFadeIn]: entry(CommandTargetName.NotesFadeIn, [
-        { keys: ['v', 'arrowleft', 'arrowdown'], argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowleft', 'arrowdown'], argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowdown'], name: 'note fade in', argumentData: [argFalse, arg0]},
+        { keys: ['shift', 'v', 'arrowleft', 'arrowdown'], name: 'note studio fade in', argumentData: [argTrue, arg0]}]),
     [CommandTargetName.NotesGainIn]: entry(CommandTargetName.NotesGainIn, [
-        { keys: ['v', 'arrowleft', 'arrowup'], argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowleft', 'arrowup'], argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowup'], name: 'note gain start', argumentData: [arg0]}]),
     [CommandTargetName.NotesGainOut]: entry(CommandTargetName.NotesGainOut, [
-        { keys: ['v', 'arrowleft', 'arrowup'], argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowleft', 'arrowup'], argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowup'], name: 'note gain end', argumentData: [arg0]}]),
     [CommandTargetName.NotesMaxContrast]: entry(CommandTargetName.NotesMaxContrast, [
-        { keys: ['v', 'c', 'arrowup'], argumentData: [arg0] },
+        { keys: ['v', 'c', 'arrowup'], name: 'max contrast', argumentData: [arg0] },
         { keys: ['v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
     [CommandTargetName.RunNoteFunction]: entry(CommandTargetName.RunNoteFunction, [
-        { keys: ['z', 'r'], argumentData: [{ value: "" }, arg0], freeformEntry: true },
-        { keys: ['shift', 'v', 'arrowup'], argumentData: [{ value: "Raise by 1" }, arg0], repeat: true },
+        { keys: ['z', 'r'], name: 'note function...', argumentData: [{ value: "" }, arg0], freeformEntry: true },
+        { keys: ['shift', 'v', 'arrowup'], name: 'note volume up 1',  argumentData: [{ value: "Raise by 1" }, arg0], repeat: true },
         { keys: ['shift', 'v'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Raise by 1" }, arg0]},
-        { keys: ['shift', 'v', 'arrowdown'], argumentData: [{ value: "Lower by 1" }, arg0], repeat: true },
+        { keys: ['shift', 'v', 'arrowdown'], name: 'note volume down 1',  argumentData: [{ value: "Lower by 1" }, arg0], repeat: true },
         { keys: ['shift', 'v'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Lower by 1" }, arg0]},
-        { keys: ['shift', 'v', 'c', 'arrowup'], argumentData: [{ value: "Double contrast" }, arg0]},
+        { keys: ['shift', 'v', 'c', 'arrowup'], name: 'double contrast', argumentData: [{ value: "Double contrast" }, arg0]},
         { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Double contrast" }, arg0]},
-        { keys: ['shift', 'v', 'c', 'arrowdown'], argumentData: [{ value: "Halve contrast" }, arg0]},
+        { keys: ['shift', 'v', 'c', 'arrowdown'], name: 'halve contrast', argumentData: [{ value: "Halve contrast" }, arg0]},
         { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Halve contrast" }, arg0]},
-        { keys: ['z', ' ', 'v'], argumentData: [{ value: "Stagger volume" }, arg0], repeat: true },
-        { keys: ['z', ' ', 'n'], argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
-        { keys: ['shift', 'z', ' ', 'n'], argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
-        { keys: ['z', ' ', 'b'], argumentData: [{ value: "Random bends" }, arg0], repeat: true }]),
+        { keys: ['z', ' ', 'v'], name: 'volume stagger', argumentData: [{ value: "Stagger volume" }, arg0], repeat: true },
+        { keys: ['z', ' ', 'n'], name: 'naturalize note positions', argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
+        { keys: ['shift', 'z', ' ', 'n'], name: 'shift notes', argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
+        { keys: ['z', ' ', 'b'], name: 'volume random bends', argumentData: [{ value: "Random bends" }, arg0], repeat: true }]),
     [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/']),
     [CommandTargetName.RepeatLastCommand]: simple(CommandTargetName.RepeatLastCommand, ['shift', '?'])
 };
@@ -953,6 +951,9 @@ export interface IShortcut {
 
     /** False by default. If early-invoked, allows repeat execution while inputs are held. */
     repeat?: boolean
+
+    /** Names for shortcuts are optional, but required to appear in the command palette. */
+    name?: string
 }
 
 /** For the freeform callback. Preview fires every time the freeform input changes. */
@@ -1105,6 +1106,21 @@ export class ShortcutHandler {
         this._freeform = undefined;
         this.heldInputs.keys = [];
         this.heldInputs.cursor = [];
+    }
+
+    /** Forces freeform input for any command + shortcut combination (ignores shortcut's freeform request status) */
+    public invokeFreeformMode = (command: Command, shortcut: IShortcut): void => {
+        this.heldInputs.cursor = [];
+        this.heldInputs.keys = [];
+
+        this._freeform = {
+            cmd: command,
+            defaultData: shortcut.argumentData
+                ?? command.ArgumentData
+                ?? targets[command.Target].params.map(_ => ({ value: "" })),
+            argInputs: [{ value: "" }] // always at least one entry
+        };
+        this.onFreeform?.(FreeformEventType.Started, this._freeform.cmd, this._freeform.argInputs);
     }
 
     /** On key down, handle early invocations (deferred=true). Compare all keyboard inputs as uppercase. */
@@ -1370,17 +1386,7 @@ export class ShortcutHandler {
 
         // Handle freeform request.
         if (requestingFreeform !== undefined) {
-            this.heldInputs.cursor = [];
-            this.heldInputs.keys = [];
-
-            this._freeform = {
-                cmd: requestingFreeform[0],
-                defaultData: requestingFreeform[1].argumentData
-                    ?? requestingFreeform[0].ArgumentData
-                    ?? targets[requestingFreeform[0].Target].params.map(_ => ({ value: "" })),
-                argInputs: [{ value: "" }] // always at least one entry
-            };
-            this.onFreeform?.(FreeformEventType.Started, this._freeform.cmd, this._freeform.argInputs);
+            this.invokeFreeformMode(requestingFreeform[0], requestingFreeform[1]);
         }
     }
 }

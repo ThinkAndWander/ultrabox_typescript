@@ -1,18 +1,19 @@
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { SongDocument } from "./SongDocument";
 import { Prompt } from "./Prompt";
-import { Command, CommandTargetName, ShowCut, builtInCommands, targets } from "./Commands";
+import { Command, CommandArgument, CommandTargetName, IShortcut, ShowCut, builtInCommands, targets } from "./Commands";
 import { SongEditor } from "./SongEditor";
 
 const { button, div, h2, input } = HTML;
+type trayItem = { command: Command, shortcut?: IShortcut }
 
-export let lastExecutedCommand: Command | undefined;
+export let lastExecuted: trayItem | undefined;
 export class CommandPalette implements Prompt {
     private static readonly searchCutoff = 12;
     private _hasRun = false;
-    private _chosenCommand: Command | undefined;
-    private _trayItems: Command[] = [];
-    private _allCommands: Command[] = [];
+    private _trayItems: trayItem[] = [];
+    private _chosen: { command?: Command, shortcut?: IShortcut } = {};
+    private _allEntries: trayItem[] = [];
 
     private readonly _searchbox = input({ class: "paletteSearchbox", type: "text", placeholder: "🔍 Search..." })
     private readonly _searchTray = div({ class: "paletteTray", style: "display: none;" });
@@ -35,24 +36,43 @@ export class CommandPalette implements Prompt {
 
         // Populates available commands with edited built-in definitions + custom commands.
         Object.entries(builtInCommands).forEach(entry => {
+            if (entry[1].Target === CommandTargetName.RunCommand || entry[1].Target === CommandTargetName.RepeatLastCommand) { return; }
             const key = entry[0] as unknown as keyof typeof builtInCommands;
             if (this._doc.prefs.builtInEditsByID[key] !== null) {
-                this._allCommands[key] = this._doc.prefs.builtInEditsByID[key] === undefined
-                    ? entry[1] : this._doc.prefs.builtInEditsByID[key] as Command;
+                const command = this._doc.prefs.builtInEditsByID[key] ?? entry[1];
+
+                if (targets[command.Target].params.length === 0) {
+                    this._allEntries.push({ command });
+                }
+                for (let i = 0; i < command.Shortcuts.length; i++) {
+                    if (command.Shortcuts[i].name) {
+                        this._allEntries.push({ command, shortcut: command.Shortcuts[i] });
+                    }
+                }
             }
         });
-        this._allCommands.concat(this._doc.prefs.customCommands);
-        this._allCommands = this._allCommands.filter(o =>
-            (o.Target !== CommandTargetName.RunCommand && o.Target !== CommandTargetName.RepeatLastCommand) &&
-            (targets[o.Target].params.length === 0 || o.ArgumentData));
-        this._allCommands.sort((a, b) => a.Name.toLowerCase().localeCompare(b.Name.toLowerCase()));
+
+        this._doc.prefs.customCommands.forEach(command => {
+            if (command.Target === CommandTargetName.RunCommand || command.Target === CommandTargetName.RepeatLastCommand) { return; }
+            if (targets[command.Target].params.length === 0) {
+                this._allEntries.push({ command });
+            }
+            for (let i = 0; i < command.Shortcuts.length; i++) {
+                if (command.Shortcuts[i].name) {
+                    this._allEntries.push({ command, shortcut: command.Shortcuts[i] });
+                }
+            }
+        })
+
+        this._allEntries.sort((a, b) => (a.shortcut?.name ?? a.command.Name).toLowerCase()
+            .localeCompare((b.shortcut?.name ?? b.command.Name).toLowerCase()));
     }
 
     private _render = (): void => {
         // Restore last executed command on re-opening.
-        if (lastExecutedCommand) {
-            this._chosenCommand = lastExecutedCommand;
-            this._searchbox.value = this._chosenCommand.Name;
+        if (lastExecuted?.command) {
+            this._chosen = { ...lastExecuted };
+            this._searchbox.value = lastExecuted.shortcut?.name ?? lastExecuted.command.Name;
             this._searchbox.setSelectionRange(0, this._searchbox.value.length);
             this._renderTrayItems();
         }
@@ -62,27 +82,27 @@ export class CommandPalette implements Prompt {
 
     private _renderTrayItems = () => {
             this._trayItems = [];
-            const newItems: [HTMLElement, Command][] = [];
+            const newItems: [HTMLElement, trayItem][] = [];
             const noFilter = !this._searchbox.value || this._searchbox.value.trim() === "";
             const lowercaseQuery = (this._searchbox.value.trim() ?? "").toLowerCase();
 
-            const itemsExact: Command[] = [];
-            const itemsStartsWith: Command[] = [];
-            const itemsContains: Command[] = [];
-            const itemsIncludes: Command[] = [];
+            const itemsExact: trayItem[] = [];
+            const itemsStartsWith: trayItem[] = [];
+            const itemsContains: trayItem[] = [];
+            const itemsIncludes: trayItem[] = [];
 
             this._searchTray.style.display = "";
 
             if (noFilter) {
-                for (let i = 0; i < this._allCommands.length && i < CommandPalette.searchCutoff; i++) {
-                    newItems.push([this._renderTrayItem(this._allCommands[i]), this._allCommands[i]]);
-                    this._trayItems.push(this._allCommands[i]);
+                for (let i = 0; i < this._allEntries.length && i < CommandPalette.searchCutoff; i++) {
+                    newItems.push([this._renderTrayItem(this._allEntries[i]), this._allEntries[i]]);
+                    this._trayItems.push(this._allEntries[i]);
                 }
             } else {
                 let lowercaseMatch: string;
 
-                this._allCommands.forEach(entry => {
-                    lowercaseMatch = entry.Name.toLowerCase();
+                this._allEntries.forEach(entry => {
+                    lowercaseMatch = (entry.shortcut?.name ?? entry.command.Name).toLowerCase();
 
                     if (lowercaseQuery === lowercaseMatch) {
                         itemsExact.push(entry);
@@ -96,7 +116,8 @@ export class CommandPalette implements Prompt {
                 });
 
                 [itemsExact, itemsStartsWith, itemsContains, itemsIncludes].every(list => {
-                    list.sort();
+                    list.sort((a, b) => (a.shortcut?.name ?? a.command?.Name)
+                        .localeCompare(b.shortcut?.name ?? b.command?.Name));
 
                     for (let i = 0; i < list.length && this._trayItems.length < CommandPalette.searchCutoff; i++) {
                         this._trayItems.push(list[i]);
@@ -110,31 +131,36 @@ export class CommandPalette implements Prompt {
             this._searchTray.replaceChildren(...newItems.map(o => o[0]));
     }
 
-    private _renderTrayItem = (command: Command) => {
-        const buttonElements: (Node | string)[] = [command.Name];
+    private _renderTrayItem = (item: trayItem) => {
+        const buttonElements: (Node | string)[] = [item.shortcut?.name ?? item.command.Name];
 
-        // Find shortest shortcut and append that if it exists.
-        let shortestIndex = -1, shortest = 999;
-        command.Shortcuts.forEach((entry, index) => {
-            const length = entry.keys.length + (entry.cursor ?? []).length;
-            if (length < shortest) {
-                shortestIndex = index;
-                shortest = length;
+        // Use the shortcut or find shortest shortcut and append that if it exists.
+        if (item.shortcut) {
+            buttonElements.push(ShowCut(item.shortcut, "html"));
+        } else {
+            let shortestIndex = -1, shortest = 999;
+            item.command.Shortcuts.forEach((entry, index) => {
+                const length = entry.keys.length + (entry.cursor ?? []).length;
+                if (length < shortest) {
+                    shortestIndex = index;
+                    shortest = length;
+                }
+            });
+
+            if (shortestIndex !== -1) {
+                buttonElements.push(ShowCut(item.command.Shortcuts[shortestIndex], "html"));
             }
-        });
-
-        if (shortestIndex !== -1) {
-            buttonElements.push(ShowCut(command.Shortcuts[shortestIndex], "html"));
         }
+        
 
         const newButton = button({ class: 'paletteEntry'}, buttonElements);
-        newButton.addEventListener("click", () => this._selectTrayItem(command));
+        newButton.addEventListener("click", () => this._selectTrayItem(item));
         return newButton;
     }
 
-    private _selectTrayItem = (command: Command) => {
-        this._chosenCommand = command;
-        this._searchbox.value = command.Name;
+    private _selectTrayItem = (item: trayItem) => {
+        this._chosen = {...item};
+        this._searchbox.value = item.shortcut?.name ?? item.command.Name;
         this._searchTray.style.display = "none";
         this._searchbox.focus();
     }
@@ -160,9 +186,9 @@ export class CommandPalette implements Prompt {
                 }
                 else {
                     // Search tray is open/unfocused and we haven't matched the command yet. Match it or first and handle Enter / Shift+Enter.
-                    if (!this._chosenCommand || this._chosenCommand === lastExecutedCommand) {
-                        const match = this._trayItems.findIndex(o => o.Name.toLowerCase() === this._searchbox.value.trim().toLowerCase());
-                        this._chosenCommand = this._trayItems[match !== -1 ? match : 0];
+                    if (!this._chosen.command || (this._chosen.command === lastExecuted?.command && this._chosen.shortcut === lastExecuted.shortcut)) {
+                        const match = this._trayItems.findIndex(o => (o.shortcut?.name ?? o.command.Name).toLowerCase() === this._searchbox.value.trim().toLowerCase());
+                        this._chosen = {...this._trayItems[match !== -1 ? match : 0]};
                         this._close();
                     } else if (event.shiftKey) {
                         this._perform();
@@ -195,8 +221,8 @@ export class CommandPalette implements Prompt {
             } else {
                 const index = this._getIndexOfActiveTrayItem();
                 if (index !== -1 && index < this._trayItems.length - 1) {
-                    this._chosenCommand = this._trayItems[index + 1];
-                    this._searchbox.value = this._chosenCommand.Name;
+                    this._chosen = {...this._trayItems[index + 1]};
+                    this._searchbox.value = this._chosen.shortcut?.name ?? this._chosen.command!.Name;
                     (this._searchTray.children.item(index + 1) as HTMLButtonElement)?.focus();
                 } else if (index === -1) {
                     (this._searchTray.firstElementChild as HTMLButtonElement)?.focus();
@@ -206,8 +232,8 @@ export class CommandPalette implements Prompt {
             if (this._searchTray.style.display !== "none") {
                 const index = this._getIndexOfActiveTrayItem();
                 if (index !== -1 && index > 0) {
-                    this._chosenCommand = this._trayItems[index - 1];
-                    this._searchbox.value = this._chosenCommand.Name;
+                    this._chosen = {...this._trayItems[index - 1]};
+                    this._searchbox.value = this._chosen.shortcut?.name ?? this._chosen.command!.Name;
                     (this._searchTray.children.item(index - 1) as HTMLButtonElement)?.focus();
                 } else if (index === 0) {
                     this._searchbox.focus();
@@ -244,9 +270,15 @@ export class CommandPalette implements Prompt {
     }
 
     private _perform = (): void => {
-        if (this._chosenCommand) {
-            this._editor.handleCommand(this._chosenCommand);
-            lastExecutedCommand = this._chosenCommand;
+        if (this._chosen.command) {
+
+            if (this._chosen.shortcut?.freeformEntry) {
+                this._editor.commandInvokeFreeform(this._chosen.command, this._chosen.shortcut);
+            } else {
+                this._editor.handleCommand(this._chosen.command, this._chosen.shortcut?.argumentData ?? this._chosen.command.ArgumentData);
+            }
+            
+            lastExecuted = { command: this._chosen.command, shortcut: this._chosen.shortcut };
             this._hasRun = true;
         }
     }

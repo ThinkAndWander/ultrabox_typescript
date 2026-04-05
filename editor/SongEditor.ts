@@ -57,9 +57,9 @@ import { SampleLoadingStatusPrompt } from "./SampleLoadingStatusPrompt";
 import { AddSamplesPrompt } from "./AddSamplesPrompt";
 import { ShortenerConfigPrompt } from "./ShortenerConfigPrompt";
 import { TabControls, TabSettingType as TabSettingType } from "./TabControls";
-import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands, actionDataAsNumber, actionDataAsBool, FreeformEventType, targets, CommandActionDataType, ParamNum } from "./Commands";
+import { Cut, Command, CommandArgument, CommandContext, CommandTargetName, ShortcutHandler, builtInCommands, actionDataAsNumber, actionDataAsBool, FreeformEventType, targets, CommandActionDataType, ParamNum, IShortcut } from "./Commands";
 import { IStepData, isValidStepData } from "./changesNoteOps";
-import { CommandPalette, lastExecutedCommand } from "./CommandPalette";
+import { CommandPalette, lastExecuted } from "./CommandPalette";
 
 const { button, div, input, select, span, optgroup, option, canvas } = HTML;
 
@@ -3933,6 +3933,11 @@ export class SongEditor {
     private _handleCursorUp = (event: MouseEvent) => { this._shortcutHandler.handleCursorUp(event, this._doc.prefs.preferEasyPianoOverShortcuts); }
     private _handleWheel = (event: WheelEvent) => { this._shortcutHandler.handleWheel(event, this._doc.prefs.preferEasyPianoOverShortcuts); }
 
+    /** Sets any command directly into freeform input mode. */
+    public commandInvokeFreeform = (command: Command, shortcut: IShortcut) => {
+        this._shortcutHandler.invokeFreeformMode(command, shortcut);
+    }
+
     /** Handles command invocation for the given command. */
 	public handleCommand = (command: Command, actionData?: CommandArgument[]) => {
         if (this._shortcutHandler.isContextSet(CommandContext.Recording) && (
@@ -4451,8 +4456,12 @@ export class SongEditor {
                 this._doc.openPrompt("runCommand");
                 return;
             case CommandTargetName.RepeatLastCommand:
-                if (lastExecutedCommand) {
-                    this.handleCommand(lastExecutedCommand);
+                if (lastExecuted) {
+                    if (lastExecuted.shortcut?.freeformEntry) {
+                        this.commandInvokeFreeform(lastExecuted.command, lastExecuted.shortcut);
+                    } else {
+                        this.handleCommand(lastExecuted.command, lastExecuted.shortcut?.argumentData ?? lastExecuted.command.ArgumentData);
+                    }
                 }
                 return;
             case CommandTargetName.SelectByFeature:
