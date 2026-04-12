@@ -1,7 +1,7 @@
 import { HTML } from "imperative-html/dist/esm/elements-strict";
 import { SongDocument } from "./SongDocument";
 import { Prompt } from "./Prompt";
-import { Command, CommandArgument, CommandTargetName, IShortcut, ShowCut, builtInCommands, targets } from "./Commands";
+import { Command, CommandTargetName, IShortcut, ShowCut, builtInCommands, targets } from "./Commands";
 import { SongEditor } from "./SongEditor";
 
 const { button, div, h2, input } = HTML;
@@ -190,7 +190,7 @@ export class CommandPalette implements Prompt {
                         const match = this._trayItems.findIndex(o => (o.shortcut?.name ?? o.command.Name).toLowerCase() === this._searchbox.value.trim().toLowerCase());
                         this._chosen = {...this._trayItems[match !== -1 ? match : 0]};
                         this._close();
-                    } else if (event.shiftKey) {
+                    } else if (event.shiftKey && !(this._chosen.shortcut?.freeformEntry)) {
                         this._perform();
                     } else {
                         this._close();
@@ -199,7 +199,7 @@ export class CommandPalette implements Prompt {
             }
             // Search tray is closed. Respond to Enter and Shift+Enter.
             else {
-                if (event.shiftKey) { this._perform(); }
+                if (event.shiftKey && !(this._chosen.shortcut?.freeformEntry)) { this._perform(); }
                 else { this._close(); }
             }
         }
@@ -238,6 +238,21 @@ export class CommandPalette implements Prompt {
                 } else if (index === 0) {
                     this._searchbox.focus();
                 }
+            }
+        } else if (document.activeElement !== this._searchbox) {
+            // Forward keys to the searchbox and refocus it if the user types when it's unfocused.
+            if (event.key === "Backspace" || event.key === "Delete") {
+                if (this._searchbox.selectionStart !== this._searchbox.selectionEnd) {
+                    this._searchbox.value = 
+                        this._searchbox.value.slice(0, this._searchbox.selectionStart ?? 0) +
+                        this._searchbox.value.slice(this._searchbox.selectionEnd ?? this._searchbox.selectionStart ?? 0)
+                } else { this._searchbox.value = this._searchbox.value.slice(0, -1); }
+                this._searchbox.focus();
+                this._renderTrayItems();
+            } else if (event.key.length === 1) {
+                this._searchbox.value += event.key;
+                this._searchbox.focus();
+                this._renderTrayItems();
             }
         }
 

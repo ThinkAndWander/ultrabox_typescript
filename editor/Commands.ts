@@ -68,90 +68,94 @@ export enum CommandTargetName {
     CopyPattern = 1,
     CutPattern = 2,
     DeleteBar = 3,
-    DeleteChannel = 4,
-    DuplicatePattern = 5,
-    EditBeatsPerBar = 6,
-    EditChannelSettings = 7,
-    EditCustomSamples = 8,
-    EditLimiter = 9,
-    EditNoteFilter = 10,
-    EditSongEQ = 11,
-    EditSongLength = 12,
-    Export = 13,
-    ExportInstrument = 14,
-    ExtendSelectionLeft = 15,
-    ExtendSelectionRight = 16,
-    GenerateEuclideanRhythm = 17,
-    Import = 18,
-    InsertBarNext = 19,
-    InsertBarPrev = 20,
-    InsertChannel = 21,
-    Jummbify = 22,
-    LoopPattern = 23,
-    MoveChannelDown = 24,
-    MoveChannelUp = 25,
-    MoveNotesSideways = 26,
-    MovePatternLeft = 27,
-    MovePatternRight = 28,
-    MuteAll = 29,
-    MuteChannel = 30,
-    NewPattern = 31,
-    NewPatternFromEmpty = 32,
-    NewSong = 33,
-    NextBar = 34,
-    OpenSongPlayer = 35,
-    PasteInstrument = 36,
-    PastePattern = 37,
-    PastePatternNumbers = 38,
-    PatternDown = 39,
-    PatternUp = 40,
-    PlayOrPause = 41,
-    PlayAtCursor = 42,
-    PrevBar = 43,
-    RandomInstrumentPreset = 44,
-    RandomInstrumentGenerated = 45,
-    Redo = 46,
-    ResetBoxSelection = 47,
-    RemovePattern = 48,
-    SelectAllPatterns = 49,
-    SelectChannel = 50,
-    SelectionDown = 51,
-    SelectionUp = 52,
-    SetInstrument = 53,
-    SetChannel = 54,
-    SetRhythm = 55,
-    SnapPlayheadToBeginning = 56,
-    SnapPlayheadToLoopStart = 57,
-    SnapPlayheadToSelected = 58,
-    SoloChannel = 59,
-    SongRecovery = 60,
-    ToggleRecording = 61,
-    TransposeDown = 62,
-    TransposeOctaveDown = 63,
-    TransposeOctaveUp = 64,
-    TransposeUp = 65,
-    Undo = 66,
-    Macro = 67,
-    EditShortcutsAndCommands = 68,
-    SetNoteSelection = 69,
-    InvertSelection = 70,
-    SelectByFeature = 71,
-    NotesMerge = 72,
-    NotesBridge = 73,
-    NotesSpread = 74,
-    NotesMirror = 75,
-    NotesFlatten = 76,
-    NotesSplit = 77,
-    NotesVolumeUp = 78,
-    NotesVolumeDown = 79,
-    NotesFadeOut = 80,
-    NotesFadeIn = 81,
-    NotesGainIn = 82,
-    NotesGainOut = 83,
-    NotesMaxContrast = 84,
-    RunNoteFunction = 85,
-    RunCommand = 86,
-    RepeatLastCommand = 87
+    DeleteBarAndPull = 4,
+    DeleteChannel = 5,
+    DuplicatePattern = 6,
+    EditBeatsPerBar = 7,
+    EditChannelSettings = 8,
+    EditCustomSamples = 9,
+    EditLimiter = 10,
+    EditNoteFilter = 11,
+    EditShortcutsAndCommands = 12,
+    EditSongEQ = 13,
+    EditSongLength = 14,
+    Export = 15,
+    ExportInstrument = 16,
+    ExtendTrackSelectionLeft = 17,
+    ExtendTrackSelectionRight = 18,
+    GenerateEuclideanRhythm = 19,
+    Import = 20,
+    InsertBarNext = 21,
+    InsertBarPrev = 22,
+    InsertChannel = 23,
+    InvertSelection = 24,
+    Jummbify = 25,
+    LoopPattern = 26,
+    Macro = 27,
+    MoveChannelDown = 28,
+    MoveChannelUp = 29,
+    MoveNotesSideways = 30,
+    MovePatternLeft = 31,
+    MovePatternRight = 32,
+    MuteAll = 33,
+    MuteChannel = 34,
+    NewPattern = 35,
+    NewPatternFromEmpty = 36,
+    NewSong = 37,
+    NextBar = 38,
+    NotesBridge = 39,
+    NotesFadeIn = 40,
+    NotesFadeOut = 41,
+    NotesFlatten = 42,
+    NotesGainIn = 43,
+    NotesGainOut = 44,
+    NotesMaxContrast = 45,
+    NotesMerge = 46,
+    NotesMirror = 47,
+    NotesSplit = 48,
+    NotesSpread = 49,
+    NotesVolumeDown = 50,
+    NotesVolumeUp = 51,
+    OpenSongPlayer = 52,
+    PasteInstrument = 53,
+    PastePattern = 54,
+    PastePatternNumbers = 55,
+    PatternDown = 56,
+    PatternUp = 57,
+    PlayOrPause = 58,
+    PlayAtCursor = 59,
+    PrevBar = 60,
+    RandomInstrumentPreset = 61,
+    RandomInstrumentGenerated = 62,
+    Redo = 63,
+    RepeatLastCommand = 64,
+    ResetBoxSelection = 65,
+    RemovePattern = 66,
+    RunCommand = 67,
+    RunNoteFunction = 68,
+    SelectAllPatterns = 69,
+    SelectByFeature = 70,
+    SelectChannel = 71,
+    SelectionDown = 72,
+    SelectionUp = 73,
+    SetInstrument = 74,
+    SetChannel = 75,
+    SetRhythm = 76,
+    SetNoteSelection = 77,
+    SetSelectionResizeMode = 78,
+    SetSelectionResizeSnapping = 79,
+    SnapPlayheadToBeginning = 80,
+    SnapPlayheadToLoopStart = 81,
+    SnapPlayheadToSelected = 82,
+    SoloChannel = 83,
+    SongRecovery = 84,
+    ToggleRecording = 85,
+    TransposeDown = 86,
+    TransposeOctaveDown = 87,
+    TransposeOctaveUp = 88,
+    TransposeUp = 89,
+    Undo = 90,
+    MoveNotesLeftOrRight = 91
 }
 
 /**
@@ -571,13 +575,13 @@ export class Command
 }
 
 /** The metadata of all possible targets. Names here are for actions, but argument-less commands often reuse them. */
-const channelparam = { hint: 'modulation track # (0 to ignore)', type: CommandActionDataType.Number };
 export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.None]: { name: '', params: [] },
     [CommandTargetName.CopyInstrument]: { name: 'Copy instrument', params: [] },
     [CommandTargetName.CopyPattern]: { name: 'Copy pattern', params: [] },
     [CommandTargetName.CutPattern]: { name: 'Cut pattern', params: [] },
     [CommandTargetName.DeleteBar]: { name: 'Delete bar', params: [] },
+    [CommandTargetName.DeleteBarAndPull]: { name: 'Delete bar and pull notes leftward', params: [] },
     [CommandTargetName.DeleteChannel]: { name: 'Delete channel', params: [] },
     [CommandTargetName.DuplicatePattern]: { name: 'Duplicate pattern', params: [] },
     [CommandTargetName.EditBeatsPerBar]: { name: 'Edit beats per bar', params: [] },
@@ -589,8 +593,8 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.EditSongLength]: { name: 'Edit song length', params: [] },
     [CommandTargetName.Export]: { name: 'Export song', params: [] },
     [CommandTargetName.ExportInstrument]: { name: 'Export instrument', params: [] },
-    [CommandTargetName.ExtendSelectionLeft]: { name: 'Extend selection left', params: [] },
-    [CommandTargetName.ExtendSelectionRight]: { name: 'Extend selection right', params: [] },
+    [CommandTargetName.ExtendTrackSelectionLeft]: { name: 'Extend track select left', params: [] },
+    [CommandTargetName.ExtendTrackSelectionRight]: { name: 'Extend track select right', params: [] },
     [CommandTargetName.GenerateEuclideanRhythm]: { name: 'Generate Euclidean rhythm', params: [] },
     [CommandTargetName.Import]: { name: 'Import samples', params: [] },
     [CommandTargetName.InsertBarNext]: { name: 'Insert bar in front', params: [] },
@@ -628,11 +632,14 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.SelectionDown]: { name: 'Selection down', params: [] },
     [CommandTargetName.SelectionUp]: { name: 'Selection up', params: [] },
     [CommandTargetName.SetInstrument]: { name: 'Set instrument #', params: [
-        { hint: 'instrument #', type: CommandActionDataType.Number, isInt: true }] },
+        { hint: 'instrument #', type: CommandActionDataType.Number, isInt: true },
+        { hint: 'directly set? (otherwise appends number)', type: CommandActionDataType.Bool }] },
     [CommandTargetName.SetChannel]: { name: 'Set channel', params: [
-        { hint: 'channel #', type: CommandActionDataType.Number, isInt: true }] },
+        { hint: 'channel #', type: CommandActionDataType.Number, isInt: true },
+        { hint: 'directly set? (otherwise appends number)', type: CommandActionDataType.Bool }] },
     [CommandTargetName.SetRhythm]: { name: 'Set rhythm', params: [
-        { hint: 'rhythm (3, 4, 6, 8, 12)', type: CommandActionDataType.Number, isInt: true }] },
+        { hint: 'rhythm (3, 4, 6, 8, 12)', type: CommandActionDataType.Number, isInt: true },
+        { hint: 'directly set? (otherwise appends number)', type: CommandActionDataType.Bool }] },
     [CommandTargetName.SnapPlayheadToBeginning]: { name: 'Snap playhead to start', params: [] },
     [CommandTargetName.SnapPlayheadToLoopStart]: { name: 'Snap playhead to loop start', params: [] },
     [CommandTargetName.SnapPlayheadToSelected]: { name: 'Snap playhead to selected', params: [] },
@@ -644,8 +651,11 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.TransposeOctaveUp]: { name: 'Move notes up an octave', params: [] },
     [CommandTargetName.TransposeUp]: { name: 'Move notes up a step', params: [] },
     [CommandTargetName.Undo]: { name: 'Undo', params: [] },
+    [CommandTargetName.MoveNotesLeftOrRight]: { name: 'Move notes left/right', params: [
+        { hint: 'Amount (negative goes left, positive right)', type: CommandActionDataType.Number, isInt: true },
+    ] },
     [CommandTargetName.Macro]: { name: 'Macro', params: [
-        { hint: 'List of command names followed by (), with args inside', type: CommandActionDataType.String }]},
+        { hint: 'Macro syntax like "command name; arg1; arg2" with ;; between commands', type: CommandActionDataType.String }]},
     [CommandTargetName.EditShortcutsAndCommands]: { name: 'Edit shortcuts and commands', params: [] },
     [CommandTargetName.SetNoteSelection]: { name: 'Set note selection', params: [
         { hint: 'Start (-1 no change)', type: CommandActionDataType.Number, isInt: true },
@@ -653,47 +663,43 @@ export const targets: { [key in CommandTargetName]: CommandTargetInfo } = {
     [CommandTargetName.InvertSelection]: { name: 'Invert selection', params: [
         { hint: 'Prefer left side? (prefers right otherwise)', type: CommandActionDataType.Bool }]},
     [CommandTargetName.SelectByFeature]: { name: 'Select by feature', params: [
-        { hint: 'any/all (n=notes g=gaps e=ends p=pins b=backwards, x=exclusive)', type: CommandActionDataType.String },
-        channelparam]},
+        { hint: 'any/all (n=notes g=gaps e=ends p=pins b=backwards, x=exclusive)', type: CommandActionDataType.String }]},
     [CommandTargetName.NotesMerge]: { name: 'Note merge', params: [
-        { hint: 'all?', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'all?', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesBridge]: { name: 'Note bridge', params: [
         { hint: 'grow?', type: CommandActionDataType.Bool },
-        { hint: 'bend?', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'bend?', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesSpread]: { name: 'Note spread', params: [
         { hint: 'stack?', type: CommandActionDataType.Bool },
-        { hint: 'pitch?', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'pitch?', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesMirror]: { name: 'Mirror notes', params: [
-        { hint: 'vertical? (otherwise horizontal)', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'vertical? (otherwise horizontal)', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesFlatten]: { name: 'Note flatten', params: [
         { hint: 'pitch?', type: CommandActionDataType.Bool },
-        { hint: 'volume?', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'volume?', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesSplit]: { name: 'Note split', params: [
         { hint: '# splits', type: CommandActionDataType.Number, isInt: true },
         { hint: 'across?', type: CommandActionDataType.Bool },
-        { hint: 'absolute?', type: CommandActionDataType.Bool },
-        channelparam]},
-    [CommandTargetName.NotesVolumeUp]: { name: 'Note volume up', params: [ channelparam ] },
-    [CommandTargetName.NotesVolumeDown]: { name: 'Note volume down', params: [ channelparam ] },
+        { hint: 'absolute?', type: CommandActionDataType.Bool }]},
+    [CommandTargetName.NotesVolumeUp]: { name: 'Note volume up', params: [] },
+    [CommandTargetName.NotesVolumeDown]: { name: 'Note volume down', params: [] },
     [CommandTargetName.NotesFadeOut]: { name: 'Note fade out', params: [
-        { hint: 'quadratic fade?', type: CommandActionDataType.Bool },
-        channelparam]},
+        { hint: 'quadratic fade?', type: CommandActionDataType.Bool }]},
     [CommandTargetName.NotesFadeIn]: { name: 'Note fade in', params: [
-        { hint: 'quadratic fade?', type: CommandActionDataType.Bool },
-        channelparam]},
-    [CommandTargetName.NotesGainIn]: { name: 'Note gain in', params: [ channelparam ] },
-    [CommandTargetName.NotesGainOut]: { name: 'Note gain out', params: [ channelparam ] },
-    [CommandTargetName.NotesMaxContrast]: { name: 'Note max contrast', params: [ channelparam ] },
+        { hint: 'quadratic fade?', type: CommandActionDataType.Bool }]},
+    [CommandTargetName.NotesGainIn]: { name: 'Note gain in', params: [] },
+    [CommandTargetName.NotesGainOut]: { name: 'Note gain out', params: [] },
+    [CommandTargetName.NotesMaxContrast]: { name: 'Note max contrast', params: [] },
     [CommandTargetName.RunNoteFunction]: { name: 'Run note function', params: [
-        { hint: 'preset name or JSON', type: CommandActionDataType.String },
-        channelparam]},
+        { hint: 'preset name or JSON', type: CommandActionDataType.String }]},
     [CommandTargetName.RunCommand]: { name: 'Run command', params: [] },
-    [CommandTargetName.RepeatLastCommand]: { name: 'Repeat last command', params: [] }
+    [CommandTargetName.RepeatLastCommand]: { name: 'Repeat last command', params: [] },
+    [CommandTargetName.SetSelectionResizeMode]: { name: 'Set selection resize mode', params: [
+        { hint: 'Mode (0=Move, 1=WrapAround, 2=Stretch)', type: CommandActionDataType.Number },
+    ]},
+    [CommandTargetName.SetSelectionResizeSnapping]: { name: 'Set selection resize snapping', params: [
+        { hint: 'Mode (0=Rhythm, 1=Features, 2=Features(expand) 3=Notes 4=Pins 5=Notes(expand))', type: CommandActionDataType.Number },
+    ]}
 };
 
 // Just to keep below neat
@@ -708,19 +714,23 @@ const entry = (target: CommandTargetName, shortcuts: IShortcut[], commandArgumen
 /**
  * The built-in commands list, indexed by command target (one entry each).
  * 
- * Built-in commands. These are indexed by target so the GUI can find and display shortcuts, though fair warning, not
- * all targets have an entry. Most borrow the display name of their target as most aren't parameterized, so this is
- * mainly for the default shortcuts. Note that Control is used by keyboard performance (playing it as a piano) which
- * uses either caps lock state or control to activate keys. Meaning no keybind should by default require Control. The
- * danger here is that two keybinds that only differ by whether Control is held or not will, when control is required
- * to activate, both be triggered by the same keybind which is surprising and unhelpful to users. However, it's
- * familiar to users as well. So ideally there should be a legacy default that does that and a brand new redesign of
- * keyboard functionality which is the actual default.
+ * Built-in commands. These are indexed by target so the GUI can find and display shortcuts, though not all targets
+ * have an entry. Most borrow the display name of their target as most aren't parameterized, so this is mainly for the
+ * default shortcuts. Note that Control is used by keyboard performance (playing it as a piano) which uses either caps
+ * lock state or control to activate keys. Meaning no keybind should by default require Control. The danger here is
+ * that two keybinds that only differ by whether Control is held or not will, when control is required to activate,
+ * both be triggered by the same keybind which is surprising and unhelpful to users. However, it's familiar to users as
+ * well. So ideally there should be a legacy default that does that and a brand new redesign of keyboard functionality
+ * which is the actual default.
  * 
- * Avoid default keybinds that use Meta or Alt due to OS/browser interception when assigning defaults.
- * Control also has some shortcuts in use among browsers. Try to avoid those.
+ * Keybinds that use Meta get intercepted by the OS, don't make defaults with it here.
+ * Control, Alt and sometimes Shift all get intercepted by the browser, but preventDefault() stops most of it.
+ * 
+ * Commands without parameters appear in the command palette, as do all named shortcuts. Some shortcuts have no
+ * assigned keys by default; this is because they're seen useful to access via palette but not useful enough to keybind
+ * by default.
  */
-const argFalse = { value: "false" }, argTrue = { value: "true" }, arg0 = { value: "0" }; // avoid redundance
+const argFalse = { value: "false" }, argTrue = { value: "true" }; // avoid redundance
 export const builtInCommands = {
     [CommandTargetName.PlayOrPause]: simple(CommandTargetName.PlayOrPause, [' ']),
     [CommandTargetName.PlayAtCursor]: simple(CommandTargetName.PlayAtCursor, ['shift', ' ']),
@@ -753,6 +763,7 @@ export const builtInCommands = {
     [CommandTargetName.InsertBarPrev]: simple(CommandTargetName.InsertBarPrev, ['shift', 'enter'], true),
     [CommandTargetName.InsertChannel]: simple(CommandTargetName.InsertChannel, ['control', 'enter'], true),
     [CommandTargetName.DeleteBar]: simple(CommandTargetName.DeleteBar, ['backspace'], true),
+    [CommandTargetName.DeleteBarAndPull]: simple(CommandTargetName.DeleteBarAndPull, ['shift', 'backspace'], true),
     [CommandTargetName.DeleteChannel]: simple(CommandTargetName.DeleteChannel, ['control', 'backspace'], true),
     [CommandTargetName.SelectAllPatterns]: entry(CommandTargetName.SelectAllPatterns, [
         { keys: ['a'] },
@@ -789,113 +800,123 @@ export const builtInCommands = {
     [CommandTargetName.PrevBar]: simple(CommandTargetName.PrevBar, ['['], true),
     [CommandTargetName.TransposeDown]: entry(CommandTargetName.TransposeDown, [
         { keys: ['-'], repeat: true, invokeOptions: InvokeOptions.Early },
-        { keys: ['s', 'arrowdown'], repeat: true, invokeOptions: InvokeOptions.Early },
-        { keys: ['s'], cursor: [CursorButtons.WheelDown], repeat: true, invokeOptions: InvokeOptions.Early }]),
+        { keys: ['n', 'arrowdown'], repeat: true, invokeOptions: InvokeOptions.Early }]), // analog of move left/right
     [CommandTargetName.TransposeUp]: entry(CommandTargetName.TransposeUp, [
         { keys: ['='], repeat: true, invokeOptions: InvokeOptions.Early },
-        { keys: ['s', 'arrowup'], repeat: true, invokeOptions: InvokeOptions.Early },
-        { keys: ['s'], cursor: [CursorButtons.WheelUp], repeat: true, invokeOptions: InvokeOptions.Early }]),
+        { keys: ['n', 'arrowup'], repeat: true, invokeOptions: InvokeOptions.Early }]), // analog of move left/right
     [CommandTargetName.TransposeOctaveDown]: simple(CommandTargetName.TransposeOctaveDown, ['shift', '_'], true, true),
     [CommandTargetName.TransposeOctaveUp]: simple(CommandTargetName.TransposeOctaveUp, ['shift', '+'], true, true),
     [CommandTargetName.RemovePattern]: simple(CommandTargetName.RemovePattern, ['delete']),
     [CommandTargetName.PatternUp]: simple(CommandTargetName.PatternUp, ['arrowup'], true, true),
     [CommandTargetName.SelectionUp]: simple(CommandTargetName.SelectionUp, ['shift', 'arrowup'], true, true),
     [CommandTargetName.SetInstrument]: entry(CommandTargetName.SetInstrument, [
-        ...nums.map(num => ({ keys: ['control', num], argumentData: [{ value: num }] })),
-        ...nums.map(num => ({ keys: ['shift', num], argumentData: [{ value: num }] })) ]),
-    [CommandTargetName.SetChannel]: entry(CommandTargetName.SetChannel,
-        nums.map(o => ({ keys: [o], argumentData: [{ value: o }], invokeOptions: InvokeOptions.LastKeypress }))),
-    [CommandTargetName.SetRhythm]: entry(CommandTargetName.SetRhythm,
-        nums.map(o => ({ keys: ['alt', o], argumentData: [{ value: o }] }))),
+        ...nums.map(num => ({ keys: ['control', num], argumentData: [{ value: num }, argFalse] })),
+        ...nums.map(num => ({ keys: ['shift', num], argumentData: [{ value: num }, argFalse] })),
+        { keys: [], name: 'Set instrument #', argumentData: [{ value: "0" }, argTrue], freeformEntry: true }]),
+    [CommandTargetName.SetChannel]: entry(CommandTargetName.SetChannel, [
+        ...nums.map(o => ({ keys: [o], argumentData: [{ value: o }, argFalse], invokeOptions: InvokeOptions.LastKeypress })),
+        { keys: [], name: 'Set channel #', argumentData: [{ value: "0" }, argTrue], freeformEntry: true }]),
+    [CommandTargetName.SetRhythm]: entry(CommandTargetName.SetRhythm, [
+        ...nums.map(o => ({ keys: ['alt', o], argumentData: [{ value: o }, argFalse] })),
+        { keys: [], name: 'Set rhythm #', argumentData: [{ value: "4" }, argTrue], freeformEntry: true }]),
     [CommandTargetName.MoveChannelUp]: simple(CommandTargetName.MoveChannelUp, ['control', 'arrowup'], true),
     [CommandTargetName.PatternDown]: simple(CommandTargetName.PatternDown, ['arrowdown'], true, true),
     [CommandTargetName.SelectionDown]: simple(CommandTargetName.SelectionDown, ['shift', 'arrowdown'], true, true),
     [CommandTargetName.MoveChannelDown]: simple(CommandTargetName.MoveChannelDown, ['control', 'arrowdown'], true),
     [CommandTargetName.MovePatternLeft]: simple(CommandTargetName.MovePatternLeft, ['arrowleft'], true, true),
-    [CommandTargetName.ExtendSelectionLeft]: simple(CommandTargetName.ExtendSelectionLeft, ['shift', 'arrowleft'], true, true),
+    [CommandTargetName.ExtendTrackSelectionLeft]: simple(CommandTargetName.ExtendTrackSelectionLeft, ['shift', 'arrowleft'], true, true),
     [CommandTargetName.MovePatternRight]: simple(CommandTargetName.MovePatternRight, ['arrowright'], true, true),
-    [CommandTargetName.ExtendSelectionRight]: simple(CommandTargetName.ExtendSelectionRight, ['shift', 'arrowright'], true, true),
+    [CommandTargetName.ExtendTrackSelectionRight]: simple(CommandTargetName.ExtendTrackSelectionRight, ['shift', 'arrowright'], true, true),
     [CommandTargetName.SetNoteSelection]: entry(CommandTargetName.SetNoteSelection, [
         { keys: ['s', ' ', 'arrowleft'], argumentData: [{ value: "-1", metadata: "add" }, { value: "-1" }], repeat: true },
         { keys: ['s', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "1", metadata: "add" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowleft'], argumentData: [{ value: "1", metadata: "add" }, { value: "-1" }], repeat: true },
         { keys: ['shift', 's', ' ', 'arrowright'], argumentData: [{ value: "-1" }, { value: "-1", metadata: "add" }], repeat: true },
-        { keys: ['shift', 's', ' '], name: 'set note selection...', argumentData: [{ value: "0" }, { value: "0" }], freeformEntry: true }]),
+        { keys: ['shift', 's', ' '], name: 'Set note selection...', argumentData: [{ value: "0" }, { value: "0" }], freeformEntry: true }]),
     [CommandTargetName.InvertSelection]: entry(CommandTargetName.InvertSelection, [
         { keys: ['s', 'i'], argumentData: [argFalse]},
-        { keys: ['s', 'i', 'arrowright'], name: 'invert selection right', argumentData: [argFalse]},
-        { keys: ['s', 'i', 'arrowleft'], name: 'invert selection left', argumentData: [argTrue]}]),
+        { keys: ['s', 'i', 'arrowright'], name: 'Invert selection right', argumentData: [argFalse]},
+        { keys: ['s', 'i', 'arrowleft'], name: 'Invert selection left', argumentData: [argTrue]}]),
     [CommandTargetName.SelectByFeature]: entry(CommandTargetName.SelectByFeature, [
-        { keys: ['s', 'arrowleft'], name: 'select previous note', argumentData: [ { value: "bxn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
-        { keys: ['s', 'arrowright'], name: 'select next note', argumentData: [ { value: "xn" }, arg0 ], repeat: true, invokeOptions: InvokeOptions.Early},
-        { keys: ['shift', 's', 'arrowleft'], name: 'select previous note (expand)', argumentData: [ { value: "bn" }, arg0 ]},
-        { keys: ['shift', 's', 'arrowright'], name: 'select next note (expand)', argumentData: [ { value: "n" }, arg0 ]},
-        { keys: ['s', 'p', 'arrowleft'], argumentData: [ { value: "bxp" }, arg0 ]}, // TODO: not working
-        { keys: ['s', 'p', 'arrowright'], argumentData: [ { value: "xp" }, arg0 ]}, // TODO: not working
-        { keys: ['shift', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" }, arg0 ]}, // TODO: not working
-        { keys: ['shift', 's', 'p', 'arrowright'], argumentData: [ { value: "p" }, arg0 ]}, // TODO: not working
-        { keys: ['s', 'f', 'arrowleft'], argumentData: [ { value: "bnge" }, arg0 ]}, // TODO: not working
-        { keys: ['s', 'f', 'arrowright'], argumentData: [ { value: "nge" }, arg0 ]},
-        { keys: ['shift', 's', 'f'], name: 'select notes...', argumentData: [ { value: "ben" }, arg0 ], freeformEntry: true }]),
+        { keys: ['s', 'arrowleft'], name: 'Select previous note', argumentData: [ { value: "bxn" } ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['s', 'arrowright'], name: 'Select next note', argumentData: [ { value: "xn" } ], repeat: true, invokeOptions: InvokeOptions.Early},
+        { keys: ['shift', 's', 'arrowleft'], name: 'Select previous note (expand)', argumentData: [ { value: "bn" } ]},
+        { keys: ['shift', 's', 'arrowright'], name: 'Select next note (expand)', argumentData: [ { value: "n" } ]},
+        { keys: ['s', 'p', 'arrowleft'], argumentData: [ { value: "bxp" } ]}, // TODO: not working
+        { keys: ['s', 'p', 'arrowright'], argumentData: [ { value: "xp" } ]}, // TODO: not working
+        { keys: ['shift', 's', 'p', 'arrowleft'], argumentData: [ { value: "bp" } ]}, // TODO: not working
+        { keys: ['shift', 's', 'p', 'arrowright'], argumentData: [ { value: "p" } ]}, // TODO: not working
+        { keys: ['s', 'f', 'arrowleft'], argumentData: [ { value: "bnge" } ]}, // TODO: not working
+        { keys: ['s', 'f', 'arrowright'], argumentData: [ { value: "nge" } ]},
+        { keys: ['shift', 's', 'f'], name: 'Select notes...', argumentData: [ { value: "ben" } ], freeformEntry: true }]),
     [CommandTargetName.NotesMerge]: entry(CommandTargetName.NotesMerge, [
-        { keys: [ 'z', 'm' ], name: 'merge adjacent notes', argumentData: [argFalse, arg0]},
-        { keys: [ 'z', 'm', 'a' ], name: 'merge all notes', argumentData: [argTrue, arg0]},
-        { keys: [ 'shift', 'z', 'm' ], argumentData: [argFalse, arg0], freeformEntry: true }]),
+        { keys: [ 'z', 'm' ], name: 'Merge adjacent notes', argumentData: [argFalse]},
+        { keys: [ 'z', 'm', 'a' ], name: 'Merge all notes', argumentData: [argTrue]}]),
     [CommandTargetName.NotesBridge]: entry(CommandTargetName.NotesBridge, [
-        { keys: ['z', 'b'], name: 'bridge notes', argumentData: [argTrue, argFalse, arg0]},
-        { keys: ['shift', 'z', 'b'], name: 'bridge notes...', argumentData: [argTrue, argFalse, arg0], freeformEntry: true }]),
+        { keys: ['z', 'b'], name: 'Bridge notes', argumentData: [argTrue, argFalse]},
+        { keys: ['shift', 'z', 'b'], name: 'Bridge notes...', argumentData: [argTrue, argFalse], freeformEntry: true }]),
     [CommandTargetName.NotesSpread]: entry(CommandTargetName.NotesSpread, [
-        { keys: ['z', ' '], name: 'spread notes', argumentData: [argFalse, argFalse, arg0 ]},
-        { keys: ['z', ' ', 'arrowleft'], name: 'stack notes', argumentData: [argTrue, argFalse, arg0 ]},
-        { keys: ['z', ' ', 'p'], name: 'sort notes on pitch', argumentData: [argFalse, argTrue, arg0 ]},
-        { keys: ['shift', 'z', ' '], name: 'spread/stack/sort notes...', argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+        { keys: ['z', ' '], name: 'Spread notes', argumentData: [argFalse, argFalse ]},
+        { keys: ['z', ' ', 'arrowleft'], name: 'Stack notes', argumentData: [argTrue, argFalse ]},
+        { keys: ['z', ' ', 'p'], name: 'Sort notes on pitch', argumentData: [argFalse, argTrue ]},
+        { keys: ['shift', 'z', ' '], name: 'Spread/stack/sort notes...', argumentData: [argFalse, argFalse ], freeformEntry: true }]),
     [CommandTargetName.NotesMirror]: entry(CommandTargetName.NotesMirror, [
-        { keys: ['z', 'h'], name: "mirror horizontal", argumentData: [argFalse, arg0]},
-        { keys: ['z', 'v'], name: "mirror vertical", argumentData: [argTrue, arg0]},
-        { keys: ['shift', 'z', 'h'], argumentData: [argFalse, arg0], freeformEntry: true }]),
+        { keys: ['z', 'h'], name: "Mirror horizontal", argumentData: [argFalse]},
+        { keys: ['z', 'v'], name: "Mirror vertical", argumentData: [argTrue]}]),
     [CommandTargetName.NotesFlatten]: entry(CommandTargetName.NotesFlatten, [
-        { keys: ['z', 'f'], name: 'flatten notes', argumentData: [argFalse, argFalse, arg0 ]},
-        { keys: ['z', 'f', 'p'], name: 'flatten note pitch', argumentData: [argTrue, argFalse, arg0 ]},
-        { keys: ['z', 'f', 'v'], name: 'flatten note volume', argumentData: [argFalse, argTrue, arg0 ]},
-        { keys: ['shift', 'z', 'f'], name: 'flatten notes...', argumentData: [argFalse, argFalse, arg0 ], freeformEntry: true }]),
+        { keys: ['z', 'f'], name: 'Flatten notes', argumentData: [argFalse, argFalse ]},
+        { keys: ['z', 'f', 'p'], name: 'Flatten note pitch', argumentData: [argTrue, argFalse ]},
+        { keys: ['z', 'f', 'v'], name: 'Flatten note volume', argumentData: [argFalse, argTrue ]},
+        { keys: ['shift', 'z', 'f'], name: 'Flatten notes...', argumentData: [argFalse, argFalse ], freeformEntry: true }]),
     [CommandTargetName.NotesSplit]: entry(CommandTargetName.NotesSplit, [
-        { keys: ['z', 's'], name: 'split notes once', argumentData: [{ value: "1" }, argFalse, argFalse, arg0]},
-        { keys: ['shift', 'z', 's'], name: 'split notes...', argumentData: [{ value: "1" }, argFalse, argFalse, arg0], freeformEntry: true }]),
+        { keys: ['z', 's'], name: 'Split notes once', argumentData: [{ value: "1" }, argFalse, argFalse]},
+        { keys: ['shift', 'z', 's'], name: 'Split notes...', argumentData: [{ value: "1" }, argFalse, argFalse], freeformEntry: true }]),
     [CommandTargetName.NotesVolumeUp]: entry(CommandTargetName.NotesVolumeUp, [
-        { keys: ['v', 'arrowup'], name: 'note volume up', argumentData: [arg0], repeat: true },
-        { keys: ['v'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
+        { keys: ['v', 'arrowup'], name: 'Note volume up', repeat: true },
+        { keys: ['v'], cursor: [CursorButtons.WheelUp] }]),
     [CommandTargetName.NotesVolumeDown]: entry(CommandTargetName.NotesVolumeDown, [
-        { keys: ['v', 'arrowdown'], name: 'note volume down', argumentData: [arg0], repeat: true },
-        { keys: ['v'], cursor: [CursorButtons.WheelDown], argumentData: [arg0] }]),
+        { keys: ['v', 'arrowdown'], name: 'Note volume down', repeat: true },
+        { keys: ['v'], cursor: [CursorButtons.WheelDown] }]),
     [CommandTargetName.NotesFadeOut]: entry(CommandTargetName.NotesFadeOut, [
-        { keys: ['v', 'arrowright', 'arrowdown'], name: 'note fade out', argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowright', 'arrowdown'], name: 'note studio fade out', argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowright', 'arrowdown'], name: 'Note fade out', argumentData: [argFalse]},
+        { keys: ['shift', 'v', 'arrowright', 'arrowdown'], name: 'Note studio fade out', argumentData: [argTrue]}]),
     [CommandTargetName.NotesFadeIn]: entry(CommandTargetName.NotesFadeIn, [
-        { keys: ['v', 'arrowleft', 'arrowdown'], name: 'note fade in', argumentData: [argFalse, arg0]},
-        { keys: ['shift', 'v', 'arrowleft', 'arrowdown'], name: 'note studio fade in', argumentData: [argTrue, arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowdown'], name: 'Note fade in', argumentData: [argFalse]},
+        { keys: ['shift', 'v', 'arrowleft', 'arrowdown'], name: 'Note studio fade in', argumentData: [argTrue]}]),
     [CommandTargetName.NotesGainIn]: entry(CommandTargetName.NotesGainIn, [
-        { keys: ['v', 'arrowleft', 'arrowup'], name: 'note gain start', argumentData: [arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowup'], name: 'Note gain start'}]),
     [CommandTargetName.NotesGainOut]: entry(CommandTargetName.NotesGainOut, [
-        { keys: ['v', 'arrowleft', 'arrowup'], name: 'note gain end', argumentData: [arg0]}]),
+        { keys: ['v', 'arrowleft', 'arrowup'], name: 'Note gain end'}]),
     [CommandTargetName.NotesMaxContrast]: entry(CommandTargetName.NotesMaxContrast, [
-        { keys: ['v', 'c', 'arrowup'], name: 'max contrast', argumentData: [arg0] },
-        { keys: ['v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [arg0] }]),
+        { keys: ['v', 'c', 'arrowup'], name: 'Max contrast' },
+        { keys: ['v', 'c'], cursor: [CursorButtons.WheelUp] }]),
     [CommandTargetName.RunNoteFunction]: entry(CommandTargetName.RunNoteFunction, [
-        { keys: ['z', 'r'], name: 'note function...', argumentData: [{ value: "" }, arg0], freeformEntry: true },
-        { keys: ['shift', 'v', 'arrowup'], name: 'note volume up 1',  argumentData: [{ value: "Raise by 1" }, arg0], repeat: true },
-        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Raise by 1" }, arg0]},
-        { keys: ['shift', 'v', 'arrowdown'], name: 'note volume down 1',  argumentData: [{ value: "Lower by 1" }, arg0], repeat: true },
-        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Lower by 1" }, arg0]},
-        { keys: ['shift', 'v', 'c', 'arrowup'], name: 'double contrast', argumentData: [{ value: "Double contrast" }, arg0]},
-        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Double contrast" }, arg0]},
-        { keys: ['shift', 'v', 'c', 'arrowdown'], name: 'halve contrast', argumentData: [{ value: "Halve contrast" }, arg0]},
-        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Halve contrast" }, arg0]},
-        { keys: ['z', ' ', 'v'], name: 'volume stagger', argumentData: [{ value: "Stagger volume" }, arg0], repeat: true },
-        { keys: ['z', ' ', 'n'], name: 'naturalize note positions', argumentData: [{ value: "Naturalize note positions" }, arg0], repeat: true },
-        { keys: ['shift', 'z', ' ', 'n'], name: 'shift notes', argumentData: [{ value: "Shift notes" }, arg0], repeat: true },
-        { keys: ['z', ' ', 'b'], name: 'volume random bends', argumentData: [{ value: "Random bends" }, arg0], repeat: true }]),
+        { keys: ['z', 'r'], name: 'Note function...', argumentData: [{ value: "" }], freeformEntry: true },
+        { keys: ['shift', 'v', 'arrowup'], name: 'Note volume up 1',  argumentData: [{ value: "Raise by 1" }], repeat: true },
+        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Raise by 1" }]},
+        { keys: ['shift', 'v', 'arrowdown'], name: 'Note volume down 1',  argumentData: [{ value: "Lower by 1" }], repeat: true },
+        { keys: ['shift', 'v'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Lower by 1" }]},
+        { keys: ['shift', 'v', 'c', 'arrowup'], name: 'Double contrast', argumentData: [{ value: "Double contrast" }]},
+        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelUp], argumentData: [{ value: "Double contrast" }]},
+        { keys: ['shift', 'v', 'c', 'arrowdown'], name: 'Halve contrast', argumentData: [{ value: "Halve contrast" }]},
+        { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Halve contrast" }]},
+        { keys: ['z', ' ', 'v'], name: 'Volume stagger', argumentData: [{ value: "Stagger volume" }], repeat: true },
+        { keys: ['z', ' ', 'n'], name: 'Naturalize note positions', argumentData: [{ value: "Naturalize note positions" }], repeat: true },
+        { keys: ['shift', 'z', ' ', 'n'], name: 'Shift notes', argumentData: [{ value: "Shift notes" }], repeat: true },
+        { keys: ['z', ' ', 'b'], name: 'Volume random bends', argumentData: [{ value: "Random bends" }], repeat: true }]),
     [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/']),
-    [CommandTargetName.RepeatLastCommand]: simple(CommandTargetName.RepeatLastCommand, ['shift', '?'])
+    [CommandTargetName.RepeatLastCommand]: simple(CommandTargetName.RepeatLastCommand, ['shift', '?']),
+    [CommandTargetName.SetSelectionResizeMode]: entry(CommandTargetName.SetSelectionResizeMode, [
+        { keys: [], name: 'Selection resize mode...', argumentData: [{ value: "0" }], freeformEntry: true }
+    ]),
+    [CommandTargetName.SetSelectionResizeSnapping]: entry(CommandTargetName.SetSelectionResizeSnapping, [
+        { keys: [], name: 'Selection resize snapping...', argumentData: [{ value: "0" }], freeformEntry: true }
+    ]),
+    [CommandTargetName.MoveNotesLeftOrRight]: entry(CommandTargetName.MoveNotesLeftOrRight, [
+        { keys: ['n', 'arrowleft'], name: 'Move selected notes left', argumentData: [{ value: "-2" }], repeat: true },
+        { keys: ['n', 'arrowright'], name: 'Move selected notes right', argumentData: [{ value: "2" }], repeat: true },
+        { keys: ['z', 'n'], name: 'Move selected notes...', argumentData: [{ value: "0" }], freeformEntry: true }
+    ]),
 };
 //#endregion
 
@@ -905,13 +926,15 @@ export const builtInCommands = {
  * against browsers listing more buttons in the future. These are prefixed with "m" like "m3" for shortcuts.
  */
 export const enum CursorButtons {
+    WheelLeft = -4,
+    WheelRight = -3,
     WheelDown = -2,
     WheelUp = -1,
     LeftButton = 0,
     RightButton = 1,
     MiddleButton = 2,
-    BrowserBack = 3,
-    BrowserForward = 4
+    Mouse4 = 3,
+    Mouse5 = 4
 }
 
 /**
@@ -1023,7 +1046,7 @@ export class ShortcutHandler {
             if (command === undefined) { continue; } // skip unassigned index gaps
             for (const entry of command.Shortcuts) {
                 const set = ShortcutHandler.toOrderedSet(entry);
-                allShortcuts.push([set.join(' '), command, entry, set]);
+                if (set.length > 0) { allShortcuts.push([set.join(' '), command, entry, set]); }
             }
         }
         allShortcuts.sort((a, b) => a[0].localeCompare(b[0]));
@@ -1097,6 +1120,11 @@ export class ShortcutHandler {
     /** Returns true if set, else false. */
     public isContextSet(context: CommandContext): boolean {
         return this._commandContexts.includes(context);
+    }
+
+    /** Returns whether a given command is valid for its contexts. Does not check its arguments or format. */
+    public validContext(command: Command): boolean {
+        return Command.ValidContext(command, this._commandContexts);
     }
 
     /** Resetting input on blur/focus avoids stuck states. */
@@ -1288,6 +1316,10 @@ export class ShortcutHandler {
             this.heldInputs.cursor.push(event.deltaY > 0 ? CursorButtons.WheelDown : CursorButtons.WheelUp);
             this._matchCommands(event, false, false, easyPianoKeys);
             this.heldInputs.cursor.pop();
+        } else if (event.deltaX !== 0) {
+            this.heldInputs.cursor.push(event.deltaX > 0 ? CursorButtons.WheelRight : CursorButtons.WheelLeft);
+            this._matchCommands(event, false, false, easyPianoKeys);
+            this.heldInputs.cursor.pop();
         }
     }
 
@@ -1337,7 +1369,7 @@ export class ShortcutHandler {
      */
     private _matchCommands(event: Event, deferFiring: boolean, isRepeating: boolean, easyPianoKeys: boolean): void
     {
-        let requestingFreeform: [Command, IShortcut] | undefined; 
+        let requestingFreeform: [Command, IShortcut] | undefined;
         let shortcutMap = deferFiring ? this._earlyCommands : this._lateCommands;
         let matchedShortcuts = shortcutMap[ShortcutHandler.toHash(this.heldInputs)] ?? [];
 
@@ -1433,10 +1465,12 @@ export function ShowCut(shortcut: IShortcut, formatFor?: 'menu'|'html'): string 
                 case CursorButtons.LeftButton: keysList.push(asMenu ? "Click" : "Left-click"); break;
                 case CursorButtons.RightButton: keysList.push(asMenu ? "RMB" : "Right-click"); break;
                 case CursorButtons.MiddleButton: keysList.push(asMenu ? "MMB" : "Middle-click"); break;
-                case CursorButtons.BrowserBack: keysList.push("Mouse 4"); break;
-                case CursorButtons.BrowserForward: keysList.push("Mouse 5"); break;
+                case CursorButtons.Mouse4: keysList.push("Mouse 4"); break;
+                case CursorButtons.Mouse5: keysList.push("Mouse 5"); break;
                 case CursorButtons.WheelDown: keysList.push("Wheel down"); break;
                 case CursorButtons.WheelUp: keysList.push("Wheel up"); break;
+                case CursorButtons.WheelRight: keysList.push("Wheel right"); break;
+                case CursorButtons.WheelLeft: keysList.push("Wheel left"); break;
                 default: (button satisfies never)
             }
         }

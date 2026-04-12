@@ -8,9 +8,9 @@ import { Slider } from "./HTMLWrapper";
 import { SongEditor } from "./SongEditor";
 import { HTML, SVG } from "imperative-html/dist/esm/elements-strict";
 import { ChangeSequence, UndoableChange } from "./Change";
-import { ChangeVolume, FilterMoveData, ChangeTempo, ChangePan, ChangeReverb, ChangeDistortion, ChangeOperatorAmplitude, ChangeFeedbackAmplitude, ChangePulseWidth, ChangeDetune, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangePanDelay, ChangeChorus, ChangeEQFilterSimplePeak, ChangeNoteFilterSimplePeak, ChangeStringSustain, ChangeEnvelopeSpeed, ChangeSupersawDynamism, ChangeSupersawShape, ChangeSupersawSpread, ChangePitchShift, ChangeChannelBar, ChangeDragSelectedNotes, ChangeEnsurePatternExists, ChangeNoteTruncate, ChangeNoteAdded, ChangePatternSelection, ChangePinTime, ChangeSizeBend, ChangePitchBend, ChangePitchAdded, ChangeArpeggioSpeed, ChangeBitcrusherQuantization, ChangeBitcrusherFreq, ChangeEchoSustain, ChangeEQFilterSimpleCut, ChangeNoteFilterSimpleCut, ChangeFilterMovePoint, ChangeDuplicateSelectedReusedPatterns, ChangeHoldingModRecording, ChangeDecimalOffset, ChangeMoveNotesSideways } from "./changes";
+import { ChangeVolume, FilterMoveData, ChangeTempo, ChangePan, ChangeReverb, ChangeDistortion, ChangeOperatorAmplitude, ChangeFeedbackAmplitude, ChangePulseWidth, ChangeDetune, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangePanDelay, ChangeChorus, ChangeEQFilterSimplePeak, ChangeNoteFilterSimplePeak, ChangeStringSustain, ChangeEnvelopeSpeed, ChangeSupersawDynamism, ChangeSupersawShape, ChangeSupersawSpread, ChangePitchShift, ChangeChannelBar, ChangeDragSelectedNotes, ChangeEnsurePatternExists, ChangeNoteTruncate, ChangeNoteAdded, ChangePatternSelection, ChangePinTime, ChangeSizeBend, ChangePitchBend, ChangePitchAdded, ChangeArpeggioSpeed, ChangeBitcrusherQuantization, ChangeBitcrusherFreq, ChangeEchoSustain, ChangeEQFilterSimpleCut, ChangeNoteFilterSimpleCut, ChangeFilterMovePoint, ChangeDuplicateSelectedReusedPatterns, ChangeHoldingModRecording, ChangeDecimalOffset } from "./changes";
 import { prettyNumber } from "./EditorConfig";
-import { ChangeStretchHorizontal, ChangeWrapAcross, search } from "./changesNoteOps";
+import { ChangeStretchHorizontal, ChangeWrapAcross } from "./changesNoteOps";
 
 function makeEmptyReplacementElement<T extends Node>(node: T): T {
     const clone: T = <T>node.cloneNode(false);
@@ -18,28 +18,28 @@ function makeEmptyReplacementElement<T extends Node>(node: T): T {
     return clone;
 }
 
-export enum SelectionResizeMode {
+export enum SelectionResizeMode { // If you update this, update the parameter hint in Commands. Don't change numbers.
     /** Resizing the selection only moves the bounds non-destructively. */
-    Move,
+    Move = 0,
     /** The selection bounds are locked. Resizing performs a wrap-around within the selection, nudging the wrap amount. */
-    WrapAround,
+    WrapAround = 1,
     /** Resizing the selection stretches all notes and note pins proportionally to the new size. */
-    Stretch
+    Stretch = 2
 }
 
-export enum SelectionResizeSnapping {
+export enum SelectionResizeSnapping { // If you update this, update the parameter hint in Commands. Don't change numbers.
     /** Resizing snaps to the rhythm (e.g. 1/4 bars) */
-    Rhythm,
+    Rhythm = 0,
     /** Snaps to the nearest ends of a note or gap. Replaces selection (intersection) */
-    SnapFeaturesIntersect,
+    SnapFeaturesIntersect = 1,
     /** Snaps to the nearest ends of a note or gap, unioning with existing selection. */
-    SnapFeaturesUnion,
+    SnapFeaturesUnion = 2,
     /** Snaps to the ends of only notes. Replaces selection (intersection) */
-    SnapNotesIntersect,
+    SnapNotesIntersect = 3,
     /** Snaps to pins within notes. Replaces selection (intersection) */
-    SnapPinsIntersect,
+    SnapPinsIntersect = 4,
     /** Snaps to the nearest ends of a note or gap, unioning with existing selection. */
-    SnapNotesUnion
+    SnapNotesUnion = 5
 }
 
 class PatternCursor {
@@ -107,7 +107,7 @@ export class PatternEditor {
     private _editorHeight: number;
     private _partWidth: number;
     private _pitchHeight: number = -1;
-    private _pitchBorder: number;
+    private _pitchBorder: number = 0; // The visual gutter above/below a mod channel track
     private _pitchCount: number;
     private _mouseX: number = 0;
     private _mouseY: number = 0;
@@ -129,7 +129,7 @@ export class PatternEditor {
     private _draggingSelectionContents: boolean = false;
     private _selectionResizing = SelectionResizeMode.Move;
     private _selectionSnapping = SelectionResizeSnapping.SnapFeaturesUnion;
-    private _unresizedSelection = { start: 0, end: 0 };
+    private _unresizedSelection = { start: 0, end: 0, startY: 0, endY: 0 };
     private _dragTime: number = 0;
     private _dragPitch: number = 0;
     private _dragSize: number = 0;
@@ -645,7 +645,8 @@ export class PatternEditor {
         if (this._usingTouch && !this.shiftMode && !this._mouseDragging && this._mouseDown && performance.now() > this._touchTime + 1000 && this._cursor.valid && this._doc.lastChangeWas(this._dragChange)) {
             // On a mobile device, the pattern editor supports using a long stationary touch to activate selection.
             this._dragChange!.undo();
-            this._unresizedSelection = { start: this._doc.selection.patternSelectionStart, end: this._doc.selection.patternSelectionEnd };
+            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
+            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
             this._shiftHeld = true;
             this._dragConfirmed = false;
             this._whenCursorPressed();
@@ -1692,23 +1693,33 @@ export class PatternEditor {
             } else if (this._shiftHeld) {
                 if ((this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1) || this._cursorIsInSelection()) {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._unresizedSelection = { start: 0, end: 0 };
+                    this._doc.selection.patternSelectionStartY = this._cursor.pitch;
+                    this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                    this._unresizedSelection = { ...this._unresizedSelection, start: 0, end: 0 };
                 } else {
                     if (this._cursor.curNote != null) {
                         sequence.append(new ChangePatternSelection(this._doc, this._cursor.curNote.start, this._cursor.curNote.end));
-                        this._unresizedSelection = { start: this._cursor.curNote.start, end: this._cursor.curNote.end };
+                        this._doc.selection.patternSelectionStartY = this._cursor.curNote.pitches[0];
+                        this._doc.selection.patternSelectionEndY = this._cursor.curNote.pitches[0];
+                        this._unresizedSelection = { ...this._unresizedSelection, start: this._cursor.curNote.start, end: this._cursor.curNote.end };
                     } else {
                         const start: number = Math.max(0, Math.min((this._doc.song.beatsPerBar - 1) * Config.partsPerBeat, Math.floor(this._cursor.exactPart / Config.partsPerBeat) * Config.partsPerBeat));
                         const end: number = start + Config.partsPerBeat;
                         sequence.append(new ChangePatternSelection(this._doc, start, end));
-                        this._unresizedSelection = { start, end };
+                        this._doc.selection.patternSelectionStartY = this._cursor.pitch;
+                        this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                        this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     }
                 }
+                this._unresizedSelection.startY = this._doc.selection.patternSelectionStartY;
+                this._unresizedSelection.endY = this._doc.selection.patternSelectionEndY;
             } else if (this._cursorIsInSelection()) {
                 this._draggingSelectionContents = true;
             } else if (this._cursor.valid && this._cursor.curNote == null) {
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._unresizedSelection = { start: 0, end: 0 };
+                this._doc.selection.patternSelectionStartY = this._cursor.pitch;
+                this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                this._unresizedSelection = { start: 0, end: 0, startY: this._cursor.pitch, endY: this._cursor.pitch };
 
                 // If clicking in empty space, the result will be adding a note,
                 // so we can safely add it immediately. Note that if clicking on
@@ -1788,7 +1799,8 @@ export class PatternEditor {
 
         if (this._mouseDragging && this._mouseDown && this._cursor.valid && continuousState) {
             this._dragChange!.undo();
-            this._unresizedSelection = { start: this._doc.selection.patternSelectionStart, end: this._doc.selection.patternSelectionEnd };
+            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
+            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
             const sequence: ChangeSequence = new ChangeSequence();
             this._dragChange = sequence;
             this._doc.setProspectiveChange(this._dragChange);
@@ -1817,11 +1829,21 @@ export class PatternEditor {
                         this._selectionSnapping === SelectionResizeSnapping.SnapFeaturesIntersect ||
                         this._selectionSnapping === SelectionResizeSnapping.SnapNotesIntersect ||
                         this._selectionSnapping === SelectionResizeSnapping.SnapPinsIntersect;
+                    const back =
+                        (this._draggingStartOfSelection && currentPart < this._doc.selection.patternSelectionStart) ||
+                        (this._draggingEndOfSelection && currentPart < this._doc.selection.patternSelectionEnd);
 
-                    const result = this._doc.selection.search(currentPart, true, pins, features, features, this._draggingStartOfSelection, exclusive);
+                    const searchResults = this._doc.selection.search(currentPart, !pins, pins, features, features, back);
+                    if (searchResults) {
+                        newStart = this._draggingStartOfSelection || exclusive ? searchResults.x1 : this._doc.selection.patternSelectionStart;
+                        newEnd = this._draggingEndOfSelection || exclusive ? searchResults.x2 : this._doc.selection.patternSelectionEnd;
 
-                    newStart = result.x1;
-                    newEnd = result.x2;
+                        if (newStart > newEnd) {
+                            const swap = newEnd;
+                            newEnd = newStart;
+                            newStart = swap;
+                        }
+                    }
                 }
 
                 // In wrap-around mode, dragging selection ends shifts the wrap amount instead of adjusting bounds.
@@ -1866,7 +1888,11 @@ export class PatternEditor {
                     const draggedParts: number = Math.round((this._mouseX - this._mouseXStart) / (this._partWidth * minDivision)) * minDivision;
                     const draggedTranspose: number = Math.round((this._mouseYStart - this._mouseY) / (this._pitchHeight * pitchRatio));
                     sequence.append(new ChangeDragSelectedNotes(this._doc, this._doc.channel, pattern, draggedParts, draggedTranspose));
-                    this._unresizedSelection = { start: this._doc.selection.patternSelectionStart, end: this._doc.selection.patternSelectionEnd };
+
+                    this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
+                    this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
+                    this._unresizedSelection.startY += draggedTranspose;
+                    this._unresizedSelection.endY += draggedTranspose;
                 }
 
             } else if (this._shiftHeld && this._dragConfirmed) {
@@ -1923,15 +1949,25 @@ export class PatternEditor {
                         }
                     }
 
+                    let mousePitch = this._findMousePitch(this._mouseY + this._pitchBorder/2);
+                    mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
+
                     sequence.append(new ChangePatternSelection(this._doc, start, end));
-                    this._unresizedSelection = { start, end };
+                    this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, mousePitch);
+                    this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, mousePitch);
+                    this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     this._updateSelection();
                 }
-            } else {
+            } else if (this._shiftHeld) {
+                let mousePitch = this._findMousePitch(this._mouseY + this._pitchBorder/2);
+                mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
 
+                sequence.append(new ChangePatternSelection(this._doc, 0, 0));
+                this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, mousePitch);
+                this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, mousePitch);
+            } else {
                 if (this._cursor.curNote == null) {
-                    sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._unresizedSelection = { start: 0, end: 0 };
+                    this._unresizedSelection = { start: 0, end: 0, startY: 0, endY: 0 };
 
                     let backwards: boolean;
                     let directLength: number;
@@ -2033,8 +2069,9 @@ export class PatternEditor {
                     }
 
                 } else if (this._mouseHorizontal) {
-
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
+                    this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                    this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
 
                     const shift: number = (this._mouseX - this._mouseXStart) / this._partWidth;
 
@@ -2067,8 +2104,11 @@ export class PatternEditor {
                     }
                 } else if (this._cursor.pitchIndex == -1 || this._doc.song.getChannelIsMod(this._doc.channel)) {
 
-                    if (!this._mouseDragging)
-                    sequence.append(new ChangePatternSelection(this._doc, 0, 0));
+                    if (!this._mouseDragging) {
+                        sequence.append(new ChangePatternSelection(this._doc, 0, 0));
+                        this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                        this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                    }
 
                     const bendPart: number =
                         Math.max(this._cursor.curNote.start,
@@ -2167,7 +2207,6 @@ export class PatternEditor {
                     this._copyPins(this._cursor.curNote);
                 } else {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-
                     this._dragSize = this._cursor.curNote.pins[this._cursor.nearPinIndex].size;
 
                     if (this._pattern == null) throw new Error();
@@ -2241,8 +2280,8 @@ export class PatternEditor {
                 this._doc.selection.patternSelectionEnd = this._unresizedSelection.end;
             }
 
-            this._unresizedSelection.start = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0;
-            this._unresizedSelection.end = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : 0;
+            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
+            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
 
             if (this._draggingSelectionContents) {
                 this._doc.record(this._dragChange);
@@ -2260,13 +2299,14 @@ export class PatternEditor {
                 if (this._pattern != null && this._doc.song.getChannelIsMod(this._doc.channel)) this._pattern.notes.sort(function (a, b) { return (a.start == b.start) ? a.pitches[0] - b.pitches[0] : a.start - b.start; });
 
             } else {
-
                 if (this._pattern == null) throw new Error();
 
                 const sequence: ChangeSequence = new ChangeSequence();
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
+                this._doc.selection.patternSelectionStartY = this._cursor.pitch;
+                this._doc.selection.patternSelectionEndY = this._cursor.pitch;
 
-                if (this._cursor.pitchIndex == -1) {
+                if (this._cursor.pitchIndex === -1) {
                     if (this._cursor.curNote.pitches.length == Config.maxChordSize) {
                         sequence.append(new ChangePitchAdded(this._doc, this._cursor.curNote, this._cursor.curNote.pitches[0], 0, true));
                     }
@@ -2389,6 +2429,12 @@ export class PatternEditor {
             this._selectionRect.setAttribute("visibility", "visible");
             this._selectionRect.setAttribute("x", String(this._partWidth * this._doc.selection.patternSelectionStart));
             this._selectionRect.setAttribute("width", String(this._partWidth * (this._doc.selection.patternSelectionEnd - this._doc.selection.patternSelectionStart)));
+
+            if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                const pitches = this._doc.selection.patternSelectionEndY - this._doc.selection.patternSelectionStartY;
+                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternSelectionEndY - 1))));
+                this._selectionRect.setAttribute("height", String(-this._pitchBorder + (this._pitchHeight * (pitches + 1))));
+            }
         } else {
             this._selectionRect.setAttribute("visibility", "hidden");
         }
@@ -2478,8 +2524,15 @@ export class PatternEditor {
             this._svgBackground.setAttribute("width", "" + this._editorWidth);
             this._svgBackground.setAttribute("height", "" + this._editorHeight);
             this._svgPlayhead.setAttribute("height", "" + this._editorHeight);
-            this._selectionRect.setAttribute("y", "0");
-            this._selectionRect.setAttribute("height", "" + this._editorHeight);
+
+            if (this._doc.song.getChannelIsMod(this._doc.channel) && this._doc.selection.patternSelectionActive) {
+                const pitches = this._doc.selection.patternSelectionEndY - this._doc.selection.patternSelectionStartY;
+                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternSelectionEndY - 1))));
+                this._selectionRect.setAttribute("height", String(-this._pitchBorder + (this._pitchHeight * (pitches + 1))));
+            } else {
+                this._selectionRect.setAttribute("y", "0");
+                this._selectionRect.setAttribute("height", "" + this._editorHeight);    
+            }
         }
 
         const beatWidth = this._editorWidth / this._doc.song.beatsPerBar;
@@ -2782,4 +2835,7 @@ export class PatternEditor {
             this._selectionSnapping = mode;
         }
     }
+
+    public getSelectionResizeMode() { return this._selectionResizing; }
+    public getSelectionResizeSnapping() { return this._selectionSnapping; }
 }

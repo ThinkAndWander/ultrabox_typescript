@@ -4,7 +4,7 @@
 import { sampleLoadEvents, SampleLoadedEvent, InstrumentType, EffectType, Config, effectsIncludeTransition, effectsIncludeChord, effectsIncludePitchShift, effectsIncludeDetune, effectsIncludeVibrato, effectsIncludeNoteFilter, effectsIncludeDistortion, effectsIncludeBitcrusher, effectsIncludePanning, effectsIncludeChorus, effectsIncludeEcho, effectsIncludeReverb, DropdownID } from "../synth/SynthConfig";
 import { BarScrollBar } from "./BarScrollBar";
 import { BeatsPerBarPrompt } from "./BeatsPerBarPrompt";
-import { Change, ChangeGroup } from "./Change";
+import { Change, ChangeGroup, ChangeSequence } from "./Change";
 import { ChannelSettingsPrompt } from "./ChannelSettingsPrompt";
 import { ColorConfig, ChannelColors } from "./ColorConfig";
 import { CustomChipPrompt } from "./CustomChipPrompt";
@@ -35,7 +35,7 @@ import { MuteEditor } from "./MuteEditor";
 import { OctaveScrollBar } from "./OctaveScrollBar";
 import { MidiInputHandler } from "./MidiInput";
 import { KeyToPianoKey } from "./KeyToPianoKey";
-import { PatternEditor } from "./PatternEditor";
+import { PatternEditor, SelectionResizeMode, SelectionResizeSnapping } from "./PatternEditor";
 import { EditorTabSelection, buttonPresets, funcBendsPresets, funcPitchPresets, funcVolPresets } from './EditorTabSelection';
 import { Piano } from "./Piano";
 import { Prompt } from "./Prompt";
@@ -48,7 +48,7 @@ import { SpectrumEditor, SpectrumEditorPrompt } from "./SpectrumEditor";
 import { CustomThemePrompt } from "./CustomThemePrompt";
 import { ThemePrompt } from "./ThemePrompt";
 import { TipPrompt } from "./TipPrompt";
-import { ChangeTempo, ChangeKeyOctave, ChangeChorus, ChangeEchoDelay, ChangeEchoSustain, ChangeReverb, ChangeVolume, ChangePan, ChangePatternSelection, ChangePatternsPerChannel, ChangePatternNumbers, ChangeSupersawDynamism, ChangeSupersawSpread, ChangeSupersawShape, ChangePulseWidth, ChangeFeedbackAmplitude, ChangeOperatorAmplitude, ChangeOperatorFrequency, ChangeDrumsetEnvelope, ChangePasteInstrument, ChangePreset, pickRandomPresetValue, ChangeRandomGeneratedInstrument, ChangeEQFilterType, ChangeNoteFilterType, ChangeEQFilterSimpleCut, ChangeEQFilterSimplePeak, ChangeNoteFilterSimpleCut, ChangeNoteFilterSimplePeak, ChangeScale, ChangeDetectKey, ChangeKey, ChangeRhythm, ChangeFeedbackType, ChangeAlgorithm, ChangeChipWave, ChangeNoiseWave, ChangeTransition, ChangeToggleEffects, ChangeVibrato, ChangeUnison, ChangeChord, ChangeSong, ChangePitchShift, ChangeDetune, ChangeDistortion, ChangeStringSustain, ChangeBitcrusherFreq, ChangeBitcrusherQuantization, ChangeAddEnvelope, ChangeEnvelopeSpeed, ChangeDiscreteEnvelope, ChangeAddChannelInstrument, ChangeRemoveChannelInstrument, ChangeCustomWave, ChangeOperatorWaveform, ChangeOperatorPulseWidth, ChangeSongTitle, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangeVibratoType, ChangePanDelay, ChangeArpeggioSpeed, ChangeFastTwoNoteArp, ChangeClicklessTransition, ChangeAliasing, ChangeSetPatternInstruments, ChangeHoldingModRecording, ChangeChipWavePlayBackwards, ChangeChipWaveStartOffset, ChangeChipWaveLoopEnd, ChangeChipWaveLoopStart, ChangeChipWaveLoopMode, ChangeChipWaveUseAdvancedLoopControls, ChangeDecimalOffset, ChangeUnisonVoices, ChangeUnisonSpread, ChangeUnisonOffset, ChangeUnisonExpression, ChangeUnisonSign, Change6OpFeedbackType, Change6OpAlgorithm, ChangeCustomAlgorythmorFeedback, ChangeViewedTab } from "./changes";
+import { ChangeTempo, ChangeKeyOctave, ChangeChorus, ChangeEchoDelay, ChangeEchoSustain, ChangeReverb, ChangeVolume, ChangePan, ChangePatternSelection, ChangePatternsPerChannel, ChangePatternNumbers, ChangeSupersawDynamism, ChangeSupersawSpread, ChangeSupersawShape, ChangePulseWidth, ChangeFeedbackAmplitude, ChangeOperatorAmplitude, ChangeOperatorFrequency, ChangeDrumsetEnvelope, ChangePasteInstrument, ChangePreset, pickRandomPresetValue, ChangeRandomGeneratedInstrument, ChangeEQFilterType, ChangeNoteFilterType, ChangeEQFilterSimpleCut, ChangeEQFilterSimplePeak, ChangeNoteFilterSimpleCut, ChangeNoteFilterSimplePeak, ChangeScale, ChangeDetectKey, ChangeKey, ChangeRhythm, ChangeFeedbackType, ChangeAlgorithm, ChangeChipWave, ChangeNoiseWave, ChangeTransition, ChangeToggleEffects, ChangeVibrato, ChangeUnison, ChangeChord, ChangeSong, ChangePitchShift, ChangeDetune, ChangeDistortion, ChangeStringSustain, ChangeBitcrusherFreq, ChangeBitcrusherQuantization, ChangeAddEnvelope, ChangeEnvelopeSpeed, ChangeDiscreteEnvelope, ChangeAddChannelInstrument, ChangeRemoveChannelInstrument, ChangeCustomWave, ChangeOperatorWaveform, ChangeOperatorPulseWidth, ChangeSongTitle, ChangeVibratoDepth, ChangeVibratoSpeed, ChangeVibratoDelay, ChangeVibratoType, ChangePanDelay, ChangeArpeggioSpeed, ChangeFastTwoNoteArp, ChangeClicklessTransition, ChangeAliasing, ChangeSetPatternInstruments, ChangeHoldingModRecording, ChangeChipWavePlayBackwards, ChangeChipWaveStartOffset, ChangeChipWaveLoopEnd, ChangeChipWaveLoopStart, ChangeChipWaveLoopMode, ChangeChipWaveUseAdvancedLoopControls, ChangeDecimalOffset, ChangeUnisonVoices, ChangeUnisonSpread, ChangeUnisonOffset, ChangeUnisonExpression, ChangeUnisonSign, Change6OpFeedbackType, Change6OpAlgorithm, ChangeCustomAlgorythmorFeedback, ChangeViewedTab, ChangeDragSelectedNotes } from "./changes";
 
 import { TrackEditor } from "./TrackEditor";
 import { oscilloscopeCanvas } from "../global/Oscilloscope";
@@ -736,8 +736,9 @@ export class SongEditor {
     private readonly _keyToPianoKeyHandler: KeyToPianoKey = new KeyToPianoKey(this._doc);
     private readonly _shortcutHandler: ShortcutHandler;
     private readonly _patternEditorPrev: PatternEditor = new PatternEditor(this._doc, false, -1);
-    private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0,
-    );
+    private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0);
+    private _nudge: { change?: ChangeSequence, offset: number };
+
     private readonly _patternEditorNext: PatternEditor = new PatternEditor(this._doc, false, 1);
     private readonly _editorTabSelection = new EditorTabSelection(this._doc, this._patternEditor);
     private readonly _trackEditor: TrackEditor = new TrackEditor(this._doc, this
@@ -3964,6 +3965,13 @@ export class SongEditor {
                 this._doc.selection.deleteBars();
                 this._barScrollBar.animatePlayhead();
                 return;
+            case CommandTargetName.DeleteBarAndPull:
+                this._doc.synth.loopBarStart = -1;
+                this._doc.synth.loopBarEnd = -1;
+                this._loopEditor.setLoopAt(this._doc.synth.loopBarStart, this._doc.synth.loopBarEnd);
+                this._doc.selection.deleteBars(true);
+                this._barScrollBar.animatePlayhead();
+                return;
             case CommandTargetName.DuplicatePattern:
                 this._doc.selection.duplicatePatterns();
                 return;
@@ -4027,12 +4035,12 @@ export class SongEditor {
                 }
                 this._copyTextToClipboard(JSON.stringify(instrumentObject));
                 return;
-            case CommandTargetName.ExtendSelectionLeft:
+            case CommandTargetName.ExtendTrackSelectionLeft:
                 this._doc.selection.boxSelectionX1 = Math.max(0, this._doc.selection.boxSelectionX1 - 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
-            case CommandTargetName.ExtendSelectionRight:
+            case CommandTargetName.ExtendTrackSelectionRight:
                 this._doc.selection.boxSelectionX1 = Math.min(this._doc.song.barCount - 1, this._doc.selection.boxSelectionX1 + 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
@@ -4286,15 +4294,21 @@ export class SongEditor {
                 this._doc.selection.selectionUpdated();
                 return;
             case CommandTargetName.SetInstrument:
-                this._doc.selection.nextDigit(actionData![0].value, true, false);
+                actionDataAsBool(actionData![1], false)
+                    ? this._doc.selection.setDigits(actionData![0].value, true, false)
+                    : this._doc.selection.nextDigit(actionData![0].value, true, false)
                 this._renderInstrumentBar(this._doc.song.channels[this._doc.channel], this._doc.getCurrentInstrument(), ColorConfig.getChannelColor(this._doc.song, this._doc.channel));
                 return;
             case CommandTargetName.SetChannel:
-                this._doc.selection.nextDigit(actionData![0].value, false, false);
+                actionDataAsBool(actionData![1], false)
+                    ? this._doc.selection.setDigits(actionData![0].value, false, false)
+                    : this._doc.selection.nextDigit(actionData![0].value, false, false)
                 this._renderInstrumentBar(this._doc.song.channels[this._doc.channel], this._doc.getCurrentInstrument(), ColorConfig.getChannelColor(this._doc.song, this._doc.channel));
                 return;
             case CommandTargetName.SetRhythm:
-                this._doc.selection.nextDigit(actionData![0].value, false, true);
+                actionDataAsBool(actionData![1], false)
+                    ? this._doc.selection.setDigits(actionData![0].value, false, true)
+                    : this._doc.selection.nextDigit(actionData![0].value, false, true)
                 this._renderInstrumentBar(this._doc.song.channels[this._doc.channel], this._doc.getCurrentInstrument(), ColorConfig.getChannelColor(this._doc.song, this._doc.channel));
                 return;
             case CommandTargetName.SnapPlayheadToBeginning:
@@ -4366,18 +4380,65 @@ export class SongEditor {
                 this._doc.openPrompt("shortcutsAndCommands");
                 return;
             case CommandTargetName.Macro:
-                // TODO: implement this!
+                if (this.prompt || document.activeElement?.tagName === "INPUT") { return; }
+
+                // Format: commands separated by ;; where each is the number/name of a target and args separated by ;
+                let failReport: string[] = [];
+                actionData![0].value.split(';;').forEach((entry, index) => {
+                    const args = entry.split(';');
+
+                    // Identify command by number, else name. Only number is protected in API changes.
+                    let target = Number.parseInt(args[0]) as keyof typeof targets;
+                    if (isNaN(target) || !isFinite(target)) {
+                        target = -1;
+                        const nameToFind = args[0].trim().toLowerCase();
+                        Object.values(builtInCommands).some(o => {
+                            if (nameToFind === o.Name.toLowerCase()) {
+                                target = o.Target;
+                                return true;
+                            }
+                            return false;
+                        });
+                    }
+
+                    if (!targets[target])
+                        { failReport.push(`#${index}: Target ${args[0]} can't be found.`)}
+                    else if (target === CommandTargetName.Macro)
+                        { failReport.push(`#${index}: Macros aren't allowed in other macros.`)}
+                    else if (targets[target].params.length !== args.length - 1)
+                        { failReport.push(`#${index}: Wrong number of inputs (got ${args.length - 1} of ${targets[target].params.length}).`)}
+                    if (failReport.length > 0) { return; }
+
+                    let command = new Command("", target, "", [], []);
+                    for (let i = 1; i < args.length; i++) {
+                        command.ArgumentData!.push({ value: args[i].trim() });
+                    }
+
+                    if (this.prompt)
+                        { failReport.push(`#${index}: Blocked by prompt.`)}
+                    else if (!command.ValidArguments())
+                        { failReport.push(`#${index}: Inputs in unexpected format.`)}
+                    else if (!this._shortcutHandler.validContext(command))
+                        { failReport.push(`#${index}: Blocked by context; can't run.`)}
+                    if (failReport.length > 0) { return; }
+
+                    this.handleCommand(command, command.ArgumentData);
+                });
+
+                if (failReport.length > 0) {
+                    this._patternEditor.setToastContent(
+                        div(span({ class: "toastText" }, div("Macro failed")),
+                        failReport.map(o => div({ class: "toastSubtext" }, o))));
+                }
                 return;
             case CommandTargetName.NotesMirror:
                 this._doc.selection.noteMirrorAcross(
-                    actionDataAsBool(actionData![0], false),
-                    actionDataAsNumber(actionData![1], 0, 1, Config.modCount) - 1);
+                    actionDataAsBool(actionData![0], false));
                 return;
             case CommandTargetName.NotesBridge:
                 this._doc.selection.noteBridge(
                     actionDataAsBool(actionData![0], false),
-                    actionDataAsBool(actionData![1], false),
-                    actionDataAsNumber(actionData![2], 0, 1, Config.modCount) - 1);
+                    actionDataAsBool(actionData![1], false));
                 return;
             case CommandTargetName.NotesFadeIn:
                 this.handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [
@@ -4392,8 +4453,7 @@ export class SongEditor {
             case CommandTargetName.NotesFlatten:
                 this._doc.selection.noteFlattenAcross(
                     !actionDataAsBool(actionData![0], false),
-                    actionDataAsBool(actionData![1], false),
-                    actionDataAsNumber(actionData![2], 0, 1, Config.modCount) - 1);
+                    actionDataAsBool(actionData![1], false));
                 return;
             case CommandTargetName.NotesGainIn:
             case CommandTargetName.NotesGainOut:
@@ -4409,21 +4469,18 @@ export class SongEditor {
                     { value: String(actionDataAsNumber(actionData![0], 0, 1, Config.modCount) - 1) }]);
                 return;
             case CommandTargetName.NotesMerge:
-                this._doc.selection.noteMerge(!actionDataAsBool(actionData![0], false),
-                    actionDataAsNumber(actionData![0], 0, 1, Config.modCount) - 1);
+                this._doc.selection.noteMerge(!actionDataAsBool(actionData![0], false));
                 break;
             case CommandTargetName.NotesSplit:
                 this._doc.selection.noteSplitAcross(
                     actionDataAsNumber(actionData![0], 1, 1, this._doc.song.partsPerPattern / 2),
                     actionDataAsBool(actionData![2], false),
-                    !actionDataAsBool(actionData![1], false),
-                    actionDataAsNumber(actionData![3], 0, 1, Config.modCount) - 1);
+                    !actionDataAsBool(actionData![1], false));
                 break;
             case CommandTargetName.NotesSpread:
                 this._doc.selection.noteSpreadAcross(
-                    actionDataAsBool(actionData![0], false),
                     actionDataAsBool(actionData![1], false),
-                    actionDataAsNumber(actionData![2], 0, 1, Config.modCount) - 1);
+                    actionDataAsBool(actionData![0], false));
                 break;
             case CommandTargetName.RunNoteFunction:
                 let stepData: IStepData | undefined = undefined;
@@ -4448,8 +4505,7 @@ export class SongEditor {
                     let add = (stepData.affect === "vol") // Scale volume by range, consistent with EditorTabSelection.
                         ? stepData.add?.map(str => `(${str}) / (maxrange - minrange)`)
                         : stepData.add;
-                    this._doc.selection.noteStepAcross({...stepData, add},
-                        actionDataAsNumber(actionData![1], 0, 1, Config.modCount) - 1);
+                    this._doc.selection.noteStepAcross({...stepData, add});
                 }
                 return;
             case CommandTargetName.RunCommand:
@@ -4477,9 +4533,12 @@ export class SongEditor {
                     }
                 }
 
-                temp = actionDataAsNumber(actionData![1], 0, 1, Config.modCount) - 1;
-                const searchResults = this._doc.selection.search(undefined, notes, pins, gaps, edges, back, exclusive, temp);
-                new ChangePatternSelection(this._doc, searchResults.x1, searchResults.x2);
+                const searchResults = this._doc.selection.search(undefined, notes, pins, gaps, edges, back);
+                if (searchResults) {
+                    new ChangePatternSelection(this._doc,
+                        back || exclusive ? searchResults.x1 : this._doc.selection.patternSelectionStart,
+                        !back || exclusive ? searchResults.x2 : this._doc.selection.patternSelectionEnd);
+                }
                 return;
             case CommandTargetName.SetNoteSelection:
                 temp = {
@@ -4505,6 +4564,39 @@ export class SongEditor {
                 } else {
                     new ChangePatternSelection(this._doc, this._doc.selection.patternSelectionEnd, this._doc.song.partsPerPattern);
                 }
+                return;
+            case CommandTargetName.SetSelectionResizeMode:
+                this._patternEditor.setSelectionResizeMode(actionDataAsNumber(actionData![0],
+                    this._patternEditor.getSelectionResizeMode(), 0, Object.keys(SelectionResizeMode).length / 2 - 1));
+                this._editorTabSelection.setResizeMode(this._patternEditor.getSelectionResizeMode());
+                return;
+            case CommandTargetName.SetSelectionResizeSnapping:
+                this._patternEditor.setSelectionResizeSnapping(actionDataAsNumber(actionData![0],
+                    this._patternEditor.getSelectionResizeSnapping(), 0, Object.keys(SelectionResizeSnapping).length / 2 - 1));
+                this._editorTabSelection.setSnapMode(this._patternEditor.getSelectionResizeSnapping());
+                return;
+            case CommandTargetName.MoveNotesLeftOrRight:
+                this._nudge ??= { offset: 0 };
+                const isConsecutive = this._doc.lastChangeWas(this._nudge.change ?? null);
+                
+                // Repeated nudges in a row are undone and their effects accumulated into an offset, that way the nudge
+                // is undone in one action. Since it's one action, it can intersect notes w.r.t. the selection length
+                // instead of truncating everything between the old/new locations.
+                temp = actionDataAsNumber(actionData![0], 0, -this._doc.song.partsPerPattern, this._doc.song.partsPerPattern);
+                if (isConsecutive) {
+                    this._nudge.change!.undo();
+                    this._nudge.offset += temp;
+                } else {
+                    this._nudge.offset = temp;
+
+                    // Auto-select the whole pattern if needed.
+                    if (!this._doc.selection.patternSelectionActive) {
+                        new ChangePatternSelection(this._doc, 0, this._doc.song.partsPerPattern);
+                    }
+                }
+
+                this._nudge.change = new ChangeDragSelectedNotes(this._doc, this._doc.channel, this._doc.getCurrentPattern(0)!, this._nudge.offset, 0);
+                this._doc.record(this._nudge.change, isConsecutive);
                 return;
             default:
                 (command.Target satisfies CommandTargetName.None) // Catch missing TS cases

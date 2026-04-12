@@ -7,7 +7,7 @@ import { SongRecovery, generateUid, errorAlert } from "./SongRecovery";
 import { ColorConfig } from "./ColorConfig";
 import { Layout } from "./Layout";
 import { SongPerformance } from "./SongPerformance";
-import { Selection } from "./Selection";
+import { Selection, SelectionJSON } from "./Selection";
 import { Preferences } from "./Preferences";
 import { Change } from "./Change";
 import { ChangeNotifier } from "./ChangeNotifier";
@@ -21,7 +21,7 @@ interface HistoryState {
 	channel: number;
 	instrument: number;
 	recoveryUid: string;
-	selection: {x0: number, x1: number, y0: number, y1: number, start: number, end: number};
+	selection: SelectionJSON;
 }
 
 export class SongDocument {

@@ -3994,6 +3994,8 @@ export class ChangeSong extends ChangeGroup {
         }
         if (newHash == "") {
             this.append(new ChangePatternSelection(doc, 0, 0));
+            doc.selection.patternSelectionStartY = 0;
+            doc.selection.patternSelectionEndY = Config.modCount - 1;
             doc.selection.resetBoxSelection();
             setDefaultInstruments(doc.song);
             doc.song.scale = doc.prefs.defaultScale;
@@ -4354,12 +4356,15 @@ export class ChangeNoteLength extends ChangePins {
 }
 
 export class ChangeNoteTruncate extends ChangeSequence {
-    constructor(doc: SongDocument, pattern: Pattern, start: number, end: number, skipNote: Note | null = null, force: boolean = false) {
+    constructor(doc: SongDocument, pattern: Pattern, start: number, end: number,
+        skipNote: Note | null = null, force: boolean = false, pitchIndex?: number) {
         super();
         let i: number = 0;
         while (i < pattern.notes.length) {
             const note: Note = pattern.notes[i];
-            if (note == skipNote && skipNote != null) {
+            if (pitchIndex !== undefined && (note.pitches.length !== 1 || note.pitches[0] !== pitchIndex)) {
+                i++;
+            } else if (note == skipNote && skipNote != null) {
                 i++;
             } else if (note.end <= start) {
                 i++;
@@ -4477,10 +4482,10 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
 }
 
 class ChangeSplitNotesAtSelection extends ChangeSequence {
-	constructor(doc: SongDocument, pattern: Pattern) {
+	constructor(doc: SongDocument, pattern: Pattern, pitchIndex?: number) {
 		super();
-		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionStart));
-		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionEnd));
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionStart, pitchIndex));
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionEnd, pitchIndex));
 	}
 }
 
@@ -4651,20 +4656,16 @@ export class ChangePatternSelection extends UndoableChange {
     private _doc: SongDocument;
     private _oldStart: number;
     private _oldEnd: number;
-    private _oldActive: boolean;
     private _newStart: number;
     private _newEnd: number;
-    private _newActive: boolean;
 
     constructor(doc: SongDocument, newStart: number, newEnd: number) {
         super(false);
         this._doc = doc;
         this._oldStart = doc.selection.patternSelectionStart;
         this._oldEnd = doc.selection.patternSelectionEnd;
-        this._oldActive = doc.selection.patternSelectionActive;
         this._newStart = newStart;
         this._newEnd = newEnd;
-        this._newActive = newStart < newEnd;
         this._doForwards();
         this._didSomething();
     }
@@ -4672,14 +4673,12 @@ export class ChangePatternSelection extends UndoableChange {
     protected _doForwards(): void {
         this._doc.selection.patternSelectionStart = this._newStart;
         this._doc.selection.patternSelectionEnd = this._newEnd;
-        this._doc.selection.patternSelectionActive = this._newActive;
         this._doc.notifier.changed();
     }
 
     protected _doBackwards(): void {
         this._doc.selection.patternSelectionStart = this._oldStart;
         this._doc.selection.patternSelectionEnd = this._oldEnd;
-        this._doc.selection.patternSelectionActive = this._oldActive;
         this._doc.notifier.changed();
     }
 }
@@ -4688,26 +4687,31 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
     constructor(doc: SongDocument, channelIndex: number, pattern: Pattern, parts: number, transpose: number) {
         super();
 
+        if (doc.song.getChannelIsMod(channelIndex)) { transpose = 0; } // Cannot jump mod tracks.
         if (parts == 0 && transpose == 0) return;
 
         const oldStart: number = doc.selection.patternSelectionStart;
         const oldEnd: number = doc.selection.patternSelectionEnd;
 
         if (doc.selection.patternSelectionActive) {
-            this.append(new ChangeSplitNotesAtSelection(doc, pattern));
+            for (const track of doc.selection.eachSelectedModTrack(channelIndex)) {
+                this.append(new ChangeSplitNotesAtSelection(doc, pattern, track));
+            }
         }
         
         const newStart: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldStart + parts));
         const newEnd: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldEnd + parts));
-        if (newStart == newEnd) {
-            // Just erase the current contents of the selection:
-            this.append(new ChangeNoteTruncate(doc, pattern, oldStart, oldEnd, null, true));
-        } else if (parts < 0) {
-            // Clear space for the dragged notes:
-            this.append(new ChangeNoteTruncate(doc, pattern, newStart, Math.min(oldStart, newEnd), null, true));
-        } else {
-            // Clear space for the dragged notes:
-            this.append(new ChangeNoteTruncate(doc, pattern, Math.max(oldEnd, newStart), newEnd, null, true));
+        for (const track of doc.selection.eachSelectedModTrack(channelIndex)) {
+            if (newStart == newEnd) {
+                // Just erase the current contents of the selection:
+                this.append(new ChangeNoteTruncate(doc, pattern, oldStart, oldEnd, null, true, track));
+            } else if (parts < 0) {
+                // Clear space for the dragged notes:
+                this.append(new ChangeNoteTruncate(doc, pattern, newStart, Math.min(oldStart, newEnd), null, true, track));
+            } else {
+                // Clear space for the dragged notes:
+                this.append(new ChangeNoteTruncate(doc, pattern, Math.max(oldEnd, newStart), newEnd, null, true, track));
+            }
         }
 
         this.append(new ChangePatternSelection(doc, newStart, newEnd));
@@ -4716,7 +4720,12 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
         let i: number = 0;
         while (i < pattern.notes.length) {
             const note: Note = pattern.notes[i];
-            if (note.end <= oldStart || note.start >= oldEnd) {
+            if ((doc.song.getChannelIsMod(channelIndex) &&
+                    (note.pitches.length !== 1
+                    || note.pitches[0] < doc.selection.patternSelectionStartY
+                    || note.pitches[0] > doc.selection.patternSelectionEndY))
+                || note.end <= oldStart || note.start >= oldEnd)
+            {
                 i++;
                 if (note.end <= newStart) noteInsertionIndex = i;
             } else {
@@ -4732,7 +4741,6 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
             if (note.start >= newEnd) continue;
 
             this.append(new ChangeNoteAdded(doc, pattern, note, noteInsertionIndex++, false));
-
             this.append(new ChangeNoteLength(doc, note, Math.max(note.start, newStart), Math.min(newEnd, note.end)));
 
             for (let i: number = 0; i < Math.abs(transpose); i++) {

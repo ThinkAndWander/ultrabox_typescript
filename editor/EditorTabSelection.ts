@@ -4,11 +4,8 @@ import { Slider } from "./HTMLWrapper";
 import { PatternEditor, SelectionResizeMode, SelectionResizeSnapping } from "./PatternEditor";
 import { SongDocument } from "./SongDocument";
 import { IStepData } from "./changesNoteOps";
-import { Config } from "../synth/SynthConfig";
 
 const { button, div, label, input, option, optgroup, select } = HTML;
-
-type TipHandler = (tipName: string) => void;
 
 // Function presets based on various or ad-hoc functions.
 enum funcSpecialPresets {
@@ -94,11 +91,8 @@ export class EditorTabSelection {
 
     private _doc: SongDocument;
     private _patternEditor: PatternEditor;
-    private _tipHandler: TipHandler;
     private _resizeModeDropdown: HTMLSelectElement;
     private _snappingModeDropdown: HTMLSelectElement;
-    private _affectModChannelContainer: HTMLDivElement;
-    private _affectModChannelNum : HTMLInputElement;
     private _merge : HTMLButtonElement;
     private _mergeAll : HTMLInputElement;
     private _bridge : HTMLButtonElement;
@@ -161,26 +155,22 @@ export class EditorTabSelection {
             if (o.x) { this._resizeModeDropdown.appendChild(option({ value: o.val, selected: true }, o.lbl)); }
             else { this._resizeModeDropdown.appendChild(option({ value: o.val }, o.lbl)); }
         });
-        this._resizeModeDropdown.addEventListener('change', this._setResizeMode);
+        this._resizeModeDropdown.addEventListener('change', this.setResizeMode);
 
         this._snappingModeDropdown = select();
         [
             { lbl: 'Rhythm', val: SelectionResizeSnapping.Rhythm },
-            { lbl: 'Features', val: SelectionResizeSnapping.SnapFeaturesUnion, x: true },
+            { lbl: 'Notes+gaps', val: SelectionResizeSnapping.SnapFeaturesUnion, x: true },
             { lbl: 'Notes', val: SelectionResizeSnapping.SnapNotesUnion },
-            { lbl: 'Notes (exclusive)', val: SelectionResizeSnapping.SnapNotesIntersect },
-            { lbl: 'Pins (exclusive)', val: SelectionResizeSnapping.SnapPinsIntersect },
-            { lbl: 'Features (exclusive)', val: SelectionResizeSnapping.SnapFeaturesIntersect }
+            { lbl: 'Just notes', val: SelectionResizeSnapping.SnapNotesIntersect },
+            { lbl: 'Just pins', val: SelectionResizeSnapping.SnapPinsIntersect },
+            { lbl: 'Just notes+gaps', val: SelectionResizeSnapping.SnapFeaturesIntersect }
         ].forEach(o => {
             if (o.x) { this._snappingModeDropdown.appendChild(option({ value: o.val, selected: true }, o.lbl)); }
             else { this._snappingModeDropdown.appendChild(option({ value: o.val }, o.lbl)); }
         });
-        this._snappingModeDropdown.addEventListener('change', this._setSnapMode);
+        this._snappingModeDropdown.addEventListener('change', this.setSnapMode);
 
-        this._affectModChannelNum = input({ type: "number", step: "1", min: 1, max: Config.modCount, value: "1" });
-        this._affectModChannelContainer = div({ class: "selectionOps-action" },
-            this._affectModChannelNum,
-            div({ class: "tip", onclick: () => this._doc.openPrompt("selectionModTarget") }, "Modulation track #"))
         this._merge = button({ class: "selectionOps-actionbutton noteOpMerge" });
         this._mergeAll = input({ type: "checkbox", class: "selectionOps-checkbox"});
         this._bridge = button({ class: "selectionOps-actionbutton noteOpBridge" });
@@ -260,7 +250,6 @@ export class EditorTabSelection {
             div({ class: "selectionOps-action"},
                 div({ class: "tip", onclick: () => this._doc.openPrompt("selectionResizeSnapping") }, "Selection snap"),
                 div({ class: "selectContainer", style: "padding-left: 4px; width:100%;" }, this._snappingModeDropdown)),
-            this._affectModChannelContainer,
             div({ class: "selectionOps-action"},
                 this._merge,
                 div({ class: "tip", onclick: () => this._doc.openPrompt("selectionMerge") }, "Merge"),
@@ -327,52 +316,70 @@ export class EditorTabSelection {
         this.htmlEntryPoint = div({}, ...patternControls);
     }
 
-    private _setResizeMode = (): void => {
-        this._patternEditor.setSelectionResizeMode(Number(this._resizeModeDropdown.value));
+    public setResizeMode = (value: Event | number): void => {
+        if (typeof value === "number") {
+            const mode = this._patternEditor.getSelectionResizeMode();
+            for (let i = 0; i < this._resizeModeDropdown?.options.length; i++) {
+                if (this._resizeModeDropdown.options.item(i)?.value === String(mode)) {
+                    this._resizeModeDropdown.selectedIndex = i;
+                    break;
+                }
+            }
+        } else {
+            this._patternEditor.setSelectionResizeMode(Number(this._resizeModeDropdown.value));
+        }
     }
 
-    private _setSnapMode = (): void => {
-        this._patternEditor.setSelectionResizeSnapping(Number(this._snappingModeDropdown.value));
+    public setSnapMode = (value: Event | number): void => {
+        if (typeof value === "number") {
+            const snapping = this._patternEditor.getSelectionResizeSnapping();
+            for (let i = 0; i < this._snappingModeDropdown?.options.length; i++) {
+                if (this._snappingModeDropdown.options.item(i)?.value === String(snapping)) {
+                    this._snappingModeDropdown.selectedIndex = i;
+                    break;
+                }
+            }
+        } else {
+            this._patternEditor.setSelectionResizeSnapping(Number(this._snappingModeDropdown.value));
+        }
     }
 
     private _whenSettingButtonClicked = (event: MouseEvent): void => {
-        const modTrackIndex = Config.modCount - this._affectModChannelNum.valueAsNumber;
-
         if (event.target === this._merge) {
-            this._doc.selection.noteMerge(!this._mergeAll.checked, modTrackIndex);
+            this._doc.selection.noteMerge(!this._mergeAll.checked);
         } else if (event.target === this._bridge) {
-            this._doc.selection.noteBridge(this._bridgeGrow.checked, this._bridgeBend.checked, modTrackIndex);
+            this._doc.selection.noteBridge(this._bridgeGrow.checked, this._bridgeBend.checked);
         } else if (event.target === this._spread) {
-            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked, this._spreadStack.checked, modTrackIndex);
+            this._doc.selection.noteSpreadAcross(this._spreadPitch.checked, this._spreadStack.checked);
         } else if (event.target === this._flatten) {
-            this._doc.selection.noteFlattenAcross(!this._flattenPitch.checked, this._flattenVolume.checked, modTrackIndex);
+            this._doc.selection.noteFlattenAcross(!this._flattenPitch.checked, this._flattenVolume.checked);
         } else if (event.target === this._mirrorH) {
-            this._doc.selection.noteMirrorAcross(false, modTrackIndex);
+            this._doc.selection.noteMirrorAcross(false);
         } else if (event.target === this._mirrorV) {
-            this._doc.selection.noteMirrorAcross(true, modTrackIndex);
+            this._doc.selection.noteMirrorAcross(true);
         } else if (event.target === this._split) {
             this._doc.selection.noteSplitAcross(Number(this._splitSlider.input.value),
-            this._splitAbsolute.checked, !this._splitAcross.checked, modTrackIndex)
+            this._splitAbsolute.checked, !this._splitAcross.checked)
         } else if (event.target === this._volUp) {
-			this._doc.selection.noteStepAcross(buttonPresets['volume up'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['volume up']);
 		} else if (event.target === this._volDown) {
-			this._doc.selection.noteStepAcross(buttonPresets['volume down'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['volume down']);
 		} else if (event.target === this._volFadeOut) {
-			this._doc.selection.noteStepAcross(buttonPresets['fade out'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['fade out']);
 		} else if (event.target === this._volFadeIn) {
-			this._doc.selection.noteStepAcross(buttonPresets['fade in'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['fade in']);
 		} else if (event.target === this._volGainEnd) {
-			this._doc.selection.noteStepAcross(buttonPresets['gain end'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['gain end']);
 		} else if (event.target === this._volGainStart) {
-			this._doc.selection.noteStepAcross(buttonPresets['gain start'], modTrackIndex);
+			this._doc.selection.noteStepAcross(buttonPresets['gain start']);
 		} else if (event.target === this._volStudioFadeOut) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade out-mod'] : buttonPresets['studio fade out'], modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade out-mod'] : buttonPresets['studio fade out']);
 		} else if (event.target === this._volStudioFadeIn) {
             const isModChannel = this._doc.song.getChannelIsMod(this._doc.channel);
-			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade in-mod'] : buttonPresets['studio fade in'], modTrackIndex);
+			this._doc.selection.noteStepAcross(isModChannel ? buttonPresets['studio fade in-mod'] : buttonPresets['studio fade in']);
 		} else if (event.target === this._volContrastMax) {
-            this._doc.selection.noteStepAcross(buttonPresets['max contrast'], modTrackIndex);
+            this._doc.selection.noteStepAcross(buttonPresets['max contrast']);
 		}
     }
 
@@ -472,7 +479,7 @@ export class EditorTabSelection {
                         : 'bends';
                     stepData.add = addArr;
                     stepData.mult = multArr;
-                    this._doc.selection.noteStepAcross(stepData, Config.modCount - this._affectModChannelNum.valueAsNumber);
+                    this._doc.selection.noteStepAcross(stepData);
                 }
             }
         }
@@ -560,7 +567,7 @@ export class EditorTabSelection {
         this._updateFunctionDisabled();
 
         if (specialFunction === funcSpecialPresets.TapNotes) {
-            this._specialFunction = () => this._doc.selection.noteTapAcross(Config.modCount - this._affectModChannelNum.valueAsNumber);
+            this._specialFunction = () => this._doc.selection.noteTapAcross();
         }
 	}
 
@@ -601,7 +608,6 @@ export class EditorTabSelection {
 
                     el.setAttribute("disabled", "true")
                 });
-                this._affectModChannelContainer.style.display = "";
 
                 // Disable pitch-related GUI in the step function when on a mod channel, and push to an
                 // array to restore values for them later. Flatten volume is forced to stay on.
@@ -617,7 +623,6 @@ export class EditorTabSelection {
                 incompatWithModulation.forEach(el => el.removeAttribute("disabled"));
                 this._rememberDisabledValues.forEach(entry => entry.chkbx.checked = entry.val);
                 this._rememberDisabledValues = [];
-                this._affectModChannelContainer.style.display = "none";
             }
 
             this._updateFunctionDisabled();
