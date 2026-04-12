@@ -12,7 +12,7 @@ enum funcSpecialPresets {
     TapNotes,
 }
 const funcSpecialPresetsMap = {
-    'Naturalize note positions': funcSpecialPresets.TapNotes,
+    'Humanize note positions': funcSpecialPresets.TapNotes,
 }
 
 // Function presets based on the step function.
@@ -593,7 +593,7 @@ export class EditorTabSelection {
     /** Adjusts controls based on whether in a modulation channel or not, since pitch features are restricted. */
     private _monitorChannelType = () => {
         if (this._monitoredChannel !== this._doc.channel) {
-            const incompatCheckboxes = [this._mergeAll, this._bridgeBend, this._spreadPitch, this._flattenPitch, this._flattenVolume];
+            const incompatCheckboxes = [this._bridgeBend, this._spreadPitch, this._flattenPitch, this._flattenVolume];
             const incompatWithModulation = [this._mirrorV, ...incompatCheckboxes];
 
             if (this._doc.song.getChannelIsMod(this._doc.channel)) {

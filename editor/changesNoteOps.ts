@@ -56,7 +56,9 @@ export class ChangeMergeAcrossAdjacent extends ChangeSequence {
  * This is incompatible with mod channels.
  * 
  * x1, x2 defaults to active selection and are intended to be overridden to control where the operation works.
- * @param pitchIndex Used only if the current channel is a mod channel. This indicates which pitch track to affect.
+ * @param pitchIndex Adjacent merge calls this function after guaranteeing conditions will not create a pitch bend,
+ * allowing it to work in mod tracks under those conditions. But normally, you should not provide a value here and it
+ * will break mod channels. Used only if the current channel is a mod channel. This indicates which pitch track to affect.
  * Must be a value under Config.modCount. Value is not checked to see if in range.
  */
 export class ChangeMergeAcross extends ChangeSequence {

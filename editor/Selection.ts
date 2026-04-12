@@ -899,7 +899,8 @@ export class Selection {
     }
 
     /**
-     * Merges notes, optionally only adjacent ones. This requires adjacent mode on mod channels.
+     * Merges notes, optionally only adjacent ones. This requires adjacent mode on mod channels, but it allows
+     * to simulate non-adjacency by running bridge first.
      * 
      * See the merge functions in changesNoteOps.ts.
      * @param adjacentOnly If true, uses adjacent merge, else uses normal merge.
@@ -911,8 +912,14 @@ export class Selection {
 
         for (const channelIndex of this._eachSelectedChannel()) {
             for (const pattern of this._eachSelectedPattern(channelIndex)) {
-                if (adjacentOnly || this._doc.song.getChannelIsMod(channelIndex)) {
+                const isMod = this._doc.song.getChannelIsMod(channelIndex);
+                if (adjacentOnly || isMod) {
                     for (const track of this.eachSelectedModTrack(channelIndex)) {
+                        if (!adjacentOnly && isMod) {
+                            // Mod channels simulate "all" by bridging, then merging, because it's equivalent to
+                            // filling in the space without making a real effect.
+                            change.append(new ChangeBridgeAcross(this._doc, pattern, false, false, false, undefined, undefined, track))
+                        }
                         change.append(new ChangeMergeAcrossAdjacent(this._doc, pattern, undefined, undefined, track));
                     }
                 } else {

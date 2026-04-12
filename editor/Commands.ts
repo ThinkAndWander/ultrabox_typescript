@@ -901,7 +901,7 @@ export const builtInCommands = {
         { keys: ['shift', 'v', 'c', 'arrowdown'], name: 'Halve contrast', argumentData: [{ value: "Halve contrast" }]},
         { keys: ['shift', 'v', 'c'], cursor: [CursorButtons.WheelDown], argumentData: [{ value: "Halve contrast" }]},
         { keys: ['z', ' ', 'v'], name: 'Volume stagger', argumentData: [{ value: "Stagger volume" }], repeat: true },
-        { keys: ['z', ' ', 'n'], name: 'Naturalize note positions', argumentData: [{ value: "Naturalize note positions" }], repeat: true },
+        { keys: ['z', ' ', 'n'], name: 'Humanize note positions', argumentData: [{ value: "Humanize note positions" }], repeat: true },
         { keys: ['shift', 'z', ' ', 'n'], name: 'Shift notes', argumentData: [{ value: "Shift notes" }], repeat: true },
         { keys: ['z', ' ', 'b'], name: 'Volume random bends', argumentData: [{ value: "Random bends" }], repeat: true }]),
     [CommandTargetName.RunCommand]: simple(CommandTargetName.RunCommand, ['/']),
