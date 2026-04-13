@@ -14,7 +14,7 @@
 		"strictBindCallApply": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
-		"noUnusedLocals": false,
+		"noUnusedLocals": true,
 		"lib": [
 			"DOM",
 			"ES5",
