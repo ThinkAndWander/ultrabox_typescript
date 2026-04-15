@@ -2604,6 +2604,14 @@ export class PatternEditor {
         this._redrawNotePatterns();
     }
 
+    public setToastText(title: string, text: string) {
+        const titleHTML = title !== "" ? HTML.span({ class: "toastText" }, HTML.div(title)) : undefined;
+        const textHTML = text !== "" ? HTML.div({ class: "toastSubtext" }, text) : undefined;
+
+        if (titleHTML && textHTML) this.setToastContent(HTML.div(titleHTML, textHTML));
+        else this.setToastContent(titleHTML ?? textHTML);
+    }
+
     public setToastContent(content: HTMLElement | undefined, indefinite?: boolean) {
         window.clearTimeout(this.toastTimeoutToken);
 

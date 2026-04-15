@@ -1782,7 +1782,7 @@ export class SongEditor {
         this._editMenuDeleteChannel.replaceChildren("Delete Selected Channels " + Cut(this._doc, [CommandTargetName.DeleteChannel], 'menu'));
         this._editMenuSelectChannel.replaceChildren("Select Channel " + Cut(this._doc, [CommandTargetName.SelectChannel], 'menu'));
         this._editMenuSelectAll.replaceChildren("Select All " + Cut(this._doc, [CommandTargetName.SelectAllPatterns], 'menu'));
-        this._editMenuDuplicatePatterns.replaceChildren("Duplicate Reused Patterns " + Cut(this._doc, [CommandTargetName.DuplicatePattern], 'menu'));
+        this._editMenuDuplicatePatterns.replaceChildren("Duplicate Reused Patterns " + Cut(this._doc, [CommandTargetName.DuplicateReusedPatterns], 'menu'));
         this._editMenuTransposeUp.replaceChildren("Move Notes Up " + Cut(this._doc, [CommandTargetName.TransposeUp, CommandTargetName.TransposeOctaveUp], 'menu'));
         this._editMenuTransposeDown.replaceChildren("Move Notes Down " + Cut(this._doc, [CommandTargetName.TransposeDown, CommandTargetName.TransposeOctaveDown], 'menu'));
         this._editMenuMoveNotesSideways.replaceChildren("Move All Notes Sideways... " + Cut(this._doc, [CommandTargetName.MoveNotesSideways], 'menu'));
@@ -3972,7 +3972,7 @@ export class SongEditor {
                 this._doc.selection.deleteBars(true);
                 this._barScrollBar.animatePlayhead();
                 return;
-            case CommandTargetName.DuplicatePattern:
+            case CommandTargetName.DuplicateReusedPatterns:
                 this._doc.selection.duplicatePatterns();
                 return;
             case CommandTargetName.DeleteChannel:
@@ -4001,13 +4001,13 @@ export class SongEditor {
                     && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount)
                 {
                     this._doc.openPrompt("customNoteFilterSettings");
-                } else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Can't open note filter (check instrument effects).")); }
+                } else { this._patternEditor.setToastText("", "Can't open note filter (check instrument effects)."); }
                 return;
-            case CommandTargetName.EditSongEQ:
+            case CommandTargetName.EditEQ:
                 const instrument2: Instrument = this._doc.song.channels[this._doc.channel].instruments[this._doc.getCurrentInstrument()];
                 if (!instrument2.eqFilterType && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
                     this._doc.openPrompt("customEQFilterSettings");
-                } else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Can't open song EQ (instrument doesn't support EQ).")); }
+                } else { this._patternEditor.setToastText("", "Can't open instrument EQ (instrument doesn't support it)."); }
                 return;
             case CommandTargetName.EditSongLength:
                 this._doc.openPrompt("barCount");
@@ -4133,11 +4133,11 @@ export class SongEditor {
             case CommandTargetName.MoveNotesSideways:
                 this._doc.openPrompt("moveNotesSideways");
                 return;
-            case CommandTargetName.MovePatternLeft:
+            case CommandTargetName.TrackSelectLeft:
                 this._doc.selection.setChannelBar(this._doc.channel, (this._doc.bar + this._doc.song.barCount - 1) % this._doc.song.barCount);
                 this._doc.selection.resetBoxSelection();
                 return;
-            case CommandTargetName.MovePatternRight:
+            case CommandTargetName.TrackSelectRight:
                 this._doc.selection.setChannelBar(this._doc.channel, (this._doc.bar + 1) % this._doc.song.barCount);
                 this._doc.selection.resetBoxSelection();
                 return;
@@ -4151,12 +4151,12 @@ export class SongEditor {
                     this._doc.selection.muteChannels(false);
                 }
                 return;
-            case CommandTargetName.NewPattern:
-            case CommandTargetName.NewPatternFromEmpty:
+            case CommandTargetName.NextUnusedPattern:
+            case CommandTargetName.NextEmptyPattern:
                 const group = new ChangeGroup();
                 let next: number;
 
-                if (command.Target === CommandTargetName.NewPattern) {
+                if (command.Target === CommandTargetName.NextUnusedPattern) {
                     next = 1; // "next" represents the next unused space
                     while (this._doc.song.channels[this._doc.channel].bars.indexOf(next) !== -1
                         && next <= this._doc.song.patternsPerChannel)
@@ -4204,6 +4204,7 @@ export class SongEditor {
                     channel.name = "";
                 }
                 this._doc.record(new ChangeSong(this._doc, ""), false, true);
+                this._patternEditor.setToastText("New Song", `${Cut(this._doc, [CommandTargetName.Undo], "menu")} to undo`);
                 return;
             case CommandTargetName.NextBar:
             case CommandTargetName.PrevBar:
@@ -4235,11 +4236,11 @@ export class SongEditor {
             case CommandTargetName.PastePatternNumbers:
                 this._doc.selection.pasteNumbers();
                 return;
-            case CommandTargetName.PatternDown:
+            case CommandTargetName.ChannelBelow:
                 this._doc.selection.setChannelBar((this._doc.channel + 1) % this._doc.song.getChannelCount(), this._doc.bar);
                 this._doc.selection.resetBoxSelection();
                 return;
-            case CommandTargetName.PatternUp:
+            case CommandTargetName.ChannelAbove:
                 this._doc.selection.setChannelBar((this._doc.channel - 1 + this._doc.song.getChannelCount()) % this._doc.song.getChannelCount(), this._doc.bar);
                 this._doc.selection.resetBoxSelection();
                 return;
@@ -4283,12 +4284,12 @@ export class SongEditor {
             case CommandTargetName.SelectChannel:
                 this._doc.selection.selectChannel();
                 return;
-            case CommandTargetName.SelectionDown:
+            case CommandTargetName.ExtendTrackSelectionDown:
                 this._doc.selection.boxSelectionY1 = Math.min(this._doc.song.getChannelCount() - 1, this._doc.selection.boxSelectionY1 + 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
-            case CommandTargetName.SelectionUp:
+            case CommandTargetName.ExtendTrackSelectionUp:
                 this._doc.selection.boxSelectionY1 = Math.max(0, this._doc.selection.boxSelectionY1 - 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
@@ -4442,13 +4443,13 @@ export class SongEditor {
                 return;
             case CommandTargetName.NotesFadeIn:
                 this.handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [
-                    { value: actionDataAsBool(actionData![0], false) ? (this._doc.song.getChannelIsMod(this._doc.channel) ? 'studio fade in' : 'studio fade in-mod') : 'fade in' },
-                    { value: String(actionDataAsNumber(actionData![1], 0, 1, Config.modCount) - 1) }]);
+                    { value: actionDataAsBool(actionData![0], false) ? (this._doc.song.getChannelIsMod(this._doc.channel)
+                        ? 'studio fade in' : 'studio fade in-mod') : 'fade in' }]);
                 return;
             case CommandTargetName.NotesFadeOut:
                 this.handleCommand(builtInCommands[CommandTargetName.RunNoteFunction], [
-                    { value: actionDataAsBool(actionData![0], false) ? (this._doc.song.getChannelIsMod(this._doc.channel) ? 'studio fade out' : 'studio fade out-mod') : 'fade out' },
-                    { value: String(actionDataAsNumber(actionData![1], 0, 1, Config.modCount) - 1) }]);
+                    { value: actionDataAsBool(actionData![0], false) ? (this._doc.song.getChannelIsMod(this._doc.channel)
+                        ? 'studio fade out' : 'studio fade out-mod') : 'fade out' }]);
                 return;
             case CommandTargetName.NotesFlatten:
                 this._doc.selection.noteFlattenAcross(
@@ -4465,8 +4466,7 @@ export class SongEditor {
                     (command.Target === CommandTargetName.NotesGainOut) ? 'gain end' :
                     (command.Target === CommandTargetName.NotesMaxContrast) ? 'max contrast' :
                     (command.Target === CommandTargetName.NotesVolumeDown) ? 'volume down' :
-                    (command.Target === CommandTargetName.NotesVolumeUp) ? 'volume up' : '' },
-                    { value: String(actionDataAsNumber(actionData![0], 0, 1, Config.modCount) - 1) }]);
+                    (command.Target === CommandTargetName.NotesVolumeUp) ? 'volume up' : '' }]);
                 return;
             case CommandTargetName.NotesMerge:
                 this._doc.selection.noteMerge(!actionDataAsBool(actionData![0], false));
@@ -4540,7 +4540,7 @@ export class SongEditor {
                         !back || exclusive ? searchResults.x2 : this._doc.selection.patternSelectionEnd);
                 }
                 return;
-            case CommandTargetName.SetNoteSelection:
+            case CommandTargetName.SetPatternSelection:
                 temp = {
                     x0: actionDataAsNumber(actionData![0], 0, 0, this._doc.song.partsPerPattern),
                     x1: actionDataAsNumber(actionData![1], 0, 0, this._doc.song.partsPerPattern)
@@ -4550,7 +4550,7 @@ export class SongEditor {
                 if (temp.x0 === temp.x1) { new ChangePatternSelection(this._doc, 0, 0); }
                 else { new ChangePatternSelection(this._doc, Math.min(temp.x0, temp.x1), Math.max(temp.x0, temp.x1)); }
                 return;
-            case CommandTargetName.InvertSelection:
+            case CommandTargetName.InvertPatternSelection:
                 if (!this._doc.selection.patternSelectionActive) {
                     new ChangePatternSelection(this._doc, 0, this._doc.song.partsPerPattern);
                 } else if (this._doc.selection.patternSelectionStart === 0
@@ -4680,7 +4680,7 @@ export class SongEditor {
 
         if (nav.clipboard && nav.clipboard.writeText) {
             nav.clipboard.writeText(text).then(() => {
-                this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Copied to clipboard"));
+                this._patternEditor.setToastText("", "Copied to clipboard");
             }).catch(() => {
                 window.prompt("Copy to clipboard:", text);
             });
@@ -4694,7 +4694,7 @@ export class SongEditor {
         textField.remove();
         this.refocusStage();
         if (!succeeded) window.prompt("Copy this:", text);
-        else { this._patternEditor.setToastContent(div({ class: "toastSubtext" }, "Copied to clipboard")); }
+        else { this._patternEditor.setToastText("", "Copied to clipboard"); }
     }
 
     private _whenPrevBarPressed = (): void => {
@@ -4848,6 +4848,7 @@ export class SongEditor {
         instrumentCopy["isDrum"] = this._doc.song.getChannelIsNoise(this._doc.channel);
         instrumentCopy["isMod"] = this._doc.song.getChannelIsMod(this._doc.channel);
         window.localStorage.setItem("instrumentCopy", JSON.stringify(instrumentCopy));
+        this._patternEditor.setToastText("", "Copied instrument");
         this.refocusStage();
     }
 
@@ -4857,6 +4858,9 @@ export class SongEditor {
         const instrumentCopy: any = JSON.parse(String(window.localStorage.getItem("instrumentCopy")));
         if (instrumentCopy != null && instrumentCopy["isDrum"] == this._doc.song.getChannelIsNoise(this._doc.channel) && instrumentCopy["isMod"] == this._doc.song.getChannelIsMod(this._doc.channel)) {
             this._doc.record(new ChangePasteInstrument(this._doc, instrument, instrumentCopy));
+            this._patternEditor.setToastText("", "Pasted instrument");
+        } else {
+            this._patternEditor.setToastText("", "Couldn't paste instrument");
         }
         this.refocusStage();
     }
@@ -4886,12 +4890,22 @@ export class SongEditor {
     }
 
     private _randomPreset(): void {
-        const isNoise: boolean = this._doc.song.getChannelIsNoise(this._doc.channel);
-        this._doc.record(new ChangePreset(this._doc, pickRandomPresetValue(isNoise)));
+        if (!this._doc.song.getChannelIsMod(this._doc.channel)) {
+            const isNoise: boolean = this._doc.song.getChannelIsNoise(this._doc.channel);
+            this._doc.record(new ChangePreset(this._doc, pickRandomPresetValue(isNoise)));
+            this._patternEditor.setToastText("", "Randomized instrument");
+        } else {
+            this._patternEditor.setToastText("", "Can't randomize instrument here");
+        }
     }
 
     private _randomGenerated(): void {
-        this._doc.record(new ChangeRandomGeneratedInstrument(this._doc));
+        if (!this._doc.song.getChannelIsMod(this._doc.channel)) {
+            this._doc.record(new ChangeRandomGeneratedInstrument(this._doc));
+            this._patternEditor.setToastText("", "Randomized instrument");
+        } else {
+            this._patternEditor.setToastText("", "Can't randomize instrument here");
+        }
     }
 
 
@@ -5295,7 +5309,7 @@ export class SongEditor {
                 this.handleCommand(builtInCommands[CommandTargetName.SelectChannel]);
                 break;
             case "duplicatePatterns":
-                this.handleCommand(builtInCommands[CommandTargetName.DuplicatePattern]);
+                this.handleCommand(builtInCommands[CommandTargetName.DuplicateReusedPatterns]);
                 break;
             case "barCount":
                 this.handleCommand(builtInCommands[CommandTargetName.EditSongLength]);
