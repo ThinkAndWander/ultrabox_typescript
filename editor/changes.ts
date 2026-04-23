@@ -505,8 +505,8 @@ export class ChangeMoveAndOverflowNotes extends ChangeGroup {
     constructor(doc: SongDocument, newBeatsPerBar: number, partsToMove: number) {
         super();
 
-        const boxY0 = Math.min(doc.selection.boxSelectionY0, doc.selection.boxSelectionY1);
-        const boxY1 = Math.max(doc.selection.boxSelectionY0, doc.selection.boxSelectionY1);
+        const boxY0 = Math.min(doc.selection.trackY0, doc.selection.trackY1);
+        const boxY1 = Math.max(doc.selection.trackY0, doc.selection.trackY1);
         const pitchChannels: {channel: Channel, skipped: boolean }[] = [];
         const noiseChannels: {channel: Channel, skipped: boolean }[] = [];
         const modChannels: {channel: Channel, skipped: boolean }[] = []
@@ -3720,10 +3720,10 @@ export class ChangeMoveNotesSideways extends ChangeGroup {
         super();
 
         // Can be out-of-order.
-        const boxX0 = Math.min(doc.selection.boxSelectionX0, doc.selection.boxSelectionX1);
-        const boxX1 = Math.max(doc.selection.boxSelectionX0, doc.selection.boxSelectionX1);
-        const boxY0 = Math.min(doc.selection.boxSelectionY0, doc.selection.boxSelectionY1);
-        const boxY1 = Math.max(doc.selection.boxSelectionY0, doc.selection.boxSelectionY1);
+        const boxX0 = Math.min(doc.selection.trackX0, doc.selection.trackX1);
+        const boxX1 = Math.max(doc.selection.trackX0, doc.selection.trackX1);
+        const boxY0 = Math.min(doc.selection.trackY0, doc.selection.trackY1);
+        const boxY1 = Math.max(doc.selection.trackY0, doc.selection.trackY1);
 
         let partsToMove: number = Math.round((beatsToMove % doc.song.beatsPerBar) * Config.partsPerBeat);
         if (partsToMove < 0) partsToMove += doc.song.partsPerPattern;
@@ -3994,8 +3994,8 @@ export class ChangeSong extends ChangeGroup {
         }
         if (newHash == "") {
             this.append(new ChangePatternSelection(doc, 0, 0));
-            doc.selection.patternSelectionStartY = 0;
-            doc.selection.patternSelectionEndY = Config.modCount - 1;
+            doc.selection.patternY0 = 0;
+            doc.selection.patternY1 = Config.modCount - 1;
             doc.selection.resetBoxSelection();
             setDefaultInstruments(doc.song);
             doc.song.scale = doc.prefs.defaultScale;
@@ -4484,8 +4484,8 @@ export class ChangeSplitNotesAtPoint extends ChangeSequence {
 class ChangeSplitNotesAtSelection extends ChangeSequence {
 	constructor(doc: SongDocument, pattern: Pattern, pitchIndex?: number) {
 		super();
-		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionStart, pitchIndex));
-		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternSelectionEnd, pitchIndex));
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternX0, pitchIndex));
+		this.append(new ChangeSplitNotesAtPoint(doc, pattern, doc.selection.patternX1, pitchIndex));
 	}
 }
 
@@ -4632,7 +4632,7 @@ export class ChangeTranspose extends ChangeSequence {
             this.append(new ChangeSplitNotesAtSelection(doc, pattern));
         }
         for (const note of pattern.notes) {
-            if (doc.selection.patternSelectionActive && (note.end <= doc.selection.patternSelectionStart || note.start >= doc.selection.patternSelectionEnd)) {
+            if (doc.selection.patternSelectionActive && (note.end <= doc.selection.patternX0 || note.start >= doc.selection.patternX1)) {
                 continue;
             }
             this.append(new ChangeTransposeNote(doc, channelIndex, note, upward, ignoreScale, octave));
@@ -4643,10 +4643,10 @@ export class ChangeTranspose extends ChangeSequence {
 export class ChangeTrackSelection extends Change {
     constructor(doc: SongDocument, newX0: number, newX1: number, newY0: number, newY1: number) {
         super();
-        doc.selection.boxSelectionX0 = newX0;
-        doc.selection.boxSelectionX1 = newX1;
-        doc.selection.boxSelectionY0 = newY0;
-        doc.selection.boxSelectionY1 = newY1;
+        doc.selection.trackX0 = newX0;
+        doc.selection.trackX1 = newX1;
+        doc.selection.trackY0 = newY0;
+        doc.selection.trackY1 = newY1;
         doc.notifier.changed();
         this._didSomething();
     }
@@ -4659,26 +4659,26 @@ export class ChangePatternSelection extends UndoableChange {
     private _newStart: number;
     private _newEnd: number;
 
-    constructor(doc: SongDocument, newStart: number, newEnd: number) {
+    constructor(doc: SongDocument, x0: number, x1: number) {
         super(false);
         this._doc = doc;
-        this._oldStart = doc.selection.patternSelectionStart;
-        this._oldEnd = doc.selection.patternSelectionEnd;
-        this._newStart = newStart;
-        this._newEnd = newEnd;
+        this._oldStart = doc.selection.patternX0;
+        this._oldEnd = doc.selection.patternX1;
+        this._newStart = x0;
+        this._newEnd = x1;
         this._doForwards();
         this._didSomething();
     }
 
     protected _doForwards(): void {
-        this._doc.selection.patternSelectionStart = this._newStart;
-        this._doc.selection.patternSelectionEnd = this._newEnd;
+        this._doc.selection.patternX0 = this._newStart;
+        this._doc.selection.patternX1 = this._newEnd;
         this._doc.notifier.changed();
     }
 
     protected _doBackwards(): void {
-        this._doc.selection.patternSelectionStart = this._oldStart;
-        this._doc.selection.patternSelectionEnd = this._oldEnd;
+        this._doc.selection.patternX0 = this._oldStart;
+        this._doc.selection.patternX1 = this._oldEnd;
         this._doc.notifier.changed();
     }
 }
@@ -4690,8 +4690,8 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
         if (doc.song.getChannelIsMod(channelIndex)) { transpose = 0; } // Cannot jump mod tracks.
         if (parts == 0 && transpose == 0) return;
 
-        const oldStart: number = doc.selection.patternSelectionStart;
-        const oldEnd: number = doc.selection.patternSelectionEnd;
+        const oldStart: number = doc.selection.patternX0;
+        const oldEnd: number = doc.selection.patternX1;
 
         if (doc.selection.patternSelectionActive) {
             for (const track of doc.selection.eachSelectedModTrack(channelIndex)) {
@@ -4701,17 +4701,12 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
         
         const newStart: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldStart + parts));
         const newEnd: number = Math.max(0, Math.min(doc.song.partsPerPattern, oldEnd + parts));
+
+        // Erases selection contents, or clears space for dragged notes
         for (const track of doc.selection.eachSelectedModTrack(channelIndex)) {
-            if (newStart == newEnd) {
-                // Just erase the current contents of the selection:
-                this.append(new ChangeNoteTruncate(doc, pattern, oldStart, oldEnd, null, true, track));
-            } else if (parts < 0) {
-                // Clear space for the dragged notes:
-                this.append(new ChangeNoteTruncate(doc, pattern, newStart, Math.min(oldStart, newEnd), null, true, track));
-            } else {
-                // Clear space for the dragged notes:
-                this.append(new ChangeNoteTruncate(doc, pattern, Math.max(oldEnd, newStart), newEnd, null, true, track));
-            }
+            if (newStart == newEnd) this.append(new ChangeNoteTruncate(doc, pattern, oldStart, oldEnd, null, true, track));
+            else if (parts < 0) this.append(new ChangeNoteTruncate(doc, pattern, newStart, Math.min(oldStart, newEnd), null, true, track));
+            else this.append(new ChangeNoteTruncate(doc, pattern, Math.max(oldEnd, newStart), newEnd, null, true, track));
         }
 
         this.append(new ChangePatternSelection(doc, newStart, newEnd));
@@ -4722,8 +4717,8 @@ export class ChangeDragSelectedNotes extends ChangeSequence {
             const note: Note = pattern.notes[i];
             if ((doc.song.getChannelIsMod(channelIndex) &&
                     (note.pitches.length !== 1
-                    || note.pitches[0] < doc.selection.patternSelectionStartY
-                    || note.pitches[0] > doc.selection.patternSelectionEndY))
+                    || note.pitches[0] < doc.selection.patternY0
+                    || note.pitches[0] > doc.selection.patternY1))
                 || note.end <= oldStart || note.start >= oldEnd)
             {
                 i++;
@@ -4817,7 +4812,7 @@ export class ChangePatternScale extends Change {
         }
         const maxPitch: number = Config.maxPitch;
         for (const note of pattern.notes) {
-            if (doc.selection.patternSelectionActive && (note.end <= doc.selection.patternSelectionStart || note.start >= doc.selection.patternSelectionEnd)) {
+            if (doc.selection.patternSelectionActive && (note.end <= doc.selection.patternX0 || note.start >= doc.selection.patternX1)) {
                 continue;
             }
 

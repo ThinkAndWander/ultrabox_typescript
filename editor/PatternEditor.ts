@@ -540,15 +540,15 @@ export class PatternEditor {
     }
 
     private _cursorIsInSelection(): boolean {
-        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._doc.selection.patternSelectionStart <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternSelectionEnd;
+        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._doc.selection.patternX0 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternX1;
     }
 
     private _cursorAtStartOfSelection(): boolean {
-        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1 && this._doc.selection.patternSelectionStart - 3 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternSelectionStart + 1.25;
+        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1 && this._doc.selection.patternX0 - 3 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternX0 + 1.25;
     }
 
     private _cursorAtEndOfSelection(): boolean {
-        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1 && this._doc.selection.patternSelectionEnd - 1.25 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternSelectionEnd + 3;
+        return this._cursor.valid && this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1 && this._doc.selection.patternX1 - 1.25 <= this._cursor.exactPart && this._cursor.exactPart <= this._doc.selection.patternX1 + 3;
     }
 
     private _findMousePitch(pixelY: number): number {
@@ -645,8 +645,8 @@ export class PatternEditor {
         if (this._usingTouch && !this.shiftMode && !this._mouseDragging && this._mouseDown && performance.now() > this._touchTime + 1000 && this._cursor.valid && this._doc.lastChangeWas(this._dragChange)) {
             // On a mobile device, the pattern editor supports using a long stationary touch to activate selection.
             this._dragChange!.undo();
-            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
-            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
+            this._unresizedSelection.start = this._doc.selection.patternX0;
+            this._unresizedSelection.end = this._doc.selection.patternX1;
             this._shiftHeld = true;
             this._dragConfirmed = false;
             this._whenCursorPressed();
@@ -1693,32 +1693,32 @@ export class PatternEditor {
             } else if (this._shiftHeld) {
                 if ((this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1) || this._cursorIsInSelection()) {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._doc.selection.patternSelectionStartY = this._cursor.pitch;
-                    this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                    this._doc.selection.patternY0 = this._cursor.pitch;
+                    this._doc.selection.patternY1 = this._cursor.pitch;
                     this._unresizedSelection = { ...this._unresizedSelection, start: 0, end: 0 };
                 } else {
                     if (this._cursor.curNote != null) {
                         sequence.append(new ChangePatternSelection(this._doc, this._cursor.curNote.start, this._cursor.curNote.end));
-                        this._doc.selection.patternSelectionStartY = this._cursor.curNote.pitches[0];
-                        this._doc.selection.patternSelectionEndY = this._cursor.curNote.pitches[0];
+                        this._doc.selection.patternY0 = this._cursor.curNote.pitches[0];
+                        this._doc.selection.patternY1 = this._cursor.curNote.pitches[0];
                         this._unresizedSelection = { ...this._unresizedSelection, start: this._cursor.curNote.start, end: this._cursor.curNote.end };
                     } else {
                         const start: number = Math.max(0, Math.min((this._doc.song.beatsPerBar - 1) * Config.partsPerBeat, Math.floor(this._cursor.exactPart / Config.partsPerBeat) * Config.partsPerBeat));
                         const end: number = start + Config.partsPerBeat;
                         sequence.append(new ChangePatternSelection(this._doc, start, end));
-                        this._doc.selection.patternSelectionStartY = this._cursor.pitch;
-                        this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                        this._doc.selection.patternY0 = this._cursor.pitch;
+                        this._doc.selection.patternY1 = this._cursor.pitch;
                         this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     }
                 }
-                this._unresizedSelection.startY = this._doc.selection.patternSelectionStartY;
-                this._unresizedSelection.endY = this._doc.selection.patternSelectionEndY;
+                this._unresizedSelection.startY = this._doc.selection.patternY0;
+                this._unresizedSelection.endY = this._doc.selection.patternY1;
             } else if (this._cursorIsInSelection()) {
                 this._draggingSelectionContents = true;
             } else if (this._cursor.valid && this._cursor.curNote == null) {
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._doc.selection.patternSelectionStartY = this._cursor.pitch;
-                this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                this._doc.selection.patternY0 = this._cursor.pitch;
+                this._doc.selection.patternY1 = this._cursor.pitch;
                 this._unresizedSelection = { start: 0, end: 0, startY: this._cursor.pitch, endY: this._cursor.pitch };
 
                 // If clicking in empty space, the result will be adding a note,
@@ -1793,14 +1793,14 @@ export class PatternEditor {
             }
         }
 
-        if (this._shiftHeld && this._mouseHorizontal && Math.abs(this._mouseXStart - this._mouseX) > 5) {
+        if (this._shiftHeld && (Math.abs(this._mouseXStart - this._mouseX) > 5 || Math.abs(this._mouseYStart - this._mouseY) > 5)) {
             this._dragConfirmed = true;
         }
 
         if (this._mouseDragging && this._mouseDown && this._cursor.valid && continuousState) {
             this._dragChange!.undo();
-            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
-            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
+            this._unresizedSelection.start = this._doc.selection.patternX0;
+            this._unresizedSelection.end = this._doc.selection.patternX1;
             const sequence: ChangeSequence = new ChangeSequence();
             this._dragChange = sequence;
             this._doc.setProspectiveChange(this._dragChange);
@@ -1812,8 +1812,8 @@ export class PatternEditor {
                 const pattern: Pattern | null = this._doc.getCurrentPattern(this._barOffset)
 
                 // Normally, dragging the selection bounds follows its snapping behavior.
-                let newStart = this._doc.selection.patternSelectionStart;
-                let newEnd = this._doc.selection.patternSelectionEnd;
+                let newStart = this._doc.selection.patternX0;
+                let newEnd = this._doc.selection.patternX1;
                 if (!this._shiftHeld || this._selectionSnapping === SelectionResizeSnapping.Rhythm) {
                     if (this._draggingStartOfSelection) {
                         newStart = Math.max(0, Math.min(this._doc.song.partsPerPattern, currentPart));
@@ -1830,13 +1830,13 @@ export class PatternEditor {
                         this._selectionSnapping === SelectionResizeSnapping.SnapNotesIntersect ||
                         this._selectionSnapping === SelectionResizeSnapping.SnapPinsIntersect;
                     const back =
-                        (this._draggingStartOfSelection && currentPart < this._doc.selection.patternSelectionStart) ||
-                        (this._draggingEndOfSelection && currentPart < this._doc.selection.patternSelectionEnd);
+                        (this._draggingStartOfSelection && currentPart < this._doc.selection.patternX0) ||
+                        (this._draggingEndOfSelection && currentPart < this._doc.selection.patternX1);
 
                     const searchResults = this._doc.selection.search(currentPart, !pins, pins, features, features, back);
                     if (searchResults) {
-                        newStart = this._draggingStartOfSelection || exclusive ? searchResults.x1 : this._doc.selection.patternSelectionStart;
-                        newEnd = this._draggingEndOfSelection || exclusive ? searchResults.x2 : this._doc.selection.patternSelectionEnd;
+                        newStart = this._draggingStartOfSelection || exclusive ? searchResults.x1 : this._doc.selection.patternX0;
+                        newEnd = this._draggingEndOfSelection || exclusive ? searchResults.x2 : this._doc.selection.patternX1;
 
                         if (newStart > newEnd) {
                             const swap = newEnd;
@@ -1848,9 +1848,7 @@ export class PatternEditor {
 
                 // In wrap-around mode, dragging selection ends shifts the wrap amount instead of adjusting bounds.
                 if (this._selectionResizing === SelectionResizeMode.WrapAround) {
-                        this._mouseLockXShift +=
-                            (newStart - this._doc.selection.patternSelectionStart) +
-                            (newEnd - this._doc.selection.patternSelectionEnd);
+                    this._mouseLockXShift += (newStart - this._doc.selection.patternX0) + (newEnd - this._doc.selection.patternX1);
                 } else {
                     sequence.append(new ChangePatternSelection(this._doc, newStart, newEnd));
                 }
@@ -1858,7 +1856,7 @@ export class PatternEditor {
                 // Prospectively perform side effects based on selection mode when adjusting selection.
                 if (this._selectionResizing === SelectionResizeMode.WrapAround) {
                     if (pattern) {
-                        const coordsWidth = this._doc.selection.patternSelectionEnd - this._doc.selection.patternSelectionStart;
+                        const coordsWidth = this._doc.selection.patternX1 - this._doc.selection.patternX0;
                         const origCoordsWidth = this._unresizedSelection.end - this._unresizedSelection.start;
                         const wrap = new ChangeWrapAcross(this._doc, pattern, coordsWidth - origCoordsWidth + this._mouseLockXShift,
                             this._unresizedSelection.start, this._unresizedSelection.end);
@@ -1867,7 +1865,7 @@ export class PatternEditor {
                 } else if (this._selectionResizing === SelectionResizeMode.Stretch) {
                     if (pattern) {
                         const stretch = new ChangeStretchHorizontal(this._doc, pattern,
-                            this._doc.selection.patternSelectionStart, this._doc.selection.patternSelectionEnd,
+                            this._doc.selection.patternX0, this._doc.selection.patternX1,
                             this._unresizedSelection.start, this._unresizedSelection.end);
                         sequence.append(stretch);
                     }
@@ -1889,8 +1887,8 @@ export class PatternEditor {
                     const draggedTranspose: number = Math.round((this._mouseYStart - this._mouseY) / (this._pitchHeight * pitchRatio));
                     sequence.append(new ChangeDragSelectedNotes(this._doc, this._doc.channel, pattern, draggedParts, draggedTranspose));
 
-                    this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
-                    this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
+                    this._unresizedSelection.start = this._doc.selection.patternX0;
+                    this._unresizedSelection.end = this._doc.selection.patternX1;
                     this._unresizedSelection.startY += draggedTranspose;
                     this._unresizedSelection.endY += draggedTranspose;
                 }
@@ -1953,8 +1951,8 @@ export class PatternEditor {
                     mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
 
                     sequence.append(new ChangePatternSelection(this._doc, start, end));
-                    this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, mousePitch);
-                    this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, mousePitch);
+                    this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
+                    this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
                     this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     this._updateSelection();
                 }
@@ -1963,8 +1961,8 @@ export class PatternEditor {
                 mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
 
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, mousePitch);
-                this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, mousePitch);
+                this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
+                this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
             } else {
                 if (this._cursor.curNote == null) {
                     this._unresizedSelection = { start: 0, end: 0, startY: 0, endY: 0 };
@@ -2070,8 +2068,8 @@ export class PatternEditor {
 
                 } else if (this._mouseHorizontal) {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
-                    this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                    this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                    this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
 
                     const shift: number = (this._mouseX - this._mouseXStart) / this._partWidth;
 
@@ -2106,8 +2104,8 @@ export class PatternEditor {
 
                     if (!this._mouseDragging) {
                         sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                        this._doc.selection.patternSelectionStartY = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
-                        this._doc.selection.patternSelectionEndY = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                        this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                        this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
                     }
 
                     const bendPart: number =
@@ -2276,12 +2274,12 @@ export class PatternEditor {
             // We still respect selection bounds changes in wrap around to accommodate those scenarios, and so we need to also
             // undo those deviations on releasing the mouse/touch event.
             if (this._selectionResizing === SelectionResizeMode.WrapAround) {
-                this._doc.selection.patternSelectionStart = this._unresizedSelection.start;
-                this._doc.selection.patternSelectionEnd = this._unresizedSelection.end;
+                this._doc.selection.patternX0 = this._unresizedSelection.start;
+                this._doc.selection.patternX1 = this._unresizedSelection.end;
             }
 
-            this._unresizedSelection.start = this._doc.selection.patternSelectionStart;
-            this._unresizedSelection.end = this._doc.selection.patternSelectionEnd;
+            this._unresizedSelection.start = this._doc.selection.patternX0;
+            this._unresizedSelection.end = this._doc.selection.patternX1;
 
             if (this._draggingSelectionContents) {
                 this._doc.record(this._dragChange);
@@ -2303,8 +2301,8 @@ export class PatternEditor {
 
                 const sequence: ChangeSequence = new ChangeSequence();
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._doc.selection.patternSelectionStartY = this._cursor.pitch;
-                this._doc.selection.patternSelectionEndY = this._cursor.pitch;
+                this._doc.selection.patternY0 = this._cursor.pitch;
+                this._doc.selection.patternY1 = this._cursor.pitch;
 
                 if (this._cursor.pitchIndex === -1) {
                     if (this._cursor.curNote.pitches.length == Config.maxChordSize) {
@@ -2400,20 +2398,20 @@ export class PatternEditor {
                 this._svgPreview.setAttribute("visibility", "visible");
 
                 if (this._cursorAtStartOfSelection()) {
-                    const center: number = this._partWidth * this._doc.selection.patternSelectionStart;
+                    const center: number = this._partWidth * this._doc.selection.patternX0;
                     const left: string = prettyNumber(center - 4);
                     const right: string = prettyNumber(center + 4);
                     const bottom: number = this._pitchToPixelHeight(-0.5);
                     this._svgPreview.setAttribute("d", "M " + left + " 0 L " + left + " " + bottom + " L " + right + " " + bottom + " L " + right + " 0 z");
                 } else if (this._cursorAtEndOfSelection()) {
-                    const center: number = this._partWidth * this._doc.selection.patternSelectionEnd;
+                    const center: number = this._partWidth * this._doc.selection.patternX1;
                     const left: string = prettyNumber(center - 4);
                     const right: string = prettyNumber(center + 4);
                     const bottom: number = this._pitchToPixelHeight(-0.5);
                     this._svgPreview.setAttribute("d", "M " + left + " 0 L " + left + " " + bottom + " L " + right + " " + bottom + " L " + right + " 0 z");
                 } else if (this._cursorIsInSelection()) {
-                    const left: string = prettyNumber(this._partWidth * this._doc.selection.patternSelectionStart - 2);
-                    const right: string = prettyNumber(this._partWidth * this._doc.selection.patternSelectionEnd + 2);
+                    const left: string = prettyNumber(this._partWidth * this._doc.selection.patternX0 - 2);
+                    const right: string = prettyNumber(this._partWidth * this._doc.selection.patternX1 + 2);
                     const bottom: number = this._pitchToPixelHeight(-0.5);
                     this._svgPreview.setAttribute("d", "M " + left + " 0 L " + left + " " + bottom + " L " + right + " " + bottom + " L " + right + " 0 z");
                 } else {
@@ -2427,12 +2425,12 @@ export class PatternEditor {
         // Update selection visibility.
         if (this._doc.selection.patternSelectionActive) {
             this._selectionRect.setAttribute("visibility", "visible");
-            this._selectionRect.setAttribute("x", String(this._partWidth * this._doc.selection.patternSelectionStart));
-            this._selectionRect.setAttribute("width", String(this._partWidth * (this._doc.selection.patternSelectionEnd - this._doc.selection.patternSelectionStart)));
+            this._selectionRect.setAttribute("x", String(this._partWidth * this._doc.selection.patternX0));
+            this._selectionRect.setAttribute("width", String(this._partWidth * (this._doc.selection.patternX1 - this._doc.selection.patternX0)));
 
             if (this._doc.song.getChannelIsMod(this._doc.channel)) {
-                const pitches = this._doc.selection.patternSelectionEndY - this._doc.selection.patternSelectionStartY;
-                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternSelectionEndY - 1))));
+                const pitches = this._doc.selection.patternY1 - this._doc.selection.patternY0;
+                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternY1 - 1))));
                 this._selectionRect.setAttribute("height", String(-this._pitchBorder + (this._pitchHeight * (pitches + 1))));
             }
         } else {
@@ -2526,8 +2524,8 @@ export class PatternEditor {
             this._svgPlayhead.setAttribute("height", "" + this._editorHeight);
 
             if (this._doc.song.getChannelIsMod(this._doc.channel) && this._doc.selection.patternSelectionActive) {
-                const pitches = this._doc.selection.patternSelectionEndY - this._doc.selection.patternSelectionStartY;
-                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternSelectionEndY - 1))));
+                const pitches = this._doc.selection.patternY1 - this._doc.selection.patternY0;
+                this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternY1 - 1))));
                 this._selectionRect.setAttribute("height", String(-this._pitchBorder + (this._pitchHeight * (pitches + 1))));
             } else {
                 this._selectionRect.setAttribute("y", "0");
@@ -2831,8 +2829,8 @@ export class PatternEditor {
     public setSelectionResizeMode(mode: SelectionResizeMode): void {
         if (this._selectionResizing !== mode) {
             this._selectionResizing = mode;
-            this._unresizedSelection.start = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionStart : 0;
-            this._unresizedSelection.end = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : 0;
+            this._unresizedSelection.start = this._doc.selection.patternSelectionActive ? this._doc.selection.patternX0 : 0;
+            this._unresizedSelection.end = this._doc.selection.patternSelectionActive ? this._doc.selection.patternX1 : 0;
         }
 
         this._updateSelection();

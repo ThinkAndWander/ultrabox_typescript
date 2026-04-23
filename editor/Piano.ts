@@ -6,6 +6,7 @@ import { HTML, SVG } from "imperative-html/dist/esm/elements-strict";
 import { ColorConfig } from "./ColorConfig";
 import { Instrument } from "../synth/synth";
 import { modulatorStrings } from "./ModulatorStrings";
+import { ChangePatternSelection } from "./changes";
 
 export class Piano {
 		private readonly _pianoContainer: HTMLDivElement = HTML.div({style: "width: 100%; height: 100%; display: flex; flex-direction: column-reverse; align-items: stretch;"});
@@ -92,6 +93,33 @@ export class Piano {
 			]);
 
 			const modKey: HTMLDivElement = HTML.div({ class: "modulator-button", style: "background: " + ColorConfig.modLabelPrimary + ";" }, flexContainer);
+			const count = this._modContainer.children.length;
+
+			// Clicking mod piano key de/selects that track, shift+clicking expands to fit with current selection.
+			modKey.addEventListener("click", (event) => {
+				let y0 = this._doc.selection.patternY0;
+				let y1 = this._doc.selection.patternY1;
+				y0 = event.shiftKey && this._doc.selection.patternSelectionActive ? Math.min(y0, count) : count;
+				y1 = event.shiftKey && this._doc.selection.patternSelectionActive ? Math.max(y1, count) : count;
+				let x0 = this._doc.selection.patternX0;
+				let x1 = !this._doc.selection.patternSelectionActive ? this._doc.song.partsPerPattern : this._doc.selection.patternX1;
+
+				// Toggle selection if it's an exact match.
+				if (this._doc.selection.patternX0 === 0 &&
+					this._doc.selection.patternX1 === this._doc.song.partsPerPattern &&
+					y0 === this._doc.selection.patternY0 &&
+					y1 === this._doc.selection.patternY1)
+				{
+					x0 = 0;
+					x1 = 0;
+				}
+
+				this._doc.record(new ChangePatternSelection(this._doc, x0, x1));
+				this._doc.selection.patternY0 = y0;
+                this._doc.selection.patternY1 = y1;
+				this._doc.selection.selectionUpdated();
+			})
+
 			this._modContainer.appendChild(modKey);
 			this._modFirstLabels.push(firstRowText);
 			this._modSecondLabels.push(secondRowText);

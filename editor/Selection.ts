@@ -32,16 +32,16 @@ export interface SelectionJSON {
     startY: number, endY: number
 }
 export class Selection {
-    public boxSelectionX0: number = 0;
-    public boxSelectionY0: number = 0;
-    public boxSelectionX1: number = 0;
-    public boxSelectionY1: number = 0;
+    public trackX0: number = 0;
+    public trackY0: number = 0;
+    public trackX1: number = 0;
+    public trackY1: number = 0;
+    public patternX0: number = 0;
+    public patternX1: number = 0;
+    public patternY0: number = 0;
+    public patternY1: number = Config.modCount - 1;
     public digits: string = "";
     public instrumentDigits: string = "";
-    public patternSelectionStart: number = 0;
-    public patternSelectionEnd: number = 0;
-    public patternSelectionStartY: number = 0;
-    public patternSelectionEndY: number = Config.modCount - 1;
 
     private _changeTranspose: ChangeGroup | null = null;
     private _changeTrack: ChangeGroup | null = null;
@@ -52,27 +52,27 @@ export class Selection {
 
     public toJSON(): SelectionJSON {
         return {
-            "x0": this.boxSelectionX0,
-            "x1": this.boxSelectionX1,
-            "y0": this.boxSelectionY0,
-            "y1": this.boxSelectionY1,
-            "start": this.patternSelectionStart,
-            "end": this.patternSelectionEnd,
-            "startY": this.patternSelectionStartY,
-            "endY": this.patternSelectionEndY,
+            "x0": this.trackX0,
+            "x1": this.trackX1,
+            "y0": this.trackY0,
+            "y1": this.trackY1,
+            "start": this.patternX0,
+            "end": this.patternX1,
+            "startY": this.patternY0,
+            "endY": this.patternY1,
         };
     }
 
     public fromJSON(json: SelectionJSON): void {
         if (json == null) return;
-        this.boxSelectionX0 = +json["x0"];
-        this.boxSelectionX1 = +json["x1"];
-        this.boxSelectionY0 = +json["y0"];
-        this.boxSelectionY1 = +json["y1"];
-        this.patternSelectionStart = +json["start"];
-        this.patternSelectionEnd = +json["end"];
-        this.patternSelectionStartY = +json["startY"];
-        this.patternSelectionEndY = +json["endY"];
+        this.trackX0 = +json["x0"];
+        this.trackX1 = +json["x1"];
+        this.trackY0 = +json["y0"];
+        this.trackY1 = +json["y1"];
+        this.patternX0 = +json["start"];
+        this.patternX1 = +json["end"];
+        this.patternY0 = +json["startY"];
+        this.patternY1 = +json["endY"];
         this.digits = "";
         this.instrumentDigits = "";
     }
@@ -84,30 +84,30 @@ export class Selection {
     }
 
     public get boxSelectionBar(): number {
-        return Math.min(this.boxSelectionX0, this.boxSelectionX1);
+        return Math.min(this.trackX0, this.trackX1);
     }
     public get boxSelectionChannel(): number {
-        return Math.min(this.boxSelectionY0, this.boxSelectionY1);
+        return Math.min(this.trackY0, this.trackY1);
     }
     public get boxSelectionWidth(): number {
-        return Math.abs(this.boxSelectionX0 - this.boxSelectionX1) + 1;
+        return Math.abs(this.trackX0 - this.trackX1) + 1;
     }
     public get boxSelectionHeight(): number {
-        return Math.abs(this.boxSelectionY0 - this.boxSelectionY1) + 1;
+        return Math.abs(this.trackY0 - this.trackY1) + 1;
     }
     public get boxSelectionActive(): boolean {
         return this.boxSelectionWidth > 1 || this.boxSelectionHeight > 1;
     }
     public get patternSelectionActive(): boolean {
-        return this.patternSelectionStart < this.patternSelectionEnd;
+        return this.patternX0 < this.patternX1;
     }
     public scrollToSelectedPattern(): void {
         this._doc.barScrollPos = Math.min(this._doc.bar, Math.max(this._doc.bar - (this._doc.trackVisibleBars - 1), this._doc.barScrollPos));
         this._doc.channelScrollPos = Math.min(this._doc.channel, Math.max(this._doc.channel - (this._doc.trackVisibleChannels - 1), this._doc.channelScrollPos));
     }
     public scrollToEndOfSelection(): void {
-        this._doc.barScrollPos = Math.min(this.boxSelectionX1, Math.max(this.boxSelectionX1 - (this._doc.trackVisibleBars - 1), this._doc.barScrollPos));
-        this._doc.channelScrollPos = Math.min(this.boxSelectionY1, Math.max(this.boxSelectionY1 - (this._doc.trackVisibleChannels - 1), this._doc.channelScrollPos));
+        this._doc.barScrollPos = Math.min(this.trackX1, Math.max(this.trackX1 - (this._doc.trackVisibleBars - 1), this._doc.barScrollPos));
+        this._doc.channelScrollPos = Math.min(this.trackY1, Math.max(this.trackY1 - (this._doc.trackVisibleChannels - 1), this._doc.channelScrollPos));
     }
 
     /** Called to ensure pattern vertical selection fits its channel. */
@@ -120,10 +120,10 @@ export class Selection {
             (toChannel < this._doc.song.pitchChannelCount) ? 0 :
             (toChannel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) ? 1 : 2;
         const limit = ((to === 2) ? Config.maxPitch : (to === 1) ? Config.drumCount : Config.modCount) - 1;
-        [this.patternSelectionStartY, this.patternSelectionEndY] =
+        [this.patternY0, this.patternY1] =
             (from !== -1 && from !== to && to === 2) ? [limit, limit] :
             (from === 2 && from !== to) ? [0, 0] :
-            [Math.min(limit, this.patternSelectionStartY), Math.min(limit, this.patternSelectionEndY)];
+            [Math.min(limit, this.patternY0), Math.min(limit, this.patternY1)];
     }
 
     public setChannelBar(channelIndex: number, bar: number): void {
@@ -235,8 +235,8 @@ export class Selection {
     public insertBars(): void {
         this._doc.record(new ChangeInsertBars(this._doc, this.boxSelectionBar + this.boxSelectionWidth, this.boxSelectionWidth));
         const width: number = this.boxSelectionWidth;
-        this.boxSelectionX0 += width;
-        this.boxSelectionX1 += width;
+        this.trackX0 += width;
+        this.trackX1 += width;
     }
 
     public insertChannel(): void {
@@ -246,7 +246,7 @@ export class Selection {
         const isMod: boolean = this._doc.song.getChannelIsMod(insertIndex - 1)
         group.append(new ChangeAddChannel(this._doc, insertIndex, isNoise, isMod));
         if (!group.isNoop()) {
-            this.boxSelectionY0 = this.boxSelectionY1 = insertIndex;
+            this.trackY0 = this.trackY1 = insertIndex;
             group.append(new ChangeChannelBar(this._doc, insertIndex, this._doc.bar));
             this._doc.record(group);
         }
@@ -262,16 +262,15 @@ export class Selection {
             for (const channelIndex of this._eachSelectedChannel()) {
                 for (const pattern of this._eachSelectedPattern(channelIndex)) {
                     for (const track of this.eachSelectedModTrack(channelIndex)) {
-                        group.append(new ChangeNoteTruncate(this._doc, pattern, this._doc.selection.patternSelectionStart,
-                            this._doc.selection.patternSelectionEnd, null, false, track));
+                        group.append(new ChangeNoteTruncate(this._doc, pattern, this._doc.selection.patternX0, this._doc.selection.patternX1, null, true, track));
                     }
                 }
             }
 
             // Pulling moves notes leftwards to fill the "gap" removed.
-            const selectionLength = this._doc.selection.patternSelectionEnd - this._doc.selection.patternSelectionStart;
-            if (selectionLength > 0 && this._doc.selection.patternSelectionEnd < this._doc.song.partsPerPattern && andPull) {
-                group.append(new ChangePatternSelection(this._doc, this._doc.selection.patternSelectionEnd, this._doc.song.partsPerPattern));
+            const selectionLength = this._doc.selection.patternX1 - this._doc.selection.patternX0;
+            if (selectionLength > 0 && this._doc.selection.patternX1 < this._doc.song.partsPerPattern && andPull) {
+                group.append(new ChangePatternSelection(this._doc, this._doc.selection.patternX1, this._doc.song.partsPerPattern));
                 for (const channelIndex of this._eachSelectedChannel()) {
                     for (const pattern of this._eachSelectedPattern(channelIndex)) {
                         group.append(new ChangeDragSelectedNotes(this._doc, channelIndex, pattern, -selectionLength, 0));
@@ -282,15 +281,15 @@ export class Selection {
         } else {
             group.append(new ChangeDeleteBars(this._doc, this.boxSelectionBar, this.boxSelectionWidth));
             const width: number = this.boxSelectionWidth;
-            this.boxSelectionX0 = Math.max(0, this.boxSelectionX0 - width);
-            this.boxSelectionX1 = Math.max(0, this.boxSelectionX1 - width);
+            this.trackX0 = Math.max(0, this.trackX0 - width);
+            this.trackX1 = Math.max(0, this.trackX1 - width);
         }
         this._doc.record(group);
     }
 
     public deleteChannel(): void {
         this._doc.record(new ChangeRemoveChannel(this._doc, this.boxSelectionChannel, this.boxSelectionChannel + this.boxSelectionHeight - 1));
-        this.boxSelectionY0 = this.boxSelectionY1 = this._doc.channel;
+        this.trackY0 = this.trackY1 = this._doc.channel;
         ColorConfig.resetColors();
     }
 
@@ -309,7 +308,7 @@ export class Selection {
     public * eachSelectedModTrack(channelIndex: number): IterableIterator<number | undefined> {
         if (this._doc.song.getChannelIsMod(channelIndex)) {
             if (this.patternSelectionActive) {
-                for (let track = this.patternSelectionStartY; track <= this.patternSelectionEndY; track++) {
+                for (let track = this.patternY0; track <= this.patternY1; track++) {
                     yield track;
                 }
             } else {
@@ -369,12 +368,12 @@ export class Selection {
 
                         if (this.patternSelectionActive) {
                             for (const note of pattern.cloneNotes()) {
-                                if (note.end <= this.patternSelectionStart) continue;
-                                if (note.start >= this.patternSelectionEnd) continue;
-                                note.start -= this.patternSelectionStart;
-                                note.end -= this.patternSelectionStart;
-                                if (note.start < 0 || note.end > this.patternSelectionEnd - this.patternSelectionStart) {
-                                    new ChangeNoteLength(null, note, Math.max(note.start, 0), Math.min(this.patternSelectionEnd - this.patternSelectionStart, note.end));
+                                if (note.end <= this.patternX0) continue;
+                                if (note.start >= this.patternX1) continue;
+                                note.start -= this.patternX0;
+                                note.end -= this.patternX0;
+                                if (note.start < 0 || note.end > this.patternX1 - this.patternX0) {
+                                    new ChangeNoteLength(null, note, Math.max(note.start, 0), Math.min(this.patternX1 - this.patternX0, note.end));
                                 }
                                 notes.push(note);
                             }
@@ -396,7 +395,7 @@ export class Selection {
         }
 
         const selectionCopy: SelectionCopy = {
-            "partDuration": this.patternSelectionActive ? this.patternSelectionEnd - this.patternSelectionStart : this._doc.song.partsPerPattern,
+            "partDuration": this.patternSelectionActive ? this.patternX1 - this.patternX0 : this._doc.song.partsPerPattern,
             "channels": channels,
         };
         window.localStorage.setItem("selectionCopy", JSON.stringify(selectionCopy));
@@ -537,7 +536,7 @@ export class Selection {
 
                 const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
                 if (pattern == null) throw new Error();
-                group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternSelectionStart, this.patternSelectionActive ? this.patternSelectionEnd : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
+                group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternSelectionActive ? this.patternX1 : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
                 // @jummbus - I actually like it better if instruments copy over, unless it's not a mod and there are notes in the pattern.
                 if (currentPatternIndex == 0 || patternCopy.notes.length == 0 || channelIndex >= this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
                     this.selectInstrument(instrumentsCopy[0]);
@@ -593,14 +592,14 @@ export class Selection {
                     const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
                     if (pattern == null) throw new Error();
                     if (copiedPatternIndex == 0) {
-                        group.append(new ChangeNoteTruncate(this._doc, pattern, this.patternSelectionStart, this.patternSelectionEnd));
+                        group.append(new ChangeNoteTruncate(this._doc, pattern, this.patternX0, this.patternX1));
                     } else {
                         const patternCopy: PatternCopy = patternCopies[String(copiedPatternIndex)];
                         let pastedNotes: Note[] = patternCopy["notes"];
                         if (isPitch && channelIsNoise) {
                             pastedNotes = this._convertCopiedPitchNotesToNoiseNotes(pastedNotes);
                         }
-                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternSelectionStart, this.patternSelectionEnd, copiedPartDuration));
+                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternX1, copiedPartDuration));
                     }
 
                     reusablePatterns[reusedIndex] = this._doc.song.channels[channelIndex].bars[bar];
@@ -644,7 +643,7 @@ export class Selection {
                         }
                         const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
                         if (pattern == null) throw new Error();
-                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternSelectionStart, this.patternSelectionActive ? this.patternSelectionEnd : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
+                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternSelectionActive ? this.patternX1 : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
                         group.append(new ChangeSetPatternInstruments(this._doc, channelIndex, instrumentsCopy, pattern));
                     }
 
@@ -719,9 +718,9 @@ export class Selection {
     public selectChannel(): void {
         new ChangePatternSelection(this._doc, 0, 0);
         if (this.boxSelectionBar == 0 && this.boxSelectionWidth == this._doc.song.barCount) {
-            this.setTrackSelection(this._doc.bar, this._doc.bar, this.boxSelectionY0, this.boxSelectionY1);
+            this.setTrackSelection(this._doc.bar, this._doc.bar, this.trackY0, this.trackY1);
         } else {
-            this.setTrackSelection(0, this._doc.song.barCount - 1, this.boxSelectionY0, this.boxSelectionY1);
+            this.setTrackSelection(0, this._doc.song.barCount - 1, this.trackY0, this.trackY1);
         }
         this.selectionUpdated();
     }
@@ -882,7 +881,7 @@ export class Selection {
     */
     public search(seekFrom?: number, notes?: boolean, pins?: boolean, gaps?: boolean, edges?: boolean, back?: boolean) {
         const seek = seekFrom ?? (this.patternSelectionActive
-            ? (back ? this.patternSelectionStart : this.patternSelectionEnd)
+            ? (back ? this.patternX0 : this.patternX1)
             : (back ? this._doc.song.partsPerPattern : 0));
 
         // Finds the nearest coords-set
@@ -967,8 +966,8 @@ export class Selection {
      */
     public noteSplitAcross(cuts: number, absolute?: boolean, perNote?: boolean): void {
         const change = new ChangeGroup();
-        let x1 = this._doc.selection.patternSelectionStart;
-        let x2 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern;
+        let x1 = this._doc.selection.patternX0;
+        let x2 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternX1 : this._doc.song.partsPerPattern;
 
         // Instead of cuts-per-range, this makes a split every {cut} units of time.
         if (absolute && !perNote) {
@@ -1020,8 +1019,8 @@ export class Selection {
     public noteFlattenAcross(dontAveragePitch?: boolean, vol?: boolean): void {
         const change = new ChangeGroup();
 
-        const x1 = this._doc.selection.patternSelectionStart;
-        const x2 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern;
+        const x1 = this._doc.selection.patternX0;
+        const x2 = this._doc.selection.patternSelectionActive ? this._doc.selection.patternX1 : this._doc.song.partsPerPattern;
 
         for (const channelIndex of this._eachSelectedChannel()) {
             const isMod = this._doc.song.getChannelIsMod(channelIndex);
@@ -1136,8 +1135,8 @@ export class Selection {
     public noteMirrorAcross(isVertical: boolean): void {
         const change = new ChangeGroup();
         const range = {
-            start: this._doc.selection.patternSelectionStart,
-            end: this._doc.selection.patternSelectionActive ? this._doc.selection.patternSelectionEnd : this._doc.song.partsPerPattern
+            start: this._doc.selection.patternX0,
+            end: this._doc.selection.patternSelectionActive ? this._doc.selection.patternX1 : this._doc.song.partsPerPattern
         };
 
         for (const channelIndex of this._eachSelectedChannel()) {
@@ -1204,10 +1203,10 @@ export class Selection {
         if (offset != 0) {
             const canReplaceLastChange: boolean = this._doc.lastChangeWas(this._changeReorder);
             this._changeReorder = new ChangeGroup();
-            this.boxSelectionY0 = newSelectionMin + offset;
-            this.boxSelectionY1 = newSelectionMax + offset;
+            this.trackY0 = newSelectionMin + offset;
+            this.trackY1 = newSelectionMax + offset;
             this._changeReorder.append(new ChangeChannelOrder(this._doc, newSelectionMin, newSelectionMax, offset));
-            this._changeReorder.append(new ChangeChannelBar(this._doc, Math.max(this.boxSelectionY0, Math.min(this.boxSelectionY1, this._doc.channel + offset)), this._doc.bar));
+            this._changeReorder.append(new ChangeChannelBar(this._doc, Math.max(this.trackY0, Math.min(this.trackY1, this._doc.channel + offset)), this._doc.bar));
             this.selectionUpdated();
             this._doc.record(this._changeReorder, canReplaceLastChange);
         }
@@ -1267,7 +1266,7 @@ export class Selection {
     }
 
     public resetBoxSelection(): void {
-        this.boxSelectionX0 = this.boxSelectionX1 = this._doc.bar;
-        this.boxSelectionY0 = this.boxSelectionY1 = this._doc.channel;
+        this.trackX0 = this.trackX1 = this._doc.bar;
+        this.trackY0 = this.trackY1 = this._doc.channel;
     }
 }

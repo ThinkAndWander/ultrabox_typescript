@@ -13,8 +13,8 @@ export class ChangeMergeAcrossAdjacent extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         let notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
@@ -65,8 +65,8 @@ export class ChangeMergeAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         if (pattern.notes.length <= 1) { return; }
@@ -168,8 +168,8 @@ export class ChangeBridgeAcross extends ChangeSequence {
         super();
         this._pattern = pattern;
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         let notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
@@ -270,8 +270,8 @@ export class ChangeSplitAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, numCuts: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (pattern.notes.length === 0) { return; } // Don't need to filter for pitchIndex since this function just calls others that do.
 
         const range = x2 - x1;
@@ -315,8 +315,8 @@ export class ChangeStackLeftAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
@@ -483,8 +483,8 @@ export class ChangeStepAcross extends ChangeSequence {
             return undefined;
         }
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
 
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length === 0) { return; }
@@ -848,8 +848,8 @@ export class ChangeSpreadAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
@@ -918,8 +918,8 @@ export class ChangeSpreadVertical extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length <= 1) { return; }
 
@@ -1023,8 +1023,8 @@ export class ChangeStackBottomAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length <= 1) { return; }
 
@@ -1113,8 +1113,8 @@ export class ChangeTapNotesAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         const notesArray = pitchIndex === undefined ? pattern.notes : pattern.notes.filter(o => o.pitches.length === 1 && o.pitches[0] === pitchIndex);
@@ -1158,8 +1158,8 @@ export class ChangeMirrorHorizontal extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, inPlace?: boolean, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
 
         const notesArray = pitchIndex === undefined
@@ -1249,8 +1249,8 @@ export class ChangeStretchHorizontal extends ChangeSequence {
         super();
 
         x2new = Math.min(x2new, doc.song.partsPerPattern);
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern
             || x1new < 0 || x2new < 0 || x1new == x2new || x1new > doc.song.partsPerPattern || x2new > doc.song.partsPerPattern
             || (x1 === x1new && x2 == x2new)) {
@@ -1364,8 +1364,8 @@ export class ChangeStretchVerticalRelative extends ChangeSequence {
         super();
 
         const pitchLimit = doc.song.getChannelIsNoise(channelIndex) ? Config.drumCount - 1 : Config.maxPitch;
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length === 0) { return; }
 
@@ -1414,8 +1414,8 @@ export class ChangeStretchVertical extends ChangeSequence {
         super();
 
         const pitchLimit = doc.song.getChannelIsNoise(channelIndex) ? Config.drumCount - 1 : Config.maxPitch;
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern
             || yMin < 0 || yMin > pitchLimit
             || yMax < 0 || yMax > pitchLimit) { return; }
@@ -1466,8 +1466,8 @@ export class ChangeWrapAcross extends ChangeSequence {
     constructor(doc: SongDocument, pattern: Pattern, amountInParts: number, x1?: number, x2?: number, pitchIndex?: number) {
         super();
 
-        x1 ??= doc.selection.patternSelectionStart;
-        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternSelectionEnd : doc.song.partsPerPattern);
+        x1 ??= doc.selection.patternX0;
+        x2 ??= (doc.selection.patternSelectionActive ? doc.selection.patternX1 : doc.song.partsPerPattern);
         if (x1 < 0 || x2 <= x1 || x2 > doc.song.partsPerPattern) { return; }
         if (pattern.notes.length === 0) { return; }
 
@@ -1596,7 +1596,7 @@ export function search(doc: SongDocument, pattern: Pattern, backwards?: boolean,
     notes?: boolean, pins?: boolean, gaps?: boolean, edges?: boolean, pitchIndex?: number): ({x1: number, x2: number} | null)
 {
     let seek = seekFrom !== undefined ? seekFrom : doc.selection.patternSelectionActive
-        ? backwards ? doc.selection.patternSelectionStart : doc.selection.patternSelectionEnd
+        ? backwards ? doc.selection.patternX0 : doc.selection.patternX1
         : 0;
 
     let prev: Note | undefined;

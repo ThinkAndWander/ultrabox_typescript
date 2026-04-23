@@ -173,7 +173,7 @@ export class TrackEditor {
 	}
 	
 	private _dragBoxSelection(): void {
-		this._doc.selection.setTrackSelection(this._doc.selection.boxSelectionX0, this._mouseBar, this._doc.selection.boxSelectionY0, this._mouseChannel);
+		this._doc.selection.setTrackSelection(this._doc.selection.trackX0, this._mouseBar, this._doc.selection.trackY0, this._mouseChannel);
 		this._doc.selection.selectionUpdated();
 	}
 		
@@ -241,7 +241,7 @@ export class TrackEditor {
 
 		if (event.shiftKey) {
 			this._mouseDragging = true;
-			this._doc.selection.setTrackSelection(this._doc.selection.boxSelectionX0, this._mouseBar, this._doc.selection.boxSelectionY0, this._mouseChannel);
+			this._doc.selection.setTrackSelection(this._doc.selection.trackX0, this._mouseBar, this._doc.selection.trackY0, this._mouseChannel);
 			this._doc.selection.selectionUpdated();
 		} else {
 			this._mouseDragging = false;

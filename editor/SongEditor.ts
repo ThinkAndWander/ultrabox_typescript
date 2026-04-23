@@ -3744,10 +3744,10 @@ export class SongEditor {
             }
         }
 
-        let lowestSelX: number = Math.min(this._doc.selection.boxSelectionX0, this._doc.selection.boxSelectionX1);
-        let highestSelX: number = Math.max(this._doc.selection.boxSelectionX0, this._doc.selection.boxSelectionX1);
-        let lowestSelY: number = Math.min(this._doc.selection.boxSelectionY0, this._doc.selection.boxSelectionY1);
-        let highestSelY: number = Math.max(this._doc.selection.boxSelectionY0, this._doc.selection.boxSelectionY1);
+        let lowestSelX: number = Math.min(this._doc.selection.trackX0, this._doc.selection.trackX1);
+        let highestSelX: number = Math.max(this._doc.selection.trackX0, this._doc.selection.trackX1);
+        let lowestSelY: number = Math.min(this._doc.selection.trackY0, this._doc.selection.trackY1);
+        let highestSelY: number = Math.max(this._doc.selection.trackY0, this._doc.selection.trackY1);
 
         if (channel.bars[this._doc.bar] != 0) {
             for (let i: number = 0; i < this._doc.song.barCount; i++) {
@@ -4036,12 +4036,12 @@ export class SongEditor {
                 this._copyTextToClipboard(JSON.stringify(instrumentObject));
                 return;
             case CommandTargetName.ExtendTrackSelectionLeft:
-                this._doc.selection.boxSelectionX1 = Math.max(0, this._doc.selection.boxSelectionX1 - 1);
+                this._doc.selection.trackX1 = Math.max(0, this._doc.selection.trackX1 - 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
             case CommandTargetName.ExtendTrackSelectionRight:
-                this._doc.selection.boxSelectionX1 = Math.min(this._doc.song.barCount - 1, this._doc.selection.boxSelectionX1 + 1);
+                this._doc.selection.trackX1 = Math.min(this._doc.song.barCount - 1, this._doc.selection.trackX1 + 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
@@ -4063,8 +4063,8 @@ export class SongEditor {
                 this._loopEditor.setLoopAt(this._doc.synth.loopBarStart, this._doc.synth.loopBarEnd);
                 const width = this._doc.selection.boxSelectionWidth;
                 this._doc.bar -= width; // TODO: remove?
-                this._doc.selection.boxSelectionX0 -= width;
-                this._doc.selection.boxSelectionX1 -= width;
+                this._doc.selection.trackX0 -= width;
+                this._doc.selection.trackX1 -= width;
                 this._doc.selection.insertBars();
                 return;
             case CommandTargetName.InsertChannel:
@@ -4093,8 +4093,8 @@ export class SongEditor {
                 location.reload();
                 return;
             case CommandTargetName.LoopPattern:
-                const leftSel = Math.min(this._doc.selection.boxSelectionX0, this._doc.selection.boxSelectionX1);
-                const rightSel = Math.max(this._doc.selection.boxSelectionX0, this._doc.selection.boxSelectionX1);
+                const leftSel = Math.min(this._doc.selection.trackX0, this._doc.selection.trackX1);
+                const rightSel = Math.max(this._doc.selection.trackX0, this._doc.selection.trackX1);
                 if ((leftSel < this._doc.synth.loopBarStart || this._doc.synth.loopBarStart == -1)
                     || (rightSel > this._doc.synth.loopBarEnd || this._doc.synth.loopBarEnd == -1)
                 ) {
@@ -4285,12 +4285,12 @@ export class SongEditor {
                 this._doc.selection.selectChannel();
                 return;
             case CommandTargetName.ExtendTrackSelectionDown:
-                this._doc.selection.boxSelectionY1 = Math.min(this._doc.song.getChannelCount() - 1, this._doc.selection.boxSelectionY1 + 1);
+                this._doc.selection.trackY1 = Math.min(this._doc.song.getChannelCount() - 1, this._doc.selection.trackY1 + 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
             case CommandTargetName.ExtendTrackSelectionUp:
-                this._doc.selection.boxSelectionY1 = Math.max(0, this._doc.selection.boxSelectionY1 - 1);
+                this._doc.selection.trackY1 = Math.max(0, this._doc.selection.trackY1 - 1);
                 this._doc.selection.scrollToEndOfSelection();
                 this._doc.selection.selectionUpdated();
                 return;
@@ -4536,8 +4536,8 @@ export class SongEditor {
                 const searchResults = this._doc.selection.search(undefined, notes, pins, gaps, edges, back);
                 if (searchResults) {
                     new ChangePatternSelection(this._doc,
-                        back || exclusive ? searchResults.x1 : this._doc.selection.patternSelectionStart,
-                        !back || exclusive ? searchResults.x2 : this._doc.selection.patternSelectionEnd);
+                        back || exclusive ? searchResults.x1 : this._doc.selection.patternX0,
+                        !back || exclusive ? searchResults.x2 : this._doc.selection.patternX1);
                 }
                 return;
             case CommandTargetName.SetPatternSelection:
@@ -4545,24 +4545,20 @@ export class SongEditor {
                     x0: actionDataAsNumber(actionData![0], 0, 0, this._doc.song.partsPerPattern),
                     x1: actionDataAsNumber(actionData![1], 0, 0, this._doc.song.partsPerPattern)
                 };
-                if (temp.x0 === -1) { temp.x0 = this._doc.selection.patternSelectionStart; }
-                if (temp.x1 === -1) { temp.x1 = this._doc.selection.patternSelectionEnd; }
+                if (temp.x0 === -1) { temp.x0 = this._doc.selection.patternX0; }
+                if (temp.x1 === -1) { temp.x1 = this._doc.selection.patternX1; }
                 if (temp.x0 === temp.x1) { new ChangePatternSelection(this._doc, 0, 0); }
                 else { new ChangePatternSelection(this._doc, Math.min(temp.x0, temp.x1), Math.max(temp.x0, temp.x1)); }
                 return;
             case CommandTargetName.InvertPatternSelection:
                 if (!this._doc.selection.patternSelectionActive) {
                     new ChangePatternSelection(this._doc, 0, this._doc.song.partsPerPattern);
-                } else if (this._doc.selection.patternSelectionStart === 0
-                    && this._doc.selection.patternSelectionEnd === this._doc.song.partsPerPattern)
-                {
-                    new ChangePatternSelection(this._doc, 0, 0);                    
-                } else if ((this._doc.selection.patternSelectionEnd === this._doc.song.partsPerPattern)
-                    || actionDataAsBool(actionData![0], false) && this._doc.selection.patternSelectionStart !== 0)
-                {
-                    new ChangePatternSelection(this._doc, 0, this._doc.selection.patternSelectionStart);
+                } else if (this._doc.selection.patternX0 === 0 && this._doc.selection.patternX1 === this._doc.song.partsPerPattern) {
+                    new ChangePatternSelection(this._doc, 0, 0);
+                } else if (this._doc.selection.patternX1 === this._doc.song.partsPerPattern || actionDataAsBool(actionData![0], false) && this._doc.selection.patternX0 !== 0) {
+                    new ChangePatternSelection(this._doc, 0, this._doc.selection.patternX0);
                 } else {
-                    new ChangePatternSelection(this._doc, this._doc.selection.patternSelectionEnd, this._doc.song.partsPerPattern);
+                    new ChangePatternSelection(this._doc, this._doc.selection.patternX1, this._doc.song.partsPerPattern);
                 }
                 return;
             case CommandTargetName.SetSelectionResizeMode:
