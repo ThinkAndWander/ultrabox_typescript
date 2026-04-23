@@ -236,6 +236,25 @@ export function positionInScaleToPitch(doc: SongDocument, indexInScale: number, 
     return 12 * Math.trunc(indexInScale / semitonesOnScale.length) + semitonesOnScale[indexInScale % semitonesOnScale.length];
 }
 
+/** Returns new notes with pins scaled from one [min,max] range to a new [min,max] range. */
+export function rescaleVolumes(notes: Note[], from: [number, number], to: [number, number]): Note[] {
+    let scale = (to[1] - to[0]) / (from[1] - from[0]);
+    const shift = from[0] < 0 ? to[0] - from[0] : to[0];
+    if (!isFinite(scale)) { scale = 0; }
+
+    const editedNotes: Note[] = [];
+    for (const note of notes) {
+        const clone = note.clone();
+        editedNotes.push(clone);
+
+        for (const pin of clone.pins) {
+            pin.size = pin.size * scale + shift;
+        }
+    }
+
+    return editedNotes;
+}
+
 export function removeRedundantPins(pins: NotePin[]): void {
     for (let i: number = 1; i < pins.length - 1;) {
         if (pins[i - 1].interval == pins[i].interval &&
@@ -516,8 +535,8 @@ export class ChangeMoveAndOverflowNotes extends ChangeGroup {
             // Skip channels that aren't selected, if a selection is active.
             // Only work on the visible channel if there is no selection.
             let skipped = (
-                (doc.selection.boxSelectionActive && (channelIndex < boxY0 || channelIndex > boxY1)) ||
-                (!doc.selection.boxSelectionActive && channelIndex !== doc.channel));
+                (doc.selection.trackSelectionActive && (channelIndex < boxY0 || channelIndex > boxY1)) ||
+                (!doc.selection.trackSelectionActive && channelIndex !== doc.channel));
 
             const oldChannel: Channel = doc.song.channels[channelIndex];
             const newChannel: Channel = new Channel();
@@ -3211,57 +3230,104 @@ export class ChangeRhythm extends ChangeGroup {
     }
 }
 
+/**
+ * Pastes the given notes (copied notes) into the current channel for the given pattern. Pastes only the copied
+ * selection to the current selection (both horizontal and vertical), clipping when the copied notes exceed the paste
+ * dimensions and wrapping to the start until the paste dimensions are filled. Only modulation channels handle
+ * verticality expressly, and they use the source channel index to scale from the old volume limits to the new volume
+ * scale of the modulator track they're copied to.
+ */
 export class ChangePaste extends ChangeGroup {
-    constructor(doc: SongDocument, pattern: Pattern, notes: any[], selectionStart: number, selectionEnd: number, oldPartDuration: number) {
+    constructor(doc: SongDocument, pattern: Pattern, notes: Note[],
+        selectionStart: number, selectionEnd: number, copiedPartDuration: number,
+        Y?: { y0: number, y1: number, copyHeight: number, copyChannelIndex: number })
+    {
         super();
 
-        // Erase the current contents of the selection:
-        this.append(new ChangeNoteTruncate(doc, pattern, selectionStart, selectionEnd, null, true));
+        const sourceIsMod = Y && doc.song.getChannelIsMod(Y.copyChannelIndex);
+        const targetIsMod = doc.song.getChannelIsMod(doc.channel);
+        const useVerticalSelection = targetIsMod && selectionStart < selectionEnd;
+        let y0 = useVerticalSelection ? (Y?.y0 ?? 0) : 0;
+        const y1 = useVerticalSelection ? (Y?.y1 ?? Config.modCount - 1) : 0;
+        if (copiedPartDuration === 0 || (useVerticalSelection && Y?.copyHeight === 0)) { return; }
 
-        // Mods don't follow this sequence, so skipping for now.
-        let noteInsertionIndex: number = 0;
-        if (!doc.song.getChannelIsMod(doc.channel)) {
-            for (let i: number = 0; i < pattern.notes.length; i++) {
+        // Erase the existing selection in the paste area.
+        if (useVerticalSelection) {
+            for (let i = y0; i <= y1; i++) {
+                this.append(new ChangeNoteTruncate(doc, pattern, selectionStart, selectionEnd, null, true, i));
+            }
+        } else {
+            this.append(new ChangeNoteTruncate(doc, pattern, selectionStart, selectionEnd, null, true));
+        }
+
+        // Find where to insert new notes. Mod channel notes are structured differently, so we sort at the end instead for them.
+        let noteInsertionIndex = pattern.notes.length;
+        if (!targetIsMod) {
+            for (let i = 0; i < pattern.notes.length; i++) {
                 if (pattern.notes[i].start < selectionStart) {
-                    if (pattern.notes[i].end > selectionStart) throw new Error();
-
+                    if (pattern.notes[i].end > selectionStart) throw new Error(); // No overlap allowed
                     noteInsertionIndex = i + 1;
-                } else if (pattern.notes[i].start < selectionEnd) {
-                    throw new Error();
                 }
             }
         }
-        else {
-            noteInsertionIndex = pattern.notes.length;
-        }
 
-        while (selectionStart < selectionEnd) {
-            for (const noteObject of notes) {
-                const noteStart: number = noteObject["start"] + selectionStart;
-                const noteEnd: number = noteObject["end"] + selectionStart;
+        const start = selectionStart;
+        let rescaleFrom: [number, number] = [0, 0];
+        let rescaleTo: [number, number] = [0, 0]; // for scaling vol in mod tracks
+        let rescaleLastPitch = [-1, -1]; // just for minor optimization w/ above
+        while (selectionStart < selectionEnd || (useVerticalSelection && Y!.copyHeight && y0 <= y1)) {
+            for (const copyNote of notes) {
+                const noteStart = copyNote.start + selectionStart;
+                const noteEnd = copyNote.end + selectionStart;
                 if (noteStart >= selectionEnd) break;
-                const note: Note = new Note(noteObject["pitches"][0], noteStart, noteEnd, noteObject["pins"][0]["size"], false);
-                note.pitches.length = 0;
-                for (const pitch of noteObject["pitches"]) {
-                    note.pitches.push(pitch);
+                if (useVerticalSelection && (copyNote.pitches.length > 1 || copyNote.pitches[0] + y0 > y1)) {
+                    continue;
                 }
-                note.pins.length = 0;
-                for (const pin of noteObject["pins"]) {
-                    note.pins.push(makeNotePin(pin.interval, pin.time, pin.size));
+
+                const note = new Note(0, noteStart, noteEnd, copyNote.pins[0].size, false);
+                note.pitches = copyNote.pitches.map(pitch => pitch + y0);
+
+                if (useVerticalSelection && Y) {
+                    if (rescaleLastPitch[0] !== copyNote.pitches[0]) {
+                        rescaleLastPitch[0] = copyNote.pitches[0];
+                        rescaleFrom = sourceIsMod
+                            ? doc.getModVolumeLimits(Y.copyChannelIndex, copyNote.pitches[0])
+                            : doc.song.getChannelIsNoise(doc.channel) ? [0, Config.drumCount - 1] : [0, Config.maxPitch];
+                    }
+                    if (rescaleLastPitch[1] !== copyNote.pitches[0] + y0) {
+                        rescaleLastPitch[1] = copyNote.pitches[0] + y0;
+                        rescaleTo = doc.getModVolumeLimits(doc.channel, rescaleLastPitch[1]);
+                    }
+                    note.pins = rescaleVolumes([note], rescaleFrom, rescaleTo)[0].pins;
+                } else {
+                    rescaleFrom = sourceIsMod
+                        ? doc.getModVolumeLimits(Y.copyChannelIndex, copyNote.pitches[0])
+                        : doc.song.getChannelIsNoise(doc.channel) ? [0, Config.drumCount - 1] : [0, Config.maxPitch];
+
+                    note.pins = note.pins.map(pin => makeNotePin(pin.interval, pin.time, pin.size));
                 }
-                note.continuesLastPattern = (noteObject["continuesLastPattern"] === true) && (note.start == 0);
+
+                note.continuesLastPattern = copyNote.continuesLastPattern && note.start === 0 && !doc.song.getChannelIsMod(doc.channel);
+
                 pattern.notes.splice(noteInsertionIndex++, 0, note);
                 if (note.end > selectionEnd) {
                     this.append(new ChangeNoteLength(doc, note, note.start, selectionEnd));
                 }
             }
 
-            selectionStart += oldPartDuration;
+            // Repeats the selection horizontally then vertically (if applicable) until paste region is filled
+            if (selectionStart < selectionEnd) {
+                selectionStart += copiedPartDuration;
+            } else {
+                selectionStart = start;
+                y0 += Y!.copyHeight;
+            }
         }
 
         // Need to re-sort the notes by start time as they might change order because of paste.
-        if (pattern != null && doc.song.getChannelIsMod(doc.channel)) pattern.notes.sort(function (a, b) { return (a.start == b.start) ? a.pitches[0] - b.pitches[0] : a.start - b.start; });
-
+        if (pattern != null && doc.song.getChannelIsMod(doc.channel)) {
+            pattern.notes.sort(function (a, b) { return (a.start == b.start) ? a.pitches[0] - b.pitches[0] : a.start - b.start; });
+        }
 
         doc.notifier.changed();
         this._didSomething();
@@ -3462,6 +3528,11 @@ export class ChangePatternsPerChannel extends Change {
     }
 }
 
+/**
+ * A pattern "exists" if the pattern index (aka the pattern number) is not the placeholder value, zero.
+ * This sets the pattern number of the given bar in a given channel to the first empty pattern number in that
+ * channel, or a new pattern, potentially extending the song patterns-per-channel number.
+*/
 export class ChangeEnsurePatternExists extends UndoableChange {
     private _doc: SongDocument;
     private _bar: number;
@@ -3739,8 +3810,8 @@ export class ChangeMoveNotesSideways extends ChangeGroup {
 
                     // Skip channels that aren't selected, if a selection is active.
                     // Only work on the visible channel if there is no selection.
-                    if ((doc.selection.boxSelectionActive && (i < boxY0 || i > boxY1)) ||
-                        (!doc.selection.boxSelectionActive && i !== doc.channel)) {
+                    if ((doc.selection.trackSelectionActive && (i < boxY0 || i > boxY1)) ||
+                        (!doc.selection.trackSelectionActive && i !== doc.channel)) {
                         continue;
                     }
 
@@ -3748,7 +3819,7 @@ export class ChangeMoveNotesSideways extends ChangeGroup {
                         const pattern = channel.patterns[j];
 
                         // Skip patterns that aren't selected, if a selection is active.
-                        if (doc.selection.boxSelectionActive && (j < boxX0 || j > boxX1)) {
+                        if (doc.selection.trackSelectionActive && (j < boxX0 || j > boxX1)) {
                             continue;
                         }
 
@@ -3788,8 +3859,8 @@ export class ChangeMoveNotesSideways extends ChangeGroup {
 
                         // Skip channels that aren't selected, if a selection is active.
                         // Only work on the visible channel if there is no selection.
-                        if ((doc.selection.boxSelectionActive && (i < boxY0 || i > boxY1)) ||
-                            (!doc.selection.boxSelectionActive && i !== doc.channel)) {
+                        if ((doc.selection.trackSelectionActive && (i < boxY0 || i > boxY1)) ||
+                            (!doc.selection.trackSelectionActive && i !== doc.channel)) {
                             continue;
                         }
 
@@ -3801,8 +3872,8 @@ export class ChangeMoveNotesSideways extends ChangeGroup {
 
                             // Skip channels that aren't selected, if a selection is active.
                             // Only work on the visible channel if there is no selection.
-                            if ((doc.selection.boxSelectionActive && (i < boxY0 || i > boxY1)) ||
-                                (!doc.selection.boxSelectionActive && i !== doc.channel)) {
+                            if ((doc.selection.trackSelectionActive && (i < boxY0 || i > boxY1)) ||
+                                (!doc.selection.trackSelectionActive && i !== doc.channel)) {
                                 continue;
                             }
 
@@ -3995,7 +4066,7 @@ export class ChangeSong extends ChangeGroup {
         if (newHash == "") {
             this.append(new ChangePatternSelection(doc, 0, 0));
             doc.selection.patternY0 = 0;
-            doc.selection.patternY1 = Config.modCount - 1;
+            doc.selection.patternY1 = 0;
             doc.selection.resetBoxSelection();
             setDefaultInstruments(doc.song);
             doc.song.scale = doc.prefs.defaultScale;
@@ -4673,12 +4744,20 @@ export class ChangePatternSelection extends UndoableChange {
     protected _doForwards(): void {
         this._doc.selection.patternX0 = this._newStart;
         this._doc.selection.patternX1 = this._newEnd;
+        if (!this._doc.selection.patternSelectionActive) {
+            this._doc.selection.patternY0 = 0;
+            this._doc.selection.patternY1 = Config.modCount - 1;
+        }
         this._doc.notifier.changed();
     }
 
     protected _doBackwards(): void {
         this._doc.selection.patternX0 = this._oldStart;
         this._doc.selection.patternX1 = this._oldEnd;
+        if (!this._doc.selection.patternSelectionActive) {
+            this._doc.selection.patternY0 = 0;
+            this._doc.selection.patternY1 = Config.modCount - 1;
+        }
         this._doc.notifier.changed();
     }
 }

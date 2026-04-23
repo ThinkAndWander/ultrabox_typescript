@@ -1480,7 +1480,7 @@ export class PatternEditor {
                 }
 
                 let prevPart: number = Math.max(0, currentPart - timeQuantum);
-                let endPart: number = Math.min(currentPart + timeQuantum + addLength, Config.partsPerBeat * this._doc.song.beatsPerBar);
+                let endPart: number = Math.min(currentPart + timeQuantum + addLength, this._doc.song.partsPerPattern);
 
                 let continuous: boolean = (toApply == false);
 
@@ -1693,21 +1693,27 @@ export class PatternEditor {
             } else if (this._shiftHeld) {
                 if ((this._doc.selection.patternSelectionActive && this._cursor.pitchIndex == -1) || this._cursorIsInSelection()) {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._doc.selection.patternY0 = this._cursor.pitch;
-                    this._doc.selection.patternY1 = this._cursor.pitch;
+                    if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                        this._doc.selection.patternY0 = this._cursor.pitch;
+                        this._doc.selection.patternY1 = this._cursor.pitch;
+                    }
                     this._unresizedSelection = { ...this._unresizedSelection, start: 0, end: 0 };
                 } else {
                     if (this._cursor.curNote != null) {
                         sequence.append(new ChangePatternSelection(this._doc, this._cursor.curNote.start, this._cursor.curNote.end));
-                        this._doc.selection.patternY0 = this._cursor.curNote.pitches[0];
-                        this._doc.selection.patternY1 = this._cursor.curNote.pitches[0];
+                        if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                            this._doc.selection.patternY0 = this._cursor.curNote.pitches[0];
+                            this._doc.selection.patternY1 = this._cursor.curNote.pitches[0];
+                        }
                         this._unresizedSelection = { ...this._unresizedSelection, start: this._cursor.curNote.start, end: this._cursor.curNote.end };
                     } else {
                         const start: number = Math.max(0, Math.min((this._doc.song.beatsPerBar - 1) * Config.partsPerBeat, Math.floor(this._cursor.exactPart / Config.partsPerBeat) * Config.partsPerBeat));
                         const end: number = start + Config.partsPerBeat;
                         sequence.append(new ChangePatternSelection(this._doc, start, end));
-                        this._doc.selection.patternY0 = this._cursor.pitch;
-                        this._doc.selection.patternY1 = this._cursor.pitch;
+                        if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                            this._doc.selection.patternY0 = this._cursor.pitch;
+                            this._doc.selection.patternY1 = this._cursor.pitch;
+                        }
                         this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     }
                 }
@@ -1717,8 +1723,10 @@ export class PatternEditor {
                 this._draggingSelectionContents = true;
             } else if (this._cursor.valid && this._cursor.curNote == null) {
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._doc.selection.patternY0 = this._cursor.pitch;
-                this._doc.selection.patternY1 = this._cursor.pitch;
+                if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                    this._doc.selection.patternY0 = this._cursor.pitch;
+                    this._doc.selection.patternY1 = this._cursor.pitch;
+                }
                 this._unresizedSelection = { start: 0, end: 0, startY: this._cursor.pitch, endY: this._cursor.pitch };
 
                 // If clicking in empty space, the result will be adding a note,
@@ -1925,7 +1933,7 @@ export class PatternEditor {
                     }
 
                     if (currentPart > end) {
-                        end = Config.partsPerBeat * this._doc.song.beatsPerBar;
+                        end = this._doc.song.partsPerPattern;
                         const pattern: Pattern | null = this._doc.getCurrentPattern(this._barOffset);
                         if (pattern != null) {
                             for (let i: number = 0; i < pattern.notes.length; i++) {
@@ -1951,8 +1959,10 @@ export class PatternEditor {
                     mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
 
                     sequence.append(new ChangePatternSelection(this._doc, start, end));
-                    this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
-                    this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
+                    if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                        this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
+                        this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
+                    }
                     this._unresizedSelection = { ...this._unresizedSelection, start, end };
                     this._updateSelection();
                 }
@@ -1961,8 +1971,10 @@ export class PatternEditor {
                 mousePitch = this._snapToPitch(mousePitch, 0, this._getMaxPitch());
 
                 sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
-                this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
+                if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                    this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, mousePitch);
+                    this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, mousePitch);
+                }
             } else {
                 if (this._cursor.curNote == null) {
                     this._unresizedSelection = { start: 0, end: 0, startY: 0, endY: 0 };
@@ -2068,8 +2080,10 @@ export class PatternEditor {
 
                 } else if (this._mouseHorizontal) {
                     sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                    this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
-                    this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                    if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                        this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                        this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                    }
 
                     const shift: number = (this._mouseX - this._mouseXStart) / this._partWidth;
 
@@ -2104,8 +2118,10 @@ export class PatternEditor {
 
                     if (!this._mouseDragging) {
                         sequence.append(new ChangePatternSelection(this._doc, 0, 0));
-                        this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
-                        this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                        if (this._doc.song.getChannelIsMod(this._doc.channel)) {
+                            this._doc.selection.patternY0 = Math.min(this._unresizedSelection.startY, this._cursor.pitch);
+                            this._doc.selection.patternY1 = Math.max(this._unresizedSelection.endY, this._cursor.pitch);
+                        }
                     }
 
                     const bendPart: number =
@@ -2432,6 +2448,9 @@ export class PatternEditor {
                 const pitches = this._doc.selection.patternY1 - this._doc.selection.patternY0;
                 this._selectionRect.setAttribute("y", String(this._pitchBorder / 2 + (this._pitchHeight * (Config.modCount - this._doc.selection.patternY1 - 1))));
                 this._selectionRect.setAttribute("height", String(-this._pitchBorder + (this._pitchHeight * (pitches + 1))));
+            } else {
+                this._selectionRect.setAttribute("y", "0");
+                this._selectionRect.setAttribute("height", "" + this._editorHeight);    
             }
         } else {
             this._selectionRect.setAttribute("visibility", "hidden");

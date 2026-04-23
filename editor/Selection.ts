@@ -5,12 +5,12 @@ import { Note, NotePin, Pattern } from "../synth/synth";
 import { SongDocument } from "./SongDocument";
 import { ChangeGroup } from "./Change";
 import { ColorConfig } from "./ColorConfig";
-import { ChangeTrackSelection, ChangeChannelBar, ChangeAddChannel, ChangeRemoveChannel, ChangeChannelOrder, ChangeDuplicateSelectedReusedPatterns, ChangeNoteAdded, ChangeNoteTruncate, ChangePatternNumbers, ChangePatternSelection, ChangeInsertBars, ChangeDeleteBars, ChangeEnsurePatternExists, ChangeNoteLength, ChangePaste, ChangeSetPatternInstruments, ChangeViewInstrument, ChangeModChannel, ChangeModInstrument, ChangeModSetting, ChangeModFilter, ChangePatternsPerChannel, ChangePatternRhythm, ChangePatternScale, ChangeTranspose, ChangeRhythm, comparePatternNotes, unionOfUsedNotes, generateScaleMap, discardInvalidPatternInstruments, patternsContainSameInstruments, ChangeDragSelectedNotes } from "./changes";
+import { ChangeTrackSelection, ChangeChannelBar, ChangeAddChannel, ChangeRemoveChannel, ChangeChannelOrder, ChangeDuplicateSelectedReusedPatterns, ChangeNoteAdded, ChangeNoteTruncate, ChangePatternNumbers, ChangePatternSelection, ChangeInsertBars, ChangeDeleteBars, ChangeEnsurePatternExists, ChangeNoteLength, ChangePaste, ChangeSetPatternInstruments, ChangeViewInstrument, ChangeModChannel, ChangeModInstrument, ChangeModSetting, ChangeModFilter, ChangePatternsPerChannel, ChangePatternRhythm, ChangePatternScale, ChangeTranspose, ChangeRhythm, comparePatternNotes, unionOfUsedNotes, generateScaleMap, discardInvalidPatternInstruments, patternsContainSameInstruments, ChangeDragSelectedNotes, rescaleVolumes } from "./changes";
 import { ChangeMergeAcross, ChangeSplitAcross, ChangeBridgeAcross, ChangeMergeAcrossAdjacent, ChangeStretchVertical, ChangeStretchVerticalRelative, ChangeMirrorHorizontal, ChangeTapNotesAcross, ChangeSpreadVertical, ChangeSpreadAcross, getVerticalBounds, IStepData, ChangeStepAcross, ChangeStackLeftAcross, ChangeStackBottomAcross, search } from "./changesNoteOps";
 
 interface PatternCopy {
     instruments: number[];
-    notes: any[];
+    notes: Note[];
 }
 
 interface ChannelCopy {
@@ -22,6 +22,8 @@ interface ChannelCopy {
 
 interface SelectionCopy {
     partDuration: number;
+    modTrackY0: number;
+    modTrackY1: number;
     channels: ChannelCopy[];
 }
 
@@ -31,18 +33,29 @@ export interface SelectionJSON {
     start: number, end: number,
     startY: number, endY: number
 }
+
 export class Selection {
+    // Track selections may be backwards from user rectangle selection (x0 > x1 or y0 > y1)
+    // Numbers are inclusive i.e. x0=x1 or y0=y1 acceptably means one index is selected
     public trackX0: number = 0;
     public trackY0: number = 0;
     public trackX1: number = 0;
     public trackY1: number = 0;
+    // Pattern selections should be ordered i.e. x0 <= x1 and y0 <= y1 or it will cause problems
+    // When X0 and X1 are 0, no pattern selection is made. When deselecting, set it to 0
+    // Y0 and Y1 are used exclusively for "mod tracks", aka the modulators selected in a mod channel
     public patternX0: number = 0;
     public patternX1: number = 0;
     public patternY0: number = 0;
-    public patternY1: number = Config.modCount - 1;
+    public patternY1: number = 0;
+
+    // Digits is used to append typed numbers freely to set the channel/rhythm
+    // instrumentDigits is used for setting the instrument # when simultaneous instruments per pattern is allowed
     public digits: string = "";
     public instrumentDigits: string = "";
 
+    // These changes are kept so they can keep replacing themselves in the undo history,
+    // because they occur rapidly and it allows the user to undo it in one move.
     private _changeTranspose: ChangeGroup | null = null;
     private _changeTrack: ChangeGroup | null = null;
     private _changeInstrument: ChangeGroup | null = null;
@@ -83,24 +96,28 @@ export class Selection {
         this.instrumentDigits = "";
     }
 
-    public get boxSelectionBar(): number {
+    // The active channel/bar is always top-left of the track editor's selection box i.e. minimum value.
+    // Bar is on X axis, Channel is on Y axis.
+    public get trackSelectionBar(): number {
         return Math.min(this.trackX0, this.trackX1);
     }
-    public get boxSelectionChannel(): number {
+    public get trackSelectionChannel(): number {
         return Math.min(this.trackY0, this.trackY1);
     }
-    public get boxSelectionWidth(): number {
+
+    public get trackSelectionWidth(): number {
         return Math.abs(this.trackX0 - this.trackX1) + 1;
     }
-    public get boxSelectionHeight(): number {
+    public get trackSelectionHeight(): number {
         return Math.abs(this.trackY0 - this.trackY1) + 1;
     }
-    public get boxSelectionActive(): boolean {
-        return this.boxSelectionWidth > 1 || this.boxSelectionHeight > 1;
+    public get trackSelectionActive(): boolean {
+        return this.trackSelectionWidth > 1 || this.trackSelectionHeight > 1;
     }
     public get patternSelectionActive(): boolean {
         return this.patternX0 < this.patternX1;
     }
+
     public scrollToSelectedPattern(): void {
         this._doc.barScrollPos = Math.min(this._doc.bar, Math.max(this._doc.bar - (this._doc.trackVisibleBars - 1), this._doc.barScrollPos));
         this._doc.channelScrollPos = Math.min(this._doc.channel, Math.max(this._doc.channel - (this._doc.trackVisibleChannels - 1), this._doc.channelScrollPos));
@@ -110,54 +127,37 @@ export class Selection {
         this._doc.channelScrollPos = Math.min(this.trackY1, Math.max(this.trackY1 - (this._doc.trackVisibleChannels - 1), this._doc.channelScrollPos));
     }
 
-    /** Called to ensure pattern vertical selection fits its channel. */
-    public transferPatternSelectionY(toChannel: number, fromChannel?: number): void {
-        const from =
-            (fromChannel === undefined) ? -1 :
-            (fromChannel < this._doc.song.pitchChannelCount) ? 0 :
-            (fromChannel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) ? 1 : 2;
-        const to =
-            (toChannel < this._doc.song.pitchChannelCount) ? 0 :
-            (toChannel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) ? 1 : 2;
-        const limit = ((to === 2) ? Config.maxPitch : (to === 1) ? Config.drumCount : Config.modCount) - 1;
-        [this.patternY0, this.patternY1] =
-            (from !== -1 && from !== to && to === 2) ? [limit, limit] :
-            (from === 2 && from !== to) ? [0, 0] :
-            [Math.min(limit, this.patternY0), Math.min(limit, this.patternY1)];
-    }
-
     public setChannelBar(channelIndex: number, bar: number): void {
         if (channelIndex == this._doc.channel && bar == this._doc.bar) return;
         const canReplaceLastChange: boolean = this._doc.lastChangeWas(this._changeTrack);
         this._changeTrack = new ChangeGroup();
         this._changeTrack.append(new ChangeChannelBar(this._doc, channelIndex, bar));
-        this.transferPatternSelectionY(channelIndex, this._doc.channel);
 
-        // @jummbus - changing current viewed instrument to the first for the current pattern if the viewedInstrument is not in the pattern
-        const pattern: Pattern | null = this._doc.getCurrentPattern(0);
-        if (pattern != null) {
-            if (pattern.instruments.indexOf(this._doc.viewedInstrument[this._doc.channel]) < 0) {
-                this._doc.viewedInstrument[this._doc.channel] = pattern.instruments[0];
-            }
+        // Changes current viewed instrument to the first for the current pattern if the viewedInstrument is not in the pattern
+        const pattern = this._doc.getCurrentPattern(0);
+        if (pattern && pattern.instruments.indexOf(this._doc.viewedInstrument[this._doc.channel]) < 0) {
+            this._doc.viewedInstrument[this._doc.channel] = pattern.instruments[0];
         }
+
         // Don't erase existing redo history just to look at highlighted pattern.
         if (!this._doc.hasRedoHistory()) {
             this._doc.record(this._changeTrack, canReplaceLastChange);
         }
         this.selectionUpdated();
-
     }
 
-    public setPattern(pattern: number): void {
-        this._doc.record(new ChangePatternNumbers(this._doc, pattern, this.boxSelectionBar, this.boxSelectionChannel, this.boxSelectionWidth, this.boxSelectionHeight));
+    public changePatternNumber(pattern: number): void {
+        this._doc.record(new ChangePatternNumbers(this._doc, pattern, this.trackSelectionBar, this.trackSelectionChannel, this.trackSelectionWidth, this.trackSelectionHeight));
     }
 
+    /** Sets the typed digit string directly, then switches the channel, rhythm or simultaneous instrument # based on it. */
     public setDigits(digits: string, forInstrument: boolean, forRhythms: boolean): void {
         if (forInstrument) { this.instrumentDigits = ""; }
         else if (!forRhythms) { this.digits = ""; } 
         this.nextDigit(digits, forInstrument, forRhythms);
     }
 
+    /** Appends a typed digit to a string, then switches the channel, rhythm or simultaneous instrument # based on it. */
     public nextDigit(digit: string, forInstrument: boolean, forRhythms: boolean): void {
         if (forRhythms) {
             if (digit == "3") {
@@ -195,20 +195,16 @@ export class Selection {
         }
         else {
             this.digits += digit;
-            let parsed: number = parseInt(this.digits);
+            let parsed = parseInt(this.digits);
             if (parsed <= this._doc.song.patternsPerChannel) {
-
-                this.setPattern(parsed);
-
+                this._doc.record(new ChangePatternNumbers(this._doc, parsed, this.trackSelectionBar, this.trackSelectionChannel, this.trackSelectionWidth, this.trackSelectionHeight));
                 return;
             }
 
             this.digits = digit;
             parsed = parseInt(this.digits);
             if (parsed <= this._doc.song.patternsPerChannel) {
-
-                this.setPattern(parsed);
-
+                this._doc.record(new ChangePatternNumbers(this._doc, parsed, this.trackSelectionBar, this.trackSelectionChannel, this.trackSelectionWidth, this.trackSelectionHeight));
                 return;
             }
 
@@ -233,15 +229,15 @@ export class Selection {
     }
 
     public insertBars(): void {
-        this._doc.record(new ChangeInsertBars(this._doc, this.boxSelectionBar + this.boxSelectionWidth, this.boxSelectionWidth));
-        const width: number = this.boxSelectionWidth;
+        this._doc.record(new ChangeInsertBars(this._doc, this.trackSelectionBar + this.trackSelectionWidth, this.trackSelectionWidth));
+        const width: number = this.trackSelectionWidth;
         this.trackX0 += width;
         this.trackX1 += width;
     }
 
     public insertChannel(): void {
         const group: ChangeGroup = new ChangeGroup();
-        const insertIndex: number = this.boxSelectionChannel + this.boxSelectionHeight;
+        const insertIndex: number = this.trackSelectionChannel + this.trackSelectionHeight;
         const isNoise: boolean = this._doc.song.getChannelIsNoise(insertIndex - 1);
         const isMod: boolean = this._doc.song.getChannelIsMod(insertIndex - 1)
         group.append(new ChangeAddChannel(this._doc, insertIndex, isNoise, isMod));
@@ -252,11 +248,17 @@ export class Selection {
         }
     }
 
+    /**
+     * If an active selection exists in the pattern editor, deletes notes within it. Pulling shifts all notes past the
+     * deleted selection leftward by the selection width to fill the gap. The selection is then cleared.
+     * 
+     * If no selection exists, the bar is deleted instead, and no notes are affected.
+     */
     public deleteBars(andPull?: boolean): void {
         const group: ChangeGroup = new ChangeGroup();
         if (this._doc.selection.patternSelectionActive) {
-            if (this.boxSelectionActive) {
-                group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+            if (this.trackSelectionActive) {
+                group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
             }
 
             for (const channelIndex of this._eachSelectedChannel()) {
@@ -279,8 +281,8 @@ export class Selection {
             }
             group.append(new ChangePatternSelection(this._doc, 0, 0));
         } else {
-            group.append(new ChangeDeleteBars(this._doc, this.boxSelectionBar, this.boxSelectionWidth));
-            const width: number = this.boxSelectionWidth;
+            group.append(new ChangeDeleteBars(this._doc, this.trackSelectionBar, this.trackSelectionWidth));
+            const width: number = this.trackSelectionWidth;
             this.trackX0 = Math.max(0, this.trackX0 - width);
             this.trackX1 = Math.max(0, this.trackX1 - width);
         }
@@ -288,25 +290,28 @@ export class Selection {
     }
 
     public deleteChannel(): void {
-        this._doc.record(new ChangeRemoveChannel(this._doc, this.boxSelectionChannel, this.boxSelectionChannel + this.boxSelectionHeight - 1));
+        this._doc.record(new ChangeRemoveChannel(this._doc, this.trackSelectionChannel, this.trackSelectionChannel + this.trackSelectionHeight - 1));
         this.trackY0 = this.trackY1 = this._doc.channel;
-        ColorConfig.resetColors();
+        ColorConfig.resetColors(); // Channels don't preserve the colors they were created with because it would break up the gradient.
     }
 
+    /** Iterates all selected channels in the track editor. */
     private * _eachSelectedChannel(): IterableIterator<number> {
-        for (let channelIndex: number = this.boxSelectionChannel; channelIndex < this.boxSelectionChannel + this.boxSelectionHeight; channelIndex++) {
+        for (let channelIndex = this.trackSelectionChannel; channelIndex < this.trackSelectionChannel + this.trackSelectionHeight; channelIndex++) {
             yield channelIndex;
         }
     }
 
+    /** Iterates all selected bars in the track editor. */
     private * _eachSelectedBar(): IterableIterator<number> {
-        for (let bar: number = this.boxSelectionBar; bar < this.boxSelectionBar + this.boxSelectionWidth; bar++) {
+        for (let bar: number = this.trackSelectionBar; bar < this.trackSelectionBar + this.trackSelectionWidth; bar++) {
             yield bar;
         }
     }
 
-    public * eachSelectedModTrack(channelIndex: number): IterableIterator<number | undefined> {
-        if (this._doc.song.getChannelIsMod(channelIndex)) {
+    /** Iterates all modulators selected in the track editor. Outside of mod channels, it iterates once with the value undefined. */
+    public * eachSelectedModTrack(channelIndex: number | true): IterableIterator<number | undefined> {
+        if (channelIndex === true || this._doc.song.getChannelIsMod(channelIndex)) {
             if (this.patternSelectionActive) {
                 for (let track = this.patternY0; track <= this.patternY1; track++) {
                     yield track;
@@ -321,6 +326,7 @@ export class Selection {
         }
     }
 
+    /** Iterates all selected patterns in the track editor. */
     private * _eachSelectedPattern(channelIndex: number): IterableIterator<Pattern> {
         const handledPatterns: Dictionary<boolean> = {};
         for (const bar of this._eachSelectedBar()) {
@@ -368,8 +374,12 @@ export class Selection {
 
                         if (this.patternSelectionActive) {
                             for (const note of pattern.cloneNotes()) {
-                                if (note.end <= this.patternX0) continue;
-                                if (note.start >= this.patternX1) continue;
+
+                                if (note.end <= this.patternX0 || note.start >= this.patternX1 ||
+                                    (this._doc.song.getChannelIsMod(channelIndex) && (note.pitches[0] > this.patternY1 || note.pitches[0] < this.patternY0)))
+                                {
+                                    continue;
+                                }
                                 note.start -= this.patternX0;
                                 note.end -= this.patternX0;
                                 if (note.start < 0 || note.end > this.patternX1 - this.patternX0) {
@@ -396,6 +406,8 @@ export class Selection {
 
         const selectionCopy: SelectionCopy = {
             "partDuration": this.patternSelectionActive ? this.patternX1 - this.patternX0 : this._doc.song.partsPerPattern,
+            "modTrackY0": this.patternSelectionActive ? this.patternY0 : 0,
+            "modTrackY1": this.patternSelectionActive ? this.patternY1 : 0,
             "channels": channels,
         };
         window.localStorage.setItem("selectionCopy", JSON.stringify(selectionCopy));
@@ -412,8 +424,7 @@ export class Selection {
         // but I'm not sure it's worth the effort.
         newPitches.sort(function (a: number, b: number): number { return a - b; });
         let lowestPitch: number = newPitches[0] % Config.drumCount;
-        const numberOfPitches: number = newPitches.length;
-        let highestPitch: number = lowestPitch + (numberOfPitches - 1);
+        let highestPitch: number = lowestPitch + newPitches.length - 1;
         while (highestPitch >= Config.drumCount) {
             lowestPitch--;
             highestPitch--;
@@ -455,17 +466,19 @@ export class Selection {
 
     public cutNotes(): void {
         const group: ChangeGroup = new ChangeGroup();
-        const channelIndex: number = this.boxSelectionChannel;
-        const barIndex: number = this.boxSelectionBar;
-        const cutHeight: number = this.boxSelectionHeight;
-        const cutWidth: number = this.boxSelectionWidth;
+        const channelIndex: number = this.trackSelectionChannel;
+        const barIndex: number = this.trackSelectionBar;
+        const cutHeight: number = this.trackSelectionHeight;
+        const cutWidth: number = this.trackSelectionWidth;
         this.copy();
         for (let channel = channelIndex; channel < channelIndex + cutHeight; channel++) {
-            for (let bar = barIndex; bar < barIndex + cutWidth; bar++) {
-                const patternNumber: number = this._doc.song.channels[channel].bars[bar];
-                if (patternNumber != 0) {
-                    const pattern: Pattern = this._doc.song.channels[channel].patterns[patternNumber - 1];
-                    group.append(new ChangeNoteTruncate(this._doc, pattern, 0, Config.partsPerBeat * this._doc.song.beatsPerBar));
+            for (const track of this.eachSelectedModTrack(channel)) {
+                for (let bar = barIndex; bar < barIndex + cutWidth; bar++) {
+                    const patternNumber: number = this._doc.song.channels[channel].bars[bar];
+                    if (patternNumber != 0) {
+                        const pattern: Pattern = this._doc.song.channels[channel].patterns[patternNumber - 1];
+                        group.append(new ChangeNoteTruncate(this._doc, pattern, 0, this._doc.song.partsPerPattern, null, true, track));
+                    }
                 }
             }
         }
@@ -480,93 +493,102 @@ export class Selection {
     public pasteNotes(): void {
         const selectionCopy: SelectionCopy | null = JSON.parse(String(window.localStorage.getItem("selectionCopy")));
         if (selectionCopy == null) return;
+
         const channelCopies: ChannelCopy[] = selectionCopy["channels"] || [];
         const copiedPartDuration: number = selectionCopy["partDuration"] >>> 0;
+        const modTrackY0 = selectionCopy['modTrackY0'];
+        const modTrackY1 = selectionCopy['modTrackY1'];
 
-        const group: ChangeGroup = new ChangeGroup();
-        const fillSelection: boolean = (this.boxSelectionWidth > 1 || this.boxSelectionHeight > 1);
+        const pasteHistory = new ChangeGroup();
+        const multiplePatterns = (this.trackSelectionWidth > 1 || this.trackSelectionHeight > 1);
+        const pasteHeight = multiplePatterns
+            ? this.trackSelectionHeight
+            : Math.min(channelCopies.length, this._doc.song.getChannelCount() - this.trackSelectionChannel);
 
-        const pasteHeight: number = fillSelection ? this.boxSelectionHeight : Math.min(channelCopies.length, this._doc.song.getChannelCount() - this.boxSelectionChannel);
-        for (let pasteChannel: number = 0; pasteChannel < pasteHeight; pasteChannel++) {
-            const channelCopy: ChannelCopy = channelCopies[pasteChannel % channelCopies.length];
-            const channelIndex: number = this.boxSelectionChannel + pasteChannel;
-               const channelIsNoise = this._doc.song.getChannelIsNoise(channelIndex);
-		
-            const isNoise: boolean = !!channelCopy["isNoise"];
-            const isMod: boolean = !!channelCopy["isMod"];
-		const isPitch = !isNoise && !isMod;
-            const patternCopies: Dictionary<PatternCopy> = channelCopy["patterns"] || {};
-            const copiedBars: number[] = channelCopy["bars"] || [];
-            if (copiedBars.length == 0) continue;
-		// Allow pasting from a pitch channel to a noise channel (and the opposite).
-            if (isNoise && this._doc.song.getChannelIsMod(channelIndex)) continue;
-            if (isMod != this._doc.song.getChannelIsMod(channelIndex)) continue;
-                // if (isNoise != this._doc.song.getChannelIsNoise(channelIndex))
-                //     continue;
+        // For each channel
+        for (let pasteChannel = 0; pasteChannel < pasteHeight; pasteChannel++) {
+            const sourceChannelIndex = pasteChannel % channelCopies.length; // Modulo fills track selection if copy < paste size
+            const sourceChannel = channelCopies[sourceChannelIndex];
+            const sourceIsPitch = !sourceChannel.isNoise && !sourceChannel.isMod;
+            const targetChannelIndex = this.trackSelectionChannel + pasteChannel;
+            const targetIsNoise = this._doc.song.getChannelIsNoise(targetChannelIndex);
+            const targetIsMod = this._doc.song.getChannelIsMod(targetChannelIndex);
+            const copiedPatterns = sourceChannel.patterns || {};
+            const copiedBars = sourceChannel.bars || [];
+            if (copiedBars.length === 0) continue;
 
-            const pasteWidth: number = fillSelection ? this.boxSelectionWidth : Math.min(copiedBars.length, this._doc.song.barCount - this.boxSelectionBar);
-            if (!fillSelection && copiedBars.length == 1 && channelCopies.length == 1) {
-                // Special case: if there's just one pattern being copied, try to insert it
-                // into whatever pattern is already selected.
-                const copiedPatternIndex: number = copiedBars[0] >>> 0;
-                const bar: number = this.boxSelectionBar;
-                const currentPatternIndex: number = this._doc.song.channels[channelIndex].bars[bar];
-                if (copiedPatternIndex == 0 && currentPatternIndex == 0) continue;
+            // Can paste pitch to any channel. Can paste noise to pitch/noise channels. Can paste mod to mod channels.
+            if (sourceChannel.isNoise && targetIsMod) continue;
+            if (sourceChannel.isMod !== targetIsMod) continue;
 
-                const patternCopy: PatternCopy = patternCopies[String(copiedPatternIndex)];
+            // Limit # patterns to paste across to track selection or copied # patterns bounded by available amount
+            const pasteWidth = multiplePatterns
+                ? this.trackSelectionWidth
+                : Math.min(copiedBars.length, this._doc.song.barCount - this.trackSelectionBar);
 
-                const instrumentsCopy: number[] = this._parseCopiedInstrumentArray(patternCopy, channelIndex);
+            // Handle posting one pattern
+            if (!multiplePatterns && copiedBars.length === 1 && channelCopies.length === 1) {
+                const sourcePatternNumber = copiedBars[0] >>> 0;
+                const bar = this.trackSelectionBar;
+                const targetPatternNumber = this._doc.song.channels[targetChannelIndex].bars[bar];
+                if (sourcePatternNumber === 0 && targetPatternNumber === 0) continue; // copied empty to empty, do nothing
 
-                 let pastedNotes: Note[] = patternCopy["notes"];
-                   if (isPitch && channelIsNoise) {
-                       pastedNotes = this._convertCopiedPitchNotesToNoiseNotes(pastedNotes);
-                    }
+                const patternCopy = copiedPatterns[String(sourcePatternNumber)];
+                const instrumentsCopy = this._parseCopiedInstrumentArray(patternCopy, targetChannelIndex);
+                let pastedNotes = sourceIsPitch && targetIsNoise
+                    ? this._convertCopiedPitchNotesToNoiseNotes(patternCopy.notes)
+                    : patternCopy.notes;
 		    
-                if (currentPatternIndex == 0) {
-                    const existingPattern: Pattern | undefined = this._doc.song.channels[channelIndex].patterns[copiedPatternIndex - 1];
-                    if (existingPattern != undefined &&
-                        !this.patternSelectionActive &&
-                        ((comparePatternNotes(pastedNotes, existingPattern.notes) && patternsContainSameInstruments(instrumentsCopy, existingPattern.instruments)) ||
-                            this._patternIndexIsUnused(channelIndex, copiedPatternIndex))) {
-                        group.append(new ChangePatternNumbers(this._doc, copiedPatternIndex, bar, channelIndex, 1, 1));
+                // If we copy into an empty pattern, we're either using an unedited pattern or creating a new one.
+                // We don't have to try to merge our notes with existing ones.
+                if (targetPatternNumber === 0) {
+                    const existingPattern: Pattern | undefined = this._doc.song.channels[targetChannelIndex].patterns[sourcePatternNumber - 1];
+                    if (existingPattern && !this.patternSelectionActive
+                        && ((comparePatternNotes(pastedNotes, existingPattern.notes) && patternsContainSameInstruments(instrumentsCopy, existingPattern.instruments))
+                            || this._patternIndexIsUnused(targetChannelIndex, sourcePatternNumber)))
+                    {
+                        pasteHistory.append(new ChangePatternNumbers(this._doc, sourcePatternNumber, bar, targetChannelIndex, 1, 1));
                     } else {
-                        group.append(new ChangeEnsurePatternExists(this._doc, channelIndex, bar));
+                        pasteHistory.append(new ChangeEnsurePatternExists(this._doc, targetChannelIndex, bar));
                     }
                 }
 
-                const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
+                const pattern: Pattern | null = this._doc.song.getPattern(targetChannelIndex, bar);
                 if (pattern == null) throw new Error();
-                group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternSelectionActive ? this.patternX1 : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
-                // @jummbus - I actually like it better if instruments copy over, unless it's not a mod and there are notes in the pattern.
-                if (currentPatternIndex == 0 || patternCopy.notes.length == 0 || channelIndex >= this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
+                pasteHistory.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternSelectionActive ? this.patternX1 : this._doc.song.partsPerPattern, copiedPartDuration,
+                    { y0: this._doc.selection.patternY0, y1: this._doc.selection.patternY1, copyHeight: modTrackY1 - modTrackY0, copyChannelIndex: sourceChannelIndex }
+                ));
+
+                // Pasting notes doesn't copy channel instruments, so we do it now.
+                if (targetPatternNumber === 0 || patternCopy.notes.length === 0 || targetIsMod) {
                     this.selectInstrument(instrumentsCopy[0]);
-                    group.append(new ChangeSetPatternInstruments(this._doc, channelIndex, instrumentsCopy, pattern));
+                    pasteHistory.append(new ChangeSetPatternInstruments(this._doc, targetChannelIndex, instrumentsCopy, pattern));
                 }
             } else if (this.patternSelectionActive) {
                 const reusablePatterns: Dictionary<number> = {};
                 const usedPatterns: Dictionary<boolean> = {};
 
-                group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, pasteWidth, this.boxSelectionChannel, pasteHeight));
+                pasteHistory.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, pasteWidth, this.trackSelectionChannel, pasteHeight));
 
                 for (let pasteBar: number = 0; pasteBar < pasteWidth; pasteBar++) {
-                    const bar: number = this.boxSelectionBar + pasteBar;
+                    const bar: number = this.trackSelectionBar + pasteBar;
                     const copiedPatternIndex: number = copiedBars[pasteBar % copiedBars.length] >>> 0;
-                    const currentPatternIndex: number = this._doc.song.channels[channelIndex].bars[bar];
+                    const currentPatternIndex: number = this._doc.song.channels[targetChannelIndex].bars[bar];
                     const reusedIndex: string = [copiedPatternIndex, currentPatternIndex].join(",");
                     if (copiedPatternIndex == 0 && currentPatternIndex == 0) continue;
                     if (reusablePatterns[reusedIndex] != undefined) {
-                        group.append(new ChangePatternNumbers(this._doc, reusablePatterns[reusedIndex], bar, channelIndex, 1, 1));
+                        pasteHistory.append(new ChangePatternNumbers(this._doc, reusablePatterns[reusedIndex], bar, targetChannelIndex, 1, 1));
                         continue;
                     }
 
-                    if (currentPatternIndex == 0) {
-                        group.append(new ChangeEnsurePatternExists(this._doc, channelIndex, bar));
-                        const patternCopy: PatternCopy = patternCopies[String(copiedPatternIndex)];
-                        const instrumentsCopy: number[] = this._parseCopiedInstrumentArray(patternCopy, channelIndex);
-                        const pattern: Pattern = this._doc.song.getPattern(channelIndex, bar)!;
-                        group.append(new ChangeSetPatternInstruments(this._doc, channelIndex, instrumentsCopy, pattern));
+                    if (currentPatternIndex === 0) {
+                        pasteHistory.append(new ChangeEnsurePatternExists(this._doc, targetChannelIndex, bar));
+                        const patternCopy: PatternCopy = copiedPatterns[String(copiedPatternIndex)];
+                        const instrumentsCopy: number[] = this._parseCopiedInstrumentArray(patternCopy, targetChannelIndex);
+                        const pattern: Pattern = this._doc.song.getPattern(targetChannelIndex, bar)!;
+                        pasteHistory.append(new ChangeSetPatternInstruments(this._doc, targetChannelIndex, instrumentsCopy, pattern));
                     } else {
-                        const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
+                        const pattern: Pattern | null = this._doc.song.getPattern(targetChannelIndex, bar);
                         if (pattern == null) throw new Error();
 
                         if (!usedPatterns[String(currentPatternIndex)]) {
@@ -574,86 +596,94 @@ export class Selection {
                         } else {
                             // If this pattern is used here and elsewhere, it's not safe to modify it directly, so
                             // make a duplicate of it and modify that instead.
-                            group.append(new ChangePatternNumbers(this._doc, 0, bar, channelIndex, 1, 1));
-                            group.append(new ChangeEnsurePatternExists(this._doc, channelIndex, bar));
-                            const newPattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
+                            pasteHistory.append(new ChangePatternNumbers(this._doc, 0, bar, targetChannelIndex, 1, 1));
+                            pasteHistory.append(new ChangeEnsurePatternExists(this._doc, targetChannelIndex, bar));
+                            const newPattern: Pattern | null = this._doc.song.getPattern(targetChannelIndex, bar);
                             if (newPattern == null) throw new Error();
                             for (const note of pattern.cloneNotes()) {
-                                   if (isPitch && channelIsNoise) {
+                                   if (sourceIsPitch && targetIsNoise) {
                                         note.pitches = this._remapToNoisePitches(note.pitches);
                                     }
-				    group.append(new ChangeNoteAdded(this._doc, newPattern, note, newPattern.notes.length, false));
+				    pasteHistory.append(new ChangeNoteAdded(this._doc, newPattern, note, newPattern.notes.length, false));
                             }
                             // Don't overwrite the existing pattern's instruments if only part of the pattern content is being replaced.
                             //group.append(new ChangeSetPatternInstruments(this._doc, channelIndex, pattern.instruments, newPattern));
                         }
                     }
 
-                    const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
+                    const pattern: Pattern | null = this._doc.song.getPattern(targetChannelIndex, bar);
                     if (pattern == null) throw new Error();
                     if (copiedPatternIndex == 0) {
-                        group.append(new ChangeNoteTruncate(this._doc, pattern, this.patternX0, this.patternX1));
+                        pasteHistory.append(new ChangeNoteTruncate(this._doc, pattern, this.patternX0, this.patternX1));
                     } else {
-                        const patternCopy: PatternCopy = patternCopies[String(copiedPatternIndex)];
+                        const patternCopy: PatternCopy = copiedPatterns[String(copiedPatternIndex)];
                         let pastedNotes: Note[] = patternCopy["notes"];
-                        if (isPitch && channelIsNoise) {
+                        if (sourceIsPitch && targetIsNoise) {
                             pastedNotes = this._convertCopiedPitchNotesToNoiseNotes(pastedNotes);
                         }
-                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternX1, copiedPartDuration));
+                        pasteHistory.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternX1, copiedPartDuration,
+                            this._doc.selection.patternY0, this._doc.selection.patternY1, modTrackY1 - modTrackY0
+                        ));
                     }
 
-                    reusablePatterns[reusedIndex] = this._doc.song.channels[channelIndex].bars[bar];
+                    reusablePatterns[reusedIndex] = this._doc.song.channels[targetChannelIndex].bars[bar];
                 }
             } else {
                 for (let pasteBar: number = 0; pasteBar < pasteWidth; pasteBar++) {
                     // When a pattern becomes unused when replaced by rectangular selection pasting,
                     // remove all the notes from the pattern so that it may be reused.
-                    this.erasePatternInBar(group, channelIndex, this.boxSelectionBar + pasteBar);
+                    this.erasePatternInBar(pasteHistory, targetChannelIndex, this.trackSelectionBar + pasteBar);
                 }
 
                 const reusablePatterns: Dictionary<number> = {};
                 for (let pasteBar: number = 0; pasteBar < pasteWidth; pasteBar++) {
-                    const bar: number = this.boxSelectionBar + pasteBar;
+                    const bar: number = this.trackSelectionBar + pasteBar;
                     const copiedPatternIndex: number = copiedBars[pasteBar % copiedBars.length] >>> 0;
                     const reusedIndex: string = String(copiedPatternIndex);
                     if (copiedPatternIndex == 0) continue;
                     if (reusablePatterns[reusedIndex] != undefined) {
-                        group.append(new ChangePatternNumbers(this._doc, reusablePatterns[reusedIndex], bar, channelIndex, 1, 1));
+                        pasteHistory.append(new ChangePatternNumbers(this._doc, reusablePatterns[reusedIndex], bar, targetChannelIndex, 1, 1));
                         continue;
                     }
-                    const patternCopy: PatternCopy = patternCopies[String(copiedPatternIndex)];
-                    const instrumentsCopy: number[] = this._parseCopiedInstrumentArray(patternCopy, channelIndex);
-                    const existingPattern: Pattern | undefined = this._doc.song.channels[channelIndex].patterns[copiedPatternIndex - 1];
 
-                 let pastedNotes: Note[] = patternCopy["notes"];
-                        if (isPitch && channelIsNoise) {
-                            pastedNotes = this._convertCopiedPitchNotesToNoiseNotes(pastedNotes);
-                        }
+                    const patternCopy: PatternCopy = copiedPatterns[String(copiedPatternIndex)];
+                    const instrumentsCopy: number[] = this._parseCopiedInstrumentArray(patternCopy, targetChannelIndex);
+                    const existingPattern: Pattern | undefined = this._doc.song.channels[targetChannelIndex].patterns[copiedPatternIndex - 1];
+
+                    let pastedNotes: Note[] = patternCopy["notes"];
+                    if (sourceIsPitch && targetIsNoise) {
+                        pastedNotes = this._convertCopiedPitchNotesToNoiseNotes(pastedNotes);
+                    }
 			
-		if (existingPattern != undefined &&
-                        copiedPartDuration == Config.partsPerBeat * this._doc.song.beatsPerBar &&
+                    if (existingPattern != undefined &&
+                        copiedPartDuration == this._doc.song.partsPerPattern &&
                         comparePatternNotes(pastedNotes, existingPattern.notes) &&
-                        patternsContainSameInstruments(instrumentsCopy, existingPattern.instruments)) {
-                        group.append(new ChangePatternNumbers(this._doc, copiedPatternIndex, bar, channelIndex, 1, 1));
+                        patternsContainSameInstruments(instrumentsCopy, existingPattern.instruments))
+                    {
+                        pasteHistory.append(new ChangePatternNumbers(this._doc, copiedPatternIndex, bar, targetChannelIndex, 1, 1));
                     } else {
-                        if (existingPattern != undefined && this._patternIndexIsUnused(channelIndex, copiedPatternIndex)) {
-                            group.append(new ChangePatternNumbers(this._doc, copiedPatternIndex, bar, channelIndex, 1, 1));
+                        if (existingPattern != undefined && this._patternIndexIsUnused(targetChannelIndex, copiedPatternIndex)) {
+                            pasteHistory.append(new ChangePatternNumbers(this._doc, copiedPatternIndex, bar, targetChannelIndex, 1, 1));
                         } else {
-                            group.append(new ChangeEnsurePatternExists(this._doc, channelIndex, bar));
+                            pasteHistory.append(new ChangeEnsurePatternExists(this._doc, targetChannelIndex, bar));
                         }
-                        const pattern: Pattern | null = this._doc.song.getPattern(channelIndex, bar);
+
+                        const pattern: Pattern | null = this._doc.song.getPattern(targetChannelIndex, bar);
                         if (pattern == null) throw new Error();
-                        group.append(new ChangePaste(this._doc, pattern, pastedNotes, this.patternX0, this.patternSelectionActive ? this.patternX1 : Config.partsPerBeat * this._doc.song.beatsPerBar, copiedPartDuration));
-                        group.append(new ChangeSetPatternInstruments(this._doc, channelIndex, instrumentsCopy, pattern));
+                        pasteHistory.append(new ChangePaste(this._doc, pattern, pastedNotes,
+                            this.patternX0, this.patternSelectionActive ? this.patternX1 : this._doc.song.partsPerPattern, copiedPartDuration,
+                            this._doc.selection.patternY0, this._doc.selection.patternY1, modTrackY1 - modTrackY0
+                        ));
+                        pasteHistory.append(new ChangeSetPatternInstruments(this._doc, targetChannelIndex, instrumentsCopy, pattern));
                     }
 
-                    reusablePatterns[reusedIndex] = this._doc.song.channels[channelIndex].bars[bar];
+                    reusablePatterns[reusedIndex] = this._doc.song.channels[targetChannelIndex].bars[bar];
 
                 }
             }
         }
 
-        this._doc.record(group);
+        this._doc.record(pasteHistory);
     }
 
     // Set a bar's pattern number to zero, and if that pattern was not used
@@ -676,20 +706,20 @@ export class Selection {
         const channelCopies: ChannelCopy[] = selectionCopy["channels"] || [];
 
         const group: ChangeGroup = new ChangeGroup();
-        const fillSelection: boolean = this.boxSelectionActive;
+        const fillSelection: boolean = this.trackSelectionActive;
 
-        const pasteHeight: number = fillSelection ? this.boxSelectionHeight : Math.min(channelCopies.length, this._doc.song.getChannelCount() - this.boxSelectionChannel);
+        const pasteHeight: number = fillSelection ? this.trackSelectionHeight : Math.min(channelCopies.length, this._doc.song.getChannelCount() - this.trackSelectionChannel);
         for (let pasteChannel: number = 0; pasteChannel < pasteHeight; pasteChannel++) {
             const channelCopy: ChannelCopy = channelCopies[pasteChannel % channelCopies.length];
-            const channelIndex: number = this.boxSelectionChannel + pasteChannel;
+            const channelIndex: number = this.trackSelectionChannel + pasteChannel;
 
             const copiedBars: number[] = channelCopy["bars"] || [];
             if (copiedBars.length == 0) continue;
 
-            const pasteWidth: number = fillSelection ? this.boxSelectionWidth : Math.min(copiedBars.length, this._doc.song.barCount - this.boxSelectionBar);
+            const pasteWidth: number = fillSelection ? this.trackSelectionWidth : Math.min(copiedBars.length, this._doc.song.barCount - this.trackSelectionBar);
             for (let pasteBar: number = 0; pasteBar < pasteWidth; pasteBar++) {
                 const copiedPatternIndex: number = copiedBars[pasteBar % copiedBars.length] >>> 0;
-                const bar: number = this.boxSelectionBar + pasteBar;
+                const bar: number = this.trackSelectionBar + pasteBar;
 
                 if (copiedPatternIndex > this._doc.song.patternsPerChannel) {
                     group.append(new ChangePatternsPerChannel(this._doc, copiedPatternIndex));
@@ -704,10 +734,10 @@ export class Selection {
 
     public selectAllPatterns(): void {
         new ChangePatternSelection(this._doc, 0, 0);
-        if (this.boxSelectionBar == 0 &&
-            this.boxSelectionChannel == 0 &&
-            this.boxSelectionWidth == this._doc.song.barCount &&
-            this.boxSelectionHeight == this._doc.song.getChannelCount()) {
+        if (this.trackSelectionBar == 0 &&
+            this.trackSelectionChannel == 0 &&
+            this.trackSelectionWidth == this._doc.song.barCount &&
+            this.trackSelectionHeight == this._doc.song.getChannelCount()) {
             this.setTrackSelection(this._doc.bar, this._doc.bar, this._doc.channel, this._doc.channel);
         } else {
             this.setTrackSelection(0, this._doc.song.barCount - 1, 0, this._doc.song.getChannelCount() - 1);
@@ -717,7 +747,7 @@ export class Selection {
 
     public selectChannel(): void {
         new ChangePatternSelection(this._doc, 0, 0);
-        if (this.boxSelectionBar == 0 && this.boxSelectionWidth == this._doc.song.barCount) {
+        if (this.trackSelectionBar == 0 && this.trackSelectionWidth == this._doc.song.barCount) {
             this.setTrackSelection(this._doc.bar, this._doc.bar, this.trackY0, this.trackY1);
         } else {
             this.setTrackSelection(0, this._doc.song.barCount - 1, this.trackY0, this.trackY1);
@@ -726,7 +756,7 @@ export class Selection {
     }
 
     public duplicatePatterns(): void {
-        this._doc.record(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+        this._doc.record(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
     }
 
     public muteChannels(allChannels: boolean): void {
@@ -761,11 +791,11 @@ export class Selection {
         let alreadySoloed: boolean = true;
 
         // Soloing mod channels - solo all channels affected by the mod, instead
-        if (this.boxSelectionChannel >= this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
+        if (this.trackSelectionChannel >= this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) {
 
-            const currentChannel = this._doc.song.channels[this.boxSelectionChannel];
+            const currentChannel = this._doc.song.channels[this.trackSelectionChannel];
             const bar: number = currentChannel.bars[this._doc.bar] - 1;
-            const modInstrument = (bar >= 0) ? currentChannel.instruments[currentChannel.patterns[bar].instruments[0]] : currentChannel.instruments[this._doc.viewedInstrument[this.boxSelectionChannel]];
+            const modInstrument = (bar >= 0) ? currentChannel.instruments[currentChannel.patterns[bar].instruments[0]] : currentChannel.instruments[this._doc.viewedInstrument[this.trackSelectionChannel]];
             const soloPattern: boolean[] = [];
             let matchesSoloPattern: boolean = !invert;
 
@@ -801,7 +831,7 @@ export class Selection {
         else {
 
             for (let channelIndex: number = 0; channelIndex < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount; channelIndex++) {
-                const shouldBeMuted: boolean = (channelIndex < this.boxSelectionChannel || channelIndex >= this.boxSelectionChannel + this.boxSelectionHeight) ? !invert : invert;
+                const shouldBeMuted: boolean = (channelIndex < this.trackSelectionChannel || channelIndex >= this.trackSelectionChannel + this.trackSelectionHeight) ? !invert : invert;
                 if (this._doc.song.channels[channelIndex].muted != shouldBeMuted) {
                     alreadySoloed = false;
                     break;
@@ -814,7 +844,7 @@ export class Selection {
                 }
             } else {
                 for (let channelIndex: number = 0; channelIndex < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount; channelIndex++) {
-                    this._doc.song.channels[channelIndex].muted = (channelIndex < this.boxSelectionChannel || channelIndex >= this.boxSelectionChannel + this.boxSelectionHeight) ? !invert : invert;
+                    this._doc.song.channels[channelIndex].muted = (channelIndex < this.trackSelectionChannel || channelIndex >= this.trackSelectionChannel + this.trackSelectionHeight) ? !invert : invert;
                 }
             }
 
@@ -826,8 +856,8 @@ export class Selection {
     public forceRhythm(): void {
         const group: ChangeGroup = new ChangeGroup();
 
-        if (this.boxSelectionActive) {
-		    group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+        if (this.trackSelectionActive) {
+		    group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
         }
 
         for (const channelIndex of this._eachSelectedChannel()) {
@@ -842,8 +872,8 @@ export class Selection {
     public forceScale(): void {
         const group: ChangeGroup = new ChangeGroup();
 
-        if (this.boxSelectionActive) {
-		    group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+        if (this.trackSelectionActive) {
+		    group.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
         }
 
         const scaleFlags: boolean[] = [true, false, false, false, false, false, false, false, false, false, false, false];
@@ -903,8 +933,6 @@ export class Selection {
      * 
      * See the merge functions in changesNoteOps.ts.
      * @param adjacentOnly If true, uses adjacent merge, else uses normal merge.
-     * @param pitchIndex For modulation channels, this indicates which pitch index to affect.
-     * Defaults to Config.modCount - 1 (the "first" track, aka the one visually at top).
      */
     public noteMerge(adjacentOnly: boolean): void {
         const change = new ChangeGroup();
@@ -1163,8 +1191,8 @@ export class Selection {
         const canReplaceLastChange: boolean = this._doc.lastChangeWas(this._changeTranspose);
         this._changeTranspose = new ChangeGroup();
 
-        if (this.boxSelectionActive) {
-		    this._changeTranspose.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+        if (this.trackSelectionActive) {
+		    this._changeTranspose.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
         }
 
         for (const channelIndex of this._eachSelectedChannel()) {
@@ -1175,6 +1203,8 @@ export class Selection {
                 this._changeTranspose.append(new ChangeTranspose(this._doc, channelIndex, pattern, upward, this._doc.prefs.notesOutsideScale, octave));
 			}
         }
+
+        // TODO: update to support transposing in mod channels, treating upward as upward + octave and octave as 0
 
         this._doc.record(this._changeTranspose, canReplaceLastChange);
     }
@@ -1189,14 +1219,14 @@ export class Selection {
         let channelSectionMin: number = 0;
         let channelSectionMax: number = 0;
         for (const nextBoundary of possibleSectionBoundaries) {
-            if ((this.boxSelectionChannel < nextBoundary && offset < 0) || (this.boxSelectionChannel + this.boxSelectionHeight <= nextBoundary)) {
+            if ((this.trackSelectionChannel < nextBoundary && offset < 0) || (this.trackSelectionChannel + this.trackSelectionHeight <= nextBoundary)) {
                 channelSectionMax = nextBoundary - 1;
                 break;
             }
             channelSectionMin = nextBoundary;
         }
-        const newSelectionMin: number = Math.max(this.boxSelectionChannel, channelSectionMin);
-        const newSelectionMax: number = Math.min(this.boxSelectionChannel + this.boxSelectionHeight - 1, channelSectionMax);
+        const newSelectionMin: number = Math.max(this.trackSelectionChannel, channelSectionMin);
+        const newSelectionMax: number = Math.min(this.trackSelectionChannel + this.trackSelectionHeight - 1, channelSectionMax);
         offset = Math.max(offset, channelSectionMin - newSelectionMin);
         offset = Math.min(offset, channelSectionMax - newSelectionMax);
 
@@ -1231,8 +1261,8 @@ export class Selection {
                     if (instruments.length == 0) instruments[0] = 0;
                 }
 
-                if (this.boxSelectionActive) {
-                    this._changeInstrument.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+                if (this.trackSelectionActive) {
+                    this._changeInstrument.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
                 }
                 for (const channelIndex of this._eachSelectedChannel()) {
                     for (const pattern of this._eachSelectedPattern(channelIndex)) {
@@ -1248,8 +1278,8 @@ export class Selection {
             this._changeInstrument.append(new ChangeViewInstrument(this._doc, instrument));
 
             if (!(this._doc.song.layeredInstruments && this._doc.channel < this._doc.song.pitchChannelCount + this._doc.song.noiseChannelCount) && this._doc.song.patternInstruments) {
-                if (this.boxSelectionActive) {
-                    this._changeInstrument.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.boxSelectionBar, this.boxSelectionWidth, this.boxSelectionChannel, this.boxSelectionHeight));
+                if (this.trackSelectionActive) {
+                    this._changeInstrument.append(new ChangeDuplicateSelectedReusedPatterns(this._doc, this.trackSelectionBar, this.trackSelectionWidth, this.trackSelectionChannel, this.trackSelectionHeight));
                 }
                 const instruments: number[] = [instrument];
                 for (const channelIndex of this._eachSelectedChannel()) {

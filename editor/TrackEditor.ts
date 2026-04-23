@@ -152,7 +152,7 @@ export class TrackEditor {
 	}
 
 	private _whenSelectChanged = (): void => {
-		this._doc.selection.setPattern(this._select.selectedIndex);
+		this._doc.selection.changePatternNumber(this._select.selectedIndex);
 	}
 		
 	private _animatePlayhead = (timestamp: number): void => {
@@ -270,7 +270,7 @@ export class TrackEditor {
 			if (this._doc.channel == this._mouseChannel && this._doc.bar == this._mouseBar) {
 				const up: boolean = ((this._mouseY - Config.barEditorHeight) % ChannelRow.patternHeight) < ChannelRow.patternHeight / 2;
 				const patternCount: number = this._doc.song.patternsPerChannel;
-				this._doc.selection.setPattern((this._doc.song.channels[this._mouseChannel].bars[this._mouseBar] + (up ? 1 : patternCount)) % (patternCount + 1));
+				this._doc.selection.changePatternNumber((this._doc.song.channels[this._mouseChannel].bars[this._mouseBar] + (up ? 1 : patternCount)) % (patternCount + 1));
 			}
 		}
 		this._mousePressed = false;
@@ -464,14 +464,14 @@ export class TrackEditor {
 			
 		this._select.style.display = this._touchMode ? "" : "none";
 		
-		if (this._doc.selection.boxSelectionActive) {
+		if (this._doc.selection.trackSelectionActive) {
 			// TODO: This causes the selection rectangle to repaint every time the
 			// editor renders and the selection is visible. Check if anything changed
 			// before overwriting the attributes?
-			this._selectionRect.setAttribute("x", String(this._barWidth * this._doc.selection.boxSelectionBar + 1));
-			this._selectionRect.setAttribute("y", String(Config.barEditorHeight + ChannelRow.patternHeight * this._doc.selection.boxSelectionChannel + 1));
-			this._selectionRect.setAttribute("width", String(this._barWidth * this._doc.selection.boxSelectionWidth - 2));
-			this._selectionRect.setAttribute("height", String(ChannelRow.patternHeight * this._doc.selection.boxSelectionHeight - 2));
+			this._selectionRect.setAttribute("x", String(this._barWidth * this._doc.selection.trackSelectionBar + 1));
+			this._selectionRect.setAttribute("y", String(Config.barEditorHeight + ChannelRow.patternHeight * this._doc.selection.trackSelectionChannel + 1));
+			this._selectionRect.setAttribute("width", String(this._barWidth * this._doc.selection.trackSelectionWidth - 2));
+			this._selectionRect.setAttribute("height", String(ChannelRow.patternHeight * this._doc.selection.trackSelectionHeight - 2));
 			this._selectionRect.setAttribute("visibility", "visible");
 		} else {
 			this._selectionRect.setAttribute("visibility", "hidden");

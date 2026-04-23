@@ -2244,7 +2244,7 @@ export class SongEditor {
     public whenUpdated = (): void => {
         if (this._shortcutHandler) { // whenUpdated is called async so this can be undefined sometimes
             this._shortcutHandler.setContext(CommandContext.PatternSelection, this._doc.selection.patternSelectionActive);
-            this._shortcutHandler.setContext(CommandContext.ChannelSelection, this._doc.selection.boxSelectionActive);
+            this._shortcutHandler.setContext(CommandContext.ChannelSelection, this._doc.selection.trackSelectionActive);
             this._shortcutHandler.setContext(CommandContext.ModulationChannelActive, this._doc.song.getChannelIsMod(this._doc.channel));
         }
 
@@ -4061,7 +4061,7 @@ export class SongEditor {
                 this._doc.synth.loopBarStart = -1;
                 this._doc.synth.loopBarEnd = -1;
                 this._loopEditor.setLoopAt(this._doc.synth.loopBarStart, this._doc.synth.loopBarEnd);
-                const width = this._doc.selection.boxSelectionWidth;
+                const width = this._doc.selection.trackSelectionWidth;
                 this._doc.bar -= width; // TODO: remove?
                 this._doc.selection.trackX0 -= width;
                 this._doc.selection.trackX1 -= width;

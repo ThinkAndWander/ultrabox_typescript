@@ -362,24 +362,24 @@ export class EuclideanRhythmPrompt implements Prompt {
 			generateFadingNotes: false,
 		}];
 
-		if (this._doc.selection.boxSelectionActive) {
+		if (this._doc.selection.trackSelectionActive) {
 			// If a selection is active, set up some default sequences, one per
 			// selected channel.
-			this._startBar = this._doc.selection.boxSelectionBar;
+			this._startBar = this._doc.selection.trackSelectionBar;
 			this._barPreviewBarIndex = this._startBar;
 
-			this._barAmount = Math.max(1, Math.min(this._barsAvailable, this._doc.selection.boxSelectionWidth));
+			this._barAmount = Math.max(1, Math.min(this._barsAvailable, this._doc.selection.trackSelectionWidth));
 
-			this._sequences[0].channel = Math.max(0, Math.min(this._maxChannel, this._doc.selection.boxSelectionChannel));
+			this._sequences[0].channel = Math.max(0, Math.min(this._maxChannel, this._doc.selection.trackSelectionChannel));
 
-			for (let i: number = 1; i < this._doc.selection.boxSelectionHeight; i++) {
+			for (let i: number = 1; i < this._doc.selection.trackSelectionHeight; i++) {
 				this._sequences.push({
 					steps: defaultSteps,
 					pulses: defaultPulses,
 					rotation: 0,
 					stepSizeNumerator: 1,
 					stepSizeDenominator: 4,
-					channel: Math.max(0, Math.min(this._maxChannel, this._doc.selection.boxSelectionChannel + i)),
+					channel: Math.max(0, Math.min(this._maxChannel, this._doc.selection.trackSelectionChannel + i)),
 					pitch: 0,
 					invert: false,
 					generateFadingNotes: false,

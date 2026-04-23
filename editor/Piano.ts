@@ -104,9 +104,8 @@ export class Piano {
 				let x0 = this._doc.selection.patternX0;
 				let x1 = !this._doc.selection.patternSelectionActive ? this._doc.song.partsPerPattern : this._doc.selection.patternX1;
 
-				// Toggle selection if it's an exact match.
-				if (this._doc.selection.patternX0 === 0 &&
-					this._doc.selection.patternX1 === this._doc.song.partsPerPattern &&
+				// Toggle selection if it's a match.
+				if (this._doc.selection.patternX1 === x1 &&
 					y0 === this._doc.selection.patternY0 &&
 					y1 === this._doc.selection.patternY1)
 				{

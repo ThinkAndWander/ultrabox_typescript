@@ -496,10 +496,7 @@ export class ChangeStepAcross extends ChangeSequence {
         let isModChannel = doc.song.getChannelIsMod(channelIndex);
 
         if (isModChannel) {
-            const modTrack = pitchIndex ? Config.modCount - pitchIndex - 1 : 0;
-            let mod = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modulators[modTrack];
-            minVolume = Config.modulators[mod].convertRealFactor;
-            maxVolume = minVolume + doc.song.getVolumeCapForSetting(true, mod, doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].modFilterTypes[modTrack]);
+            [minVolume, maxVolume] = doc.getModVolumeLimits(doc.channel, pitchIndex !== undefined ? Config.modCount - pitchIndex - 1 : 0);
         }
         let volRange = maxVolume - minVolume;
 
@@ -1516,7 +1513,7 @@ export class ChangeWrapAcross extends ChangeSequence {
     }
 }
 
-/** Returns the pitches of the lowest and highest point among all notes in the given range. Incompatible with mod channels. */
+/** Returns the pitches of the lowest and highest point among all notes in the given range. */
 export function getVerticalBounds(notes: Note[], x1: number, x2: number) {
     let absoluteMax = 0;
     let absoluteMin = Number.MAX_SAFE_INTEGER;

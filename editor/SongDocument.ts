@@ -327,12 +327,12 @@ export class SongDocument {
 		// I'm allowing the doc.bar to drift outside the box selection while playing
 		// because it may auto-follow the playhead outside the selection but it would
 		// be annoying to lose your selection just because the song is playing.
-		if ((!this.synth.playing && (this.bar < this.selection.boxSelectionBar || this.selection.boxSelectionBar + this.selection.boxSelectionWidth <= this.bar)) ||
-			this.channel < this.selection.boxSelectionChannel ||
-			this.selection.boxSelectionChannel + this.selection.boxSelectionHeight <= this.channel ||
-			this.song.barCount < this.selection.boxSelectionBar + this.selection.boxSelectionWidth ||
-			channelCount < this.selection.boxSelectionChannel + this.selection.boxSelectionHeight ||
-			(this.selection.boxSelectionWidth == 1 && this.selection.boxSelectionHeight == 1)) {
+		if ((!this.synth.playing && (this.bar < this.selection.trackSelectionBar || this.selection.trackSelectionBar + this.selection.trackSelectionWidth <= this.bar)) ||
+			this.channel < this.selection.trackSelectionChannel ||
+			this.selection.trackSelectionChannel + this.selection.trackSelectionHeight <= this.channel ||
+			this.song.barCount < this.selection.trackSelectionBar + this.selection.trackSelectionWidth ||
+			channelCount < this.selection.trackSelectionChannel + this.selection.trackSelectionHeight ||
+			(this.selection.trackSelectionWidth == 1 && this.selection.trackSelectionHeight == 1)) {
 			this.selection.resetBoxSelection();
 		}
 
@@ -441,6 +441,12 @@ export class SongDocument {
 		
 	private _calcVolume(): number {
 		return Math.min(1.0, Math.pow(this.prefs.volume / 50.0, 0.5)) * Math.pow(2.0, (this.prefs.volume - 75.0) / 25.0);
+	}
+
+	public getModVolumeLimits(channelIndex: number, modulatorIndex: number): [number, number] {
+		const mod = this.song.channels[channelIndex].instruments[this.viewedInstrument[channelIndex]].modulators[modulatorIndex];
+		const min = Config.modulators[mod].convertRealFactor;
+		return [min, min + this.song.getVolumeCapForSetting(true, mod, this.song.channels[channelIndex].instruments[this.getCurrentInstrument()].modFilterTypes[modulatorIndex])];
 	}
 		
 	public getCurrentPattern(barOffset: number = 0): Pattern | null {
